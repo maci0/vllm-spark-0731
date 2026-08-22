@@ -66,6 +66,11 @@ RUN set -eux; \
       cp -r /tmp/vllm-*.dist-info "${SITE}/"; \
     fi; \
     rm -rf /tmp/vllm-rc2 /tmp/vllm-so /tmp/vllm-*.dist-info; \
+    # Provide version module (source overlay has no _version.py from build) \
+    printf '__version__ = "%s"\n__version_tuple__ = (%s)\n' \
+      "${VLLM_RELEASE#v}" \
+      "$(echo "${VLLM_RELEASE#v}" | sed 's/[^0-9.].*//; s/\./, /g')" \
+      > "${SITE}/vllm/_version.py"; \
     # Clear stale bytecode \
     find "${SITE}/vllm" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true; \
     python3 -m compileall -q "${SITE}/vllm" || true; \
