@@ -1,0 +1,28 @@
+diff --git a/vllm/utils/b12x.py b/vllm/utils/b12x.py
+--- a/vllm/utils/b12x.py
++++ b/vllm/utils/b12x.py
+@@ -5,8 +5,9 @@
+ import functools
+ import importlib
+ import importlib.util
+-from collections.abc import Iterable
+-from dataclasses import fields, is_dataclass
++from collections.abc import Callable, Hashable, Iterable
++from dataclasses import dataclass, fields, is_dataclass
+ from types import ModuleType
+ from typing import Any
+ 
+ import torch
+ 
+ 
++@dataclass(frozen=True)
++class B12xWarmupUnit:
++    name: str
++    key: Hashable
++    compile: Callable[[], None]
++
++
+ @functools.cache
+ def has_b12x() -> bool:
+     """Return whether the B12X package is installed."""
+     return importlib.util.find_spec("b12x") is not None
