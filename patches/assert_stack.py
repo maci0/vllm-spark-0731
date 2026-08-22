@@ -11,7 +11,7 @@ DSPARK_K = 5
 ALLOWED_KV = ("fp8_ds_mla", "nvfp4_ds_mla")
 ALLOWED_MOE = ("b12x", "flashinfer_b12x")
 EUGR_ATTN = "B12X_MLA_SPARSE"
-SM120_ATTN = "FLASHINFER_MLA_SPARSE_SM120"
+SM120_ATTN = "FLASHINFER_MLA_SPARSE_DSV4"
 
 
 def check(
