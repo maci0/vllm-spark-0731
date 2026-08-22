@@ -548,6 +548,95 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
     )
 
 
+def patch_fp8_einsum_fallback(vllm: Path) -> None:
+    path = vllm / "utils/deep_gemm.py"
+    replace_once(
+        path,
+        "def fp8_einsum(*args, **kwargs):\n"
+        "    _lazy_init()\n"
+        "    if _fp8_einsum_impl is None:\n"
+        "        return _missing(*args, **kwargs)\n"
+        "    return _fp8_einsum_impl(*args, **kwargs)\n",
+        "def fp8_einsum(subscripts, a_and_scale, b_and_scale, out, recipe=(1, 128, 128)):\n"
+        "    if not is_deep_gemm_supported():\n"
+        "        a_fp8, a_scale = a_and_scale\n"
+        "        w_fp8, w_scale = b_and_scale\n"
+        "        a_scale_f32 = a_scale.to(torch.float32)\n"
+        "        if a_scale_f32.shape[-1] != a_fp8.shape[-1]:\n"
+        "            a_scale_f32 = a_scale_f32.repeat_interleave(a_fp8.shape[-1] // a_scale_f32.shape[-1], dim=-1)\n"
+        "        if a_scale_f32.dim() >= 2 and a_fp8.dim() >= 2 and a_scale_f32.shape[-2] != a_fp8.shape[-2]:\n"
+        "            a_scale_f32 = a_scale_f32.repeat_interleave(a_fp8.shape[-2] // a_scale_f32.shape[-2], dim=-2)\n"
+        "        a_dq = a_fp8.to(out.dtype) * a_scale_f32.to(out.dtype)\n"
+        "        w_scale_f32 = w_scale.to(torch.float32)\n"
+        "        if w_scale_f32.shape[-1] != w_fp8.shape[-1]:\n"
+        "            w_scale_f32 = w_scale_f32.repeat_interleave(w_fp8.shape[-1] // w_scale_f32.shape[-1], dim=-1)\n"
+        "        if w_scale_f32.dim() >= 2 and w_fp8.dim() >= 2 and w_scale_f32.shape[-2] != w_fp8.shape[-2]:\n"
+        "            w_scale_f32 = w_scale_f32.repeat_interleave(w_fp8.shape[-2] // w_scale_f32.shape[-2], dim=-2)\n"
+        "        w_dq = w_fp8.to(out.dtype) * w_scale_f32.to(out.dtype)\n"
+        "        b, h, r = a_dq.shape\n"
+        "        if w_dq.dim() == 2 and out.dim() == 3 and w_dq.shape[0] == h * out.shape[2]:\n"
+        "            w_dq = w_dq.view(h, out.shape[2], w_dq.shape[1])\n"
+        "        elif w_dq.dim() == 2 and w_dq.shape[1] == h * r:\n"
+        "            w_dq = w_dq.view(w_dq.shape[0], h, r)\n"
+        "        res = torch.einsum(subscripts, a_dq, w_dq)\n"
+        "        out.copy_(res)\n"
+        "        return out\n"
+        "    _lazy_init()\n"
+        "    if _fp8_einsum_impl is None:\n"
+        "        return _missing(subscripts, a_and_scale, b_and_scale, out, recipe)\n"
+        "    return _fp8_einsum_impl(subscripts, a_and_scale, b_and_scale, out, recipe)\n",
+        "fp8_einsum SM12x dequant fallback",
+    )
+
+
+def patch_mxfp4_process_weights(vllm: Path) -> None:
+    path = vllm / "model_executor/layers/fused_moe/oracle/mxfp4.py"
+    replace_once(
+        path,
+        "    routing_tables: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None,\n"
+        ") -> mk.FusedMoEKernel:\n",
+        "    routing_tables: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | None = None,\n"
+        "    layer: \"torch.nn.Module | None\" = None,\n"
+        ") -> mk.FusedMoEKernel:\n",
+        "make_mxfp4_moe_kernel +layer param",
+    )
+    replace_once(
+        path,
+        "    else:\n"
+        "        experts = experts_cls(\n"
+        "            moe_config=moe_config,\n"
+        "            quant_config=moe_quant_config,\n"
+        "        )\n"
+        "\n"
+        "    kernel = mk.FusedMoEKernel(\n",
+        "    else:\n"
+        "        experts = experts_cls(\n"
+        "            moe_config=moe_config,\n"
+        "            quant_config=moe_quant_config,\n"
+        "        )\n"
+        "\n"
+        "    if layer is not None and hasattr(experts, \"process_weights_after_loading\"):\n"
+        "        experts.process_weights_after_loading(layer)\n"
+        "\n"
+        "    kernel = mk.FusedMoEKernel(\n",
+        "make_mxfp4_moe_kernel process_weights_after_loading",
+    )
+    caller = vllm / "model_executor/layers/quantization/mxfp4.py"
+    replace_once(
+        caller,
+        "                routing_tables=layer._expert_routing_tables(),\n"
+        "            )\n"
+        "\n"
+        "    def process_weights_after_loading(self, layer):\n",
+        "                routing_tables=layer._expert_routing_tables(),\n"
+        "                layer=layer,\n"
+        "            )\n"
+        "\n"
+        "    def process_weights_after_loading(self, layer):\n",
+        "Mxfp4MoEMethod pass layer to kernel factory",
+    )
+
+
 def apply(vllm: Path) -> None:
     copy_new_modules(vllm)
     patch_moe_backend(vllm)
@@ -556,6 +645,8 @@ def apply(vllm: Path) -> None:
     patch_mxfp4_oracle(vllm)
     patch_mhc(vllm)
     patch_nvfp4_ds_mla(vllm)
+    patch_fp8_einsum_fallback(vllm)
+    patch_mxfp4_process_weights(vllm)
     print(f"overlays applied under {vllm}")
 
 

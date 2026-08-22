@@ -20,6 +20,7 @@ def main() -> int:
     from vllm.model_executor.layers.fused_moe.oracle import mxfp4 as mx
     from vllm.model_executor.kernels.mhc import tilelang as mhc
     from vllm.config.vllm import VllmConfig
+    from vllm.utils.deep_gemm import is_deep_gemm_supported, fp8_einsum
 
     opts = getattr(CacheDType, "__args__", ())
     assert "fp8_ds_mla" in opts, opts
@@ -32,8 +33,6 @@ def main() -> int:
     assert a._dsv4_page_alignment("fp8_ds_mla") == 576
     assert a._dsv4_page_alignment("auto") == 512
 
-    # Indexer must keep upstream alignment. Widening it to 584 looks
-    # plausible and then dies in FlashInfer after a full load.
     idx_src = inspect.getsource(a.DeepseekV4IndexerCache.get_kv_cache_spec)
     assert "_dsv4_page_alignment" not in idx_src
     assert "nvfp4_ds_mla" not in idx_src
@@ -47,7 +46,10 @@ def main() -> int:
     assert sparse_swa.DeepseekSparseSWABackend.get_kv_cache_shape(
         1, 64, 1, 512, cache_dtype_str="fp8_ds_mla"
     ) == (1, 64, 584)
-    assert sparse_mla.DeepseekV4SparseMLABackend.get_kv_cache_shape(
+    backend_cls = getattr(sparse_mla, "DeepseekV4SparseMLABackend",
+                          getattr(sparse_mla, "DeepseekV4FlashMLABackend", None))
+    assert backend_cls is not None, "sparse_mla backend class not found"
+    assert backend_cls.get_kv_cache_shape(
         1, 256, 1, 512, cache_dtype_str="nvfp4_ds_mla"
     ) == (1, 256, 584)
 
@@ -75,9 +77,20 @@ def main() -> int:
 
     from vllm.model_executor.layers.fused_moe.b12x import B12xExperts  # noqa: F401
 
+    # SM12x guards
+    dg_src = inspect.getsource(is_deep_gemm_supported)
+    assert "is_device_capability_family(120)" in dg_src, "missing SM12x guard in is_deep_gemm_supported"
+    einsum_src = inspect.getsource(fp8_einsum)
+    assert "is_deep_gemm_supported" in einsum_src, "fp8_einsum missing SM12x fallback"
+
+    mkk_src = inspect.getsource(mx.make_mxfp4_moe_kernel)
+    assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"
+    assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
+
     print(
         "image OK: b12x importable, moe/linear b12x, "
-        "fp8_ds_mla + nvfp4_ds_mla, 584B DSV4 page, mHC TileLang guard"
+        "fp8_ds_mla + nvfp4_ds_mla, 584B DSV4 page, "
+        "mHC TileLang guard, SM12x kernel guards"
     )
     return 0
 

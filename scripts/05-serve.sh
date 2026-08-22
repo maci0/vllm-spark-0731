@@ -40,6 +40,14 @@ python3 "${ROOT}/patches/assert_stack.py" \
 HOST_MODEL="${HOST_MODEL_DIR:-${HOME}/models/ds4-flash-0731}"
 python3 "${ROOT}/patches/assert_0731.py" "${HOST_MODEL}"
 
+BLOBS_DIR="$(dirname "$(dirname "${HOST_MODEL}")")/blobs"
+BLOBS_ARG=()
+if [[ -d "${BLOBS_DIR}" ]]; then
+  BLOBS_ARG+=(-v "${BLOBS_DIR}:/blobs:ro")
+elif [[ -d "${HOME}/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4-Flash-0731/blobs" ]]; then
+  BLOBS_ARG+=(-v "${HOME}/.cache/huggingface/hub/models--deepseek-ai--DeepSeek-V4-Flash-0731/blobs:/blobs:ro")
+fi
+
 SPEC_JSON="$(python3 -c 'import json,sys; print(json.dumps({"method":sys.argv[1],"num_speculative_tokens":int(sys.argv[2]),"draft_sample_method":sys.argv[3]}))' \
   "${SPEC_METHOD}" "${NUM_SPECULATIVE_TOKENS}" "${DRAFT_SAMPLE_METHOD}")"
 
@@ -97,8 +105,9 @@ docker run --rm --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host 
   -e VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="${VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS}" \
   -e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
   -v "${HOST_MODEL}:${MODEL_DIR}:ro" \
+  "${BLOBS_ARG[@]}" \
   "${IMAGE}" \
-  vllm serve "${MODEL_DIR}" \
+  "${MODEL_DIR}" \
     --host 0.0.0.0 \
     --port "${SERVE_PORT}" \
     --tensor-parallel-size "${TP_SIZE}" \

@@ -1,192 +1,121 @@
-# Handoff: vllm-spark-0731
+# Handoff: 2-Node vLLM for DeepSeek-V4-Flash-0731 on DGX Spark (GB10)
 
-Last updated: 2026-08-22.
-Repo: https://github.com/maci0/vllm-spark-0731
-Local: `/home/maci/Desktop/trt-llm-ds4/vllm-spark-0731` (nested git, not the parent TRT-LLM tree).
+## Overview
 
-Read this, then [README.md](README.md). Field measurements live in
-[maci0/dgx-spark-deepseek-v4-flash-0731](https://github.com/maci0/dgx-spark-deepseek-v4-flash-0731)
-(`GOLDEN.md`). Failed envelope work lives in
-[maci0/vllm-spark-nvfp4](https://github.com/maci0/vllm-spark-nvfp4).
+Deploy `deepseek-ai/DeepSeek-V4-Flash-0731` across 2x DGX Spark nodes using
+vLLM v0.28.0rc2 (installed from source onto v0.27.1 base) + b12x==1.2.6.
+fp8_ds_mla KV cache, DSpark k=5 speculative decoding, TP=2 over RoCE.
+
+**Why v0.27.1 base**: v0.28.0rc2 has no arm64 Docker image on Docker Hub.
+v0.27.1 is the latest arm64 release. We uninstall v0.27.1 Python code and
+install rc2 from source; the base provides PyTorch 2.13, CUDA 13.0, system libs.
+Build-time overlays add b12x MoE integration, fp8_einsum SM12x fallback,
+mHC TileLang guard, and nvfp4_ds_mla 584-byte page support.
+
+---
+
+## Cluster
+
+| Node | IP (fabric) | IP (mgmt) | Role |
+|------|-------------|-----------|------|
+| spark1 | 10.0.1.1 | 192.168.0.211 | head (rank 0) |
+| spark2 | 10.0.1.2 | 192.168.0.212 | worker (rank 1) |
+
+- **GPU**: NVIDIA GB10, SM12x (capability 12.1, family 120), 128 GiB UMA per node
+- **Fabric**: ConnectX-7 RoCE, `enp1s0f1np1`, NCCL IB GID 3
+- **Model**: 155.43 GiB safetensors, `/models/ds4-flash-0731`
+
+---
+
+## Docker Image
+
+- **Tag**: `vllm-spark-0731:v0.28.0rc2-b12x`
+- **Base**: `vllm/vllm-openai:v0.27.1` (arm64)
+- **vLLM**: v0.28.0rc2 installed from source (replaces v0.27.1 Python code)
+- **Added**: `b12x==1.2.6` via uv
+- **Overlays**: `patches/apply_overlays.py` (build-time string-replace patches)
+- **Asserts**: `patches/assert_image.py` (build-time source-level checks)
+
+All patches are baked into the image at build time. No runtime volume mounts needed.
+
+---
+
+## SM12x kernel guards
+
+DeepGEMM and CUTLASS block-FP8 kernels target SM100+. On SM12x they crash.
+
+| Guard | File | Effect |
+|-------|------|--------|
+| `is_deep_gemm_supported()` | `utils/deep_gemm.py` | Returns False on family 120 |
+| `fp8_einsum` fallback | `utils/deep_gemm.py` | Dequant FP8 to bf16 + torch.einsum |
+| `cutlass_block_fp8_supported()` | `w8a8_utils.py` | Returns False on family 120 |
+| `compute_fp8_einsum_recipe` | `o_proj.py` | Returns ((1,128,128), False) on family 120 |
+| Triton e8m0fnu canonicalization | `torch_utils.py` | Maps e8m0fnu to u8 |
+| `VLLM_USE_DEEP_GEMM_E8M0=0` | Dockerfile env | Disables E8M0 at env level |
+
+---
+
+## Memory settings
+
+128 GiB UMA per node. Model weights ~77.7 GiB/rank. b12x weight prep adds overhead.
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| GPU_MEMORY_UTILIZATION | 0.80 | 102.4 GiB budget. 0.62 gave -6.9 GiB for KV cache |
+| MAX_MODEL_LEN | 65536 | |
+| MAX_NUM_SEQS | 2 | Conservative for initial bring-up |
+| MAX_NUM_BATCHED_TOKENS | 2048 | |
+| MAX_CUDAGRAPH_CAPTURE_SIZE | 36 | |
+
+---
+
+## Operating the cluster
+
+### Stop (cleans shm, prompts for fs cache drop)
+```bash
+ssh spark1 "cd ~/Desktop/trt-llm-ds4/vllm-spark-0731 && bash scripts/07-stop.sh"
+ssh spark2 "cd ~/Desktop/trt-llm-ds4/vllm-spark-0731 && bash scripts/07-stop.sh"
+# Optional: sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' on each node
+```
+
+### Launch (worker first, then head)
+```bash
+ssh spark2 "cd ~/Desktop/trt-llm-ds4/vllm-spark-0731 && nohup bash scripts/05-serve.sh fp8 > ~/vllm_worker.log 2>&1 &"
+# Wait for worker to reach distributed_init, then:
+ssh spark1 "cd ~/Desktop/trt-llm-ds4/vllm-spark-0731 && nohup bash scripts/05-serve.sh fp8 > ~/vllm_head.log 2>&1 &"
+```
+
+`nodes.env` auto-sets `VLLM_HOST_IP` and `NODE_RANK` from hostname.
+
+### Check logs
+```bash
+ssh spark1 "tail -20 ~/vllm_head.log"
+ssh spark2 "tail -20 ~/vllm_worker.log"
+```
+
+---
 
 ## Status
 
-**Paper recipe, not a measured serve.** The 0.28 image has never been built on
-GB10. Dual-Spark mp flags were wired after the first push. Next owner starts at
-step 1 below, on a Spark, not on a laptop.
+- [x] SM12x kernel guards (DeepGEMM, CUTLASS block-FP8, Triton e8m0)
+- [x] fp8_einsum SM12x fallback (baked into overlay)
+- [x] b12x MoE weight preparation (baked into overlay)
+- [x] nodes.env auto-detects hostname for NODE_RANK/VLLM_HOST_IP
+- [x] Stop script cleans shm
+- [ ] Build image with rc2 from source + overlays
+- [ ] fp8_ds_mla serve at GPU_MEMORY_UTILIZATION=0.80
+- [ ] Validate with scripts/06-validate.sh
+- [ ] Push memory utilization higher, document KV cache token counts
+- [ ] Test nvfp4_ds_mla mode
+- [ ] Benchmark (tok/s, B/token)
 
-| Goal | State |
-|---|---|
-| Pin `deepseek-ai/DeepSeek-V4-Flash-0731` | done (`assert_0731.py`) |
-| Dockerfile FROM `v0.28.0rc2` + `b12x==1.2.6` via uv | written, unbuilt |
-| `--linear-backend b12x --moe-backend b12x` | overlay written (#52016 in rc2, #52018 cherry-pick) |
-| `--kv-cache-dtype fp8_ds_mla` | stock rc2 + DSpark k=5 locked |
-| `--kv-cache-dtype nvfp4_ds_mla` | Python 584 B DSV4 page only. No CUDA writer. |
-| DSpark `method=dspark` k=5 | locked in pins and `assert_stack.py` |
-| 2-node RoCE serve | `--master-addr`, `--headless`, privileged IB. Untested. |
-| GHCR image | not published |
+---
 
-HEAD on `main` after the serve-flag commit. Confirm with `git log -1 --oneline`.
+## Key learnings
 
-## What the image is supposed to be
-
-```
-vllm/vllm-openai:v0.28.0rc2     # 74a6576, 2026-08-21 06:47 UTC. Need linux/arm64.
-+ uv pip install b12x==1.2.6
-+ patches/apply_overlays.py
-    #52018 fused_moe/b12x.py + mxfp4 oracle + MoEBackend "b12x"
-    B12xWarmupUnit + get_b12x_fused_moe
-    #50645 mhc_pre_broadcast_tilelang DeepGEMM guard
-    nvfp4_ds_mla CacheDType, 584/576/512 page ladder, indexer untouched
-    MLA guard narrowed from startswith("nvfp4") to == "nvfp4"
-+ patches/assert_image.py          # build dies if the dtype is a silent alias
-```
-
-Serve default: `./scripts/05-serve.sh fp8`
-Same image, NVFP4 name: `./scripts/05-serve.sh nvfp4`
-
-`--moe-backend b12x` is the MXFP4 expert path. `flashinfer_b12x` is a different
-CuteDSL NVFP4-weight path. Do not swap them because the name looks similar.
-
-## Do not do
-
-- Mix `B12X_MLA_SPARSE` with `nvfp4_ds_mla`. That is the 432-vs-584 eugr overlay.
-- Drop `maci0/vllm-spark-nvfp4` `eugr-nvfp4.patch` or the 191-line 0.27.1 envelope
-  onto 0.28.
-- Widen `DeepseekV4IndexerCache` to 584. FlashInfer then dies after a full load.
-- Serve without DSpark, or with k other than 5. 0731 `n_predict=5`; 7 rejects, 10 crashes.
-- `docker rm -f` alone. Always `./scripts/07-stop.sh` (`pkill -9 -f 'VLLM::'`).
-- SSD KV offload. Illegal memory access on this model, every dtype.
-- Preview checkpoint `DeepSeek-V4-Flash` (no `-0731`).
-- Trust a green `assert_image.py` as "NVFP4 is real". It only proves the **name**
-  and the **584 B page**. Packing is a CUDA writer.
-
-## Next steps (do these in order)
-
-### 1. Confirm linger and a quiet box
-
-On **both** Sparks:
-
-```
-loginctl show-user "$USER" | grep Linger    # must be yes
-# if not: loginctl enable-linger "$USER"
-```
-
-Stop other GPU tenants (`llama-server`, gpustack, leftover `VLLM::`). Clock cap
-2200 MHz is already the production default on these boxes; leave it.
-
-### 2. Arm64 base tag
-
-```
-docker manifest inspect vllm/vllm-openai:v0.28.0rc2 | grep -E 'architecture|variant'
-```
-
-Need `arm64`. If the tag is amd64-only, change `VLLM_RELEASE` in `configs/pin.env`
-and the Dockerfile `FROM` to the aarch64 nightly (or NGC Spark vLLM) and record
-the digest in this file. Do not build amd64 and expect it to run on GB10.
-
-### 3. Build on one Spark
-
-```
-cd /home/maci/Desktop/trt-llm-ds4/vllm-spark-0731
-./scripts/00-prereq.sh
-./scripts/02-build-image.sh
-```
-
-If `apply_overlays.py` exits "missing needle" or "not unique", rc2 drifted.
-Fix the needle in `patches/apply_overlays.py` against the installed
-`python3 -c 'import vllm,os; print(os.path.dirname(vllm.__file__))'` tree.
-`patches/v0.28/*.diff` are provenance; the applicator is what the Dockerfile runs.
-
-If `uv pip install b12x==1.2.6` fails, check PyPI has an aarch64 wheel. Do not pip.
-
-### 4. Serve fp8 + DSpark on 2 nodes (the real test)
-
-Checkpoint: `~/models/ds4-flash-0731` (or `./scripts/01-download-0731.sh`).
-Must pass `patches/assert_0731.py` (`dspark_block_size=5`).
-
-`configs/nodes.env` from `nodes.env.example`. QSFP fabric IPs, not LAN.
-
-**Worker first, then head:**
-
-```
-# spark2
-NODE_RANK=1 VLLM_HOST_IP=<worker fabric> HEAD_IP=<head fabric> ./scripts/05-serve.sh fp8
-
-# spark1
-NODE_RANK=0 VLLM_HOST_IP=<head fabric> HEAD_IP=<head fabric> ./scripts/05-serve.sh fp8
-```
-
-Pass criteria (log + `./scripts/06-validate.sh`):
-
-- `method=dspark` / spec k=5
-- `--moe-backend b12x` actually selected (`B12X_MXFP4_*`, not "not supported for MXFP4 MoE")
-- mHC does not die in `tf32_hc_prenorm_gemm` / `hyperconnection.hpp`
-- `GPU KV cache size: N tokens` and a short completion returns
-- Dist init is not stuck on 1/2 clients (if it is: linger, leftover `VLLM::`, wrong `HEAD_IP`)
-
-Record: image id, KV tokens, B/token, c1 and c6 tok/s on the existing `c5.py` harness.
-
-If this step fails, stop. Do not debug nvfp4 on a stack that cannot serve fp8.
-
-### 5. Same image, nvfp4 flag
-
-```
-./scripts/07-stop.sh    # both nodes
-# then worker, then head:
-./scripts/05-serve.sh nvfp4
-```
-
-Pass criteria:
-
-- log: `Using DeepSeek V4 padded nvfp4_ds_mla KV cache format`
-- no `Expected packed SM120 DSV4 swa_kv_cache head dim 584, got 512`
-- no GLM 432 page-size assert
-- **B/token vs the fp8 run from step 4.** If it is ~11k (fp8 was 11,317 on eugr),
-  the flag is an envelope. If it is ~7.6k (anemll GOLDEN), a writer is present
-  in this FlashInfer. Write the number in GOLDEN.md / here. Do not claim NVFP4
-  from the log line alone.
-
-### 6. Only if step 5 is envelope (expected)
-
-Do **not** invent a 416 B layout. Options, pick one:
-
-1. Stay on `fp8_ds_mla` + b12x + DSpark (this image) for the 0.28 path.
-2. Keep serving GOLDEN anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1`
-   (`./scripts/02-pull-image.sh golden`) when you need the 2.00M token pool.
-3. Port the anemll DSV4 writer (17 sites under `models/deepseek_v4/`) onto this
-   0.28 tree. That is a CUDA/FlashInfer job, not another Python CacheDType patch.
-
-### 7. Optional follow-ups (after a healthy fp8 serve)
-
-- Wire `#52018` MoE warmup units into rc2 `b12x_warmup.py` (file shape differs;
-  first MoE shapes JIT at request time today).
-- Confirm `--compilation-config max_cudagraph_capture_size=36` is accepted on rc2.
-- `LONG_PREFILL_TOKEN_THRESHOLD=1024` is in the pin and not passed to `vllm serve`.
-  Add it if chunked-prefill starves decode at c5/c10 (see GOLDEN / arena notes).
-- Shared-expert 0731 loader (tonyd2wild Patch 4) if 12 tensors drop at load.
-- Publish `ghcr.io/maci0/vllm-spark-0731:v0.28.0rc2-b12x` once step 4 is measured.
-
-## Related pins (do not mix)
-
-| Pin | When to use |
-|---|---|
-| `configs/pin.env` | this 0.28 image, fp8 KV, b12x, DSpark |
-| `configs/pin.nvfp4.env` | same image, nvfp4 **name** |
-| `configs/pin.golden.env` | anemll 0.1.1, measured real NVFP4 |
-| `configs/pin.eugr-b12x.env` | eugr nightly, `B12X_MLA_SPARSE` + fp8 only |
-
-## Cluster gotchas that already cost time
-
-- `Linger=no` + SSH-started worker: systemd deletes POSIX semaphores, head hangs
-  on the next collective, looks like a b12x deadlock. Worker has no `Worker_TP`.
-- Other GPU containers on spark2 (llama.cpp, gpustack) steal UMA and wedge NCCL.
-- Fabric IP must be the QSFP (`enp1s0f0np0` / `enp1s0f1np1`), GID index 3 (RoCE v2).
-- `HEAD_IP` unused used to default `--master-addr 127.0.0.1`. Fixed in 05-serve.
-- Host-owned JIT caches from root docker runs break later uid-mapped containers.
-
-## Done when
-
-Step 4 has a measured fp8 + DSpark + b12x serve on 2x Spark, and step 5 has a
-B/token number next to it. Until both exist, this repo is a patchset, not a
-deployment.
+1. **v0.28.0rc2 arm64 image does not exist** on Docker Hub. v0.27.1 is the latest. We install rc2 from source on the v0.27.1 base.
+2. **rc2 still lacks**: B12xExperts MoE integration, fp8_einsum SM12x fallback, nvfp4_ds_mla support. All patched by `apply_overlays.py`.
+3. **LINEAR_BACKEND must be empty** (auto). b12x linear only covers NVFP4 weight layers, not FP8 attention projections. Auto-select correctly picks TritonFp8BlockScaledMMKernel for linear + B12X_MXFP4_MXFP8 for MoE.
+4. **fp8_einsum SM12x fallback**: rc2 has no fallback (calls `_missing()` which raises RuntimeError). The overlay adds dequant-to-bf16 + torch.einsum with correct weight reshape `[h*d, r] -> [h, d, r]`.
+5. **B12xExperts.process_weights_after_loading** must be called by the MXFP4 kernel factory. rc2 omits this call. The overlay patches both the factory function and `Mxfp4MoEMethod` caller.
+6. **GPU_MEMORY_UTILIZATION=0.62** is too low. Model + b12x prepared weights consume ~86.3 GiB/rank, leaving negative KV cache headroom. Use 0.80+.

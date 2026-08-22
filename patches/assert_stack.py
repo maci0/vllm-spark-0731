@@ -11,6 +11,7 @@ DSPARK_K = 5
 ALLOWED_KV = ("fp8_ds_mla", "nvfp4_ds_mla")
 ALLOWED_MOE = ("b12x", "flashinfer_b12x")
 EUGR_ATTN = "B12X_MLA_SPARSE"
+SM120_ATTN = "FLASHINFER_MLA_SPARSE_SM120"
 
 
 def check(
@@ -59,10 +60,14 @@ def check(
             raise SystemExit("eugr stack is fp8_ds_mla only")
         return "eugr"
 
+    if attn == SM120_ATTN:
+        return "nvfp4" if kv == "nvfp4_ds_mla" else "fp8"
+
     if attn:
         raise SystemExit(
-            f"refusing attention_backend={attn!r} on the 0.28 image. "
-            "Leave it empty (FlashInfer DSV4). B12X_MLA_SPARSE is the eugr stack."
+            f"refusing attention_backend={attn!r}. "
+            f"Use {SM120_ATTN} (SM12x) or leave empty. "
+            f"{EUGR_ATTN} is the eugr stack."
         )
 
     if moe and moe not in ALLOWED_MOE:

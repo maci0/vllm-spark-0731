@@ -10,7 +10,7 @@ TAG="${1:-${IMAGE}}"
 PLATFORM="${DOCKER_PLATFORM:-linux/arm64}"
 
 echo "build ${TAG} from vllm/vllm-openai:${VLLM_RELEASE} platform=${PLATFORM}"
-docker build \
+docker build --no-cache \
   --platform "${PLATFORM}" \
   --build-arg "VLLM_RELEASE=${VLLM_RELEASE}" \
   --build-arg "B12X_VERSION=${B12X_VERSION}" \
