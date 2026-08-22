@@ -3,6 +3,8 @@
 Official **vLLM v0.28.0rc2** + **b12x 1.2.6** kernels + **DSpark k=5** for
 `deepseek-ai/DeepSeek-V4-Flash-0731` on **2x DGX Spark** (GB10, sm_121a).
 
+**Resume from [HANDOFF.md](HANDOFF.md).** The image has not been built on GB10 yet.
+
 One image, two KV dtypes:
 
 | `--kv-cache-dtype` | Kernels | Spec | Notes |
