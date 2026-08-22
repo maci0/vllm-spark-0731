@@ -51,21 +51,9 @@ RUN set -eux; \
     SITE="/usr/local/lib/python3.12/dist-packages"; \
     git clone --depth 1 --branch "${VLLM_RELEASE}" \
       https://github.com/vllm-project/vllm.git /tmp/vllm-rc2; \
-    # Preserve compiled extensions and metadata \
-    mkdir -p /tmp/vllm-so; \
-    find "${SITE}/vllm" -name '*.so' -exec cp --parents -t /tmp/vllm-so {} +; \
-    find "${SITE}" -maxdepth 1 -name 'vllm-*.dist-info' -exec cp -r {} /tmp/ \;; \
-    # Replace Python code with rc2 \
-    rm -rf "${SITE}/vllm"; \
-    cp -r /tmp/vllm-rc2/vllm "${SITE}/vllm"; \
-    # Restore .so extensions \
-    cp -r /tmp/vllm-so/. /; \
-    # Update version in dist-info \
-    if [ -d /tmp/vllm-*.dist-info ]; then \
-      rm -rf "${SITE}"/vllm-*.dist-info; \
-      cp -r /tmp/vllm-*.dist-info "${SITE}/"; \
-    fi; \
-    rm -rf /tmp/vllm-rc2 /tmp/vllm-so /tmp/vllm-*.dist-info; \
+    # Overlay rc2 Python code on top of v0.27.1 (preserves .so, build-generated .py) \
+    cp -r /tmp/vllm-rc2/vllm/* "${SITE}/vllm/"; \
+    rm -rf /tmp/vllm-rc2; \
     # Provide version module (source overlay has no _version.py from build) \
     printf '__version__ = "%s"\n__version_tuple__ = (%s)\n' \
       "${VLLM_RELEASE#v}" \
