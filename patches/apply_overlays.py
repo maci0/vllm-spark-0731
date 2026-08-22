@@ -666,6 +666,42 @@ def patch_mxfp4_process_weights(vllm: Path) -> None:
     )
 
 
+def patch_cutlass_sm12x_guard(vllm: Path) -> None:
+    """Exclude SM12x from CutlassFp8BlockScaledMMKernel.is_supported().
+
+    The v0.27.1 compiled CUTLASS .so doesn't target SM12x. With DeepGEMM
+    already excluded, auto-selection falls through to CUTLASS which crashes
+    with "dispatch_scaled_mm". This guard lets B12xFp8BlockScaledMMKernel
+    (next in priority) get selected instead.
+    """
+    path = vllm / "model_executor/kernels/linear/scaled_mm/cutlass.py"
+    replace_once(
+        path,
+        "    @classmethod\n"
+        "    def is_supported(cls, compute_capability=None):\n"
+        "        if not CUTLASS_BLOCK_FP8_SUPPORTED:\n"
+        "            return (\n"
+        "                False,\n"
+        '                "The device compute capability of"\n'
+        '                f"{compute_capability} is not supported.",\n'
+        "            )\n"
+        "        return True, None\n",
+        "    @classmethod\n"
+        "    def is_supported(cls, compute_capability=None):\n"
+        "        if not CUTLASS_BLOCK_FP8_SUPPORTED:\n"
+        "            return (\n"
+        "                False,\n"
+        '                "The device compute capability of"\n'
+        '                f"{compute_capability} is not supported.",\n'
+        "            )\n"
+        "        from vllm.platforms import current_platform\n"
+        "        if current_platform.is_device_capability_family(120):\n"
+        "            return False, \"CUTLASS FP8 not supported on SM12x\"\n"
+        "        return True, None\n",
+        "CUTLASS FP8 SM12x exclusion",
+    )
+
+
 def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
     """Add (32, 192) to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
 
@@ -713,6 +749,7 @@ def apply(vllm: Path) -> None:
     patch_mhc(vllm)
     patch_nvfp4_ds_mla(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
+    patch_cutlass_sm12x_guard(vllm)
     patch_fp8_einsum_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
     patch_flashinfer_dsv4_dispatch(vllm.parent)

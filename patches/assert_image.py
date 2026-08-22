@@ -84,6 +84,10 @@ def main() -> int:
     einsum_src = inspect.getsource(fp8_einsum)
     assert "is_device_capability_family(120)" in einsum_src, "fp8_einsum missing SM12x fallback"
 
+    from vllm.model_executor.kernels.linear.scaled_mm.cutlass import CutlassFp8BlockScaledMMKernel
+    cutlass_src = inspect.getsource(CutlassFp8BlockScaledMMKernel.is_supported)
+    assert "is_device_capability_family(120)" in cutlass_src, "CUTLASS FP8 missing SM12x exclusion"
+
     mkk_src = inspect.getsource(mx.make_mxfp4_moe_kernel)
     assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"
     assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
