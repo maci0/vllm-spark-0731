@@ -702,6 +702,26 @@ def patch_cutlass_sm12x_guard(vllm: Path) -> None:
     )
 
 
+def patch_indexer_deepgemm_guard(vllm: Path) -> None:
+    """Guard indexer paged MQA logits metadata against SM12x.
+
+    The indexer calls get_paged_mqa_logits_metadata (DeepGEMM C++) gated
+    only on has_deep_gemm() (importable), not is_deep_gemm_supported()
+    (architecture). On SM12x, the compiled .so crashes. The schedule_metadata
+    is not consumed by FlashInfer sparse MLA, so skipping it is safe.
+    """
+    path = vllm / "v1/attention/backends/mla/indexer.py"
+    replace_once(
+        path,
+        "            if current_platform.is_cuda() and has_deep_gemm():\n"
+        "                metadata = get_paged_mqa_logits_metadata(\n",
+        "            from vllm.utils.deep_gemm import is_deep_gemm_supported\n"
+        "            if current_platform.is_cuda() and is_deep_gemm_supported():\n"
+        "                metadata = get_paged_mqa_logits_metadata(\n",
+        "indexer paged MQA logits SM12x guard",
+    )
+
+
 def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
     """Add (32, 192) to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
 
@@ -750,6 +770,7 @@ def apply(vllm: Path) -> None:
     patch_nvfp4_ds_mla(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
+    patch_indexer_deepgemm_guard(vllm)
     patch_fp8_einsum_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
     patch_flashinfer_dsv4_dispatch(vllm.parent)

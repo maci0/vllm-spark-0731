@@ -88,6 +88,10 @@ def main() -> int:
     cutlass_src = inspect.getsource(CutlassFp8BlockScaledMMKernel.is_supported)
     assert "is_device_capability_family(120)" in cutlass_src, "CUTLASS FP8 missing SM12x exclusion"
 
+    from vllm.v1.attention.backends.mla import indexer
+    idx_build_src = inspect.getsource(indexer.DeepSeekV32IndexerMetadataBuilder.build)
+    assert "is_deep_gemm_supported" in idx_build_src, "indexer build() missing is_deep_gemm_supported guard"
+
     mkk_src = inspect.getsource(mx.make_mxfp4_moe_kernel)
     assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"
     assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
