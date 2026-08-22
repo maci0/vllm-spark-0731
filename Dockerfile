@@ -41,6 +41,12 @@ COPY VERSION /opt/spark-0731/VERSION
 
 RUN set -eux; \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends git && rm -rf /var/lib/apt/lists/*; \
+    # CUDA dev symlinks for CMake (base image has versioned libs only) \
+    for lib in /usr/local/cuda/targets/sbsa-linux/lib/lib*.so.*; do \
+      base="$(echo "$lib" | sed 's/\.so\..*/\.so/')"; \
+      [ ! -e "$base" ] && ln -s "$lib" "$base" || true; \
+    done; \
+    ldconfig; \
     if ! command -v uv >/dev/null 2>&1; then \
       curl -LsSf https://astral.sh/uv/install.sh | sh; \
       export PATH="${HOME}/.local/bin:${PATH}"; \
@@ -48,6 +54,8 @@ RUN set -eux; \
     # Remove v0.27.1 vLLM, keep PyTorch and system deps \
     uv pip uninstall --python "$(command -v python3)" vllm || true; \
     # Install vLLM rc2 from source \
+    CUDA_HOME=/usr/local/cuda \
+    TORCH_CUDA_ARCH_LIST="12.1a" \
     uv pip install --python "$(command -v python3)" --no-cache \
       "vllm @ git+https://github.com/vllm-project/vllm.git@${VLLM_RELEASE}"; \
     # Install b12x \
