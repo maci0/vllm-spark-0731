@@ -637,6 +637,28 @@ def patch_mxfp4_process_weights(vllm: Path) -> None:
     )
 
 
+def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
+    """Add (32, 192) to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
+
+    DSpark k=5 with window_size=128 requires top_k=ceil(133/64)*64=192.
+    The underlying SM120 split-K kernel handles arbitrary top_k (num_splits =
+    ceil(topk/64)), but the dispatch table only lists tested shapes.
+    """
+    path = site / "flashinfer/mla/_sparse_mla_sm120.py"
+    if not path.is_file():
+        print(f"skip flashinfer dsv4 dispatch: {path} not found")
+        return
+    replace_once(
+        path,
+        "        (32, 128),\n"
+        "        (32, 512),\n",
+        "        (32, 128),\n"
+        "        (32, 192),\n"
+        "        (32, 512),\n",
+        "flashinfer _DECODE_DSV4_DISPATCH +(32,192) for DSpark k=5",
+    )
+
+
 def apply(vllm: Path) -> None:
     copy_new_modules(vllm)
     patch_moe_backend(vllm)
@@ -647,6 +669,7 @@ def apply(vllm: Path) -> None:
     patch_nvfp4_ds_mla(vllm)
     patch_fp8_einsum_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
+    patch_flashinfer_dsv4_dispatch(vllm.parent)
     print(f"overlays applied under {vllm}")
 
 

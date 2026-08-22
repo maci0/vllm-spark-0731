@@ -85,10 +85,16 @@ def main() -> int:
     assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"
     assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
 
+    # FlashInfer DSV4 dispatch: (32, 192) must be registered for DSpark k=5
+    from vllm.utils.flashinfer import has_flashinfer_sparse_mla_sm120_config
+    assert has_flashinfer_sparse_mla_sm120_config(32, 192), (
+        "FlashInfer _DECODE_DSV4_DISPATCH missing (32, 192) for DSpark k=5"
+    )
+
     print(
         "image OK: b12x importable, moe/linear b12x, "
         "fp8_ds_mla + nvfp4_ds_mla, 584B DSV4 page, "
-        "mHC TileLang guard, SM12x kernel guards"
+        "mHC TileLang guard, SM12x kernel guards, DSpark dispatch"
     )
     return 0
 
