@@ -52,6 +52,7 @@ RUN set -eux; \
     git clone --depth 1 --branch "${VLLM_RELEASE}" \
       https://github.com/vllm-project/vllm.git /tmp/vllm-rc2; \
     # Preserve compiled extensions and metadata \
+    mkdir -p /tmp/vllm-so; \
     find "${SITE}/vllm" -name '*.so' -exec cp --parents -t /tmp/vllm-so {} +; \
     find "${SITE}" -maxdepth 1 -name 'vllm-*.dist-info' -exec cp -r {} /tmp/ \;; \
     # Replace Python code with rc2 \
