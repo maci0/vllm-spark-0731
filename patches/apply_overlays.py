@@ -558,7 +558,7 @@ def patch_fp8_einsum_fallback(vllm: Path) -> None:
         "        return _missing(*args, **kwargs)\n"
         "    return _fp8_einsum_impl(*args, **kwargs)\n",
         "def fp8_einsum(subscripts, a_and_scale, b_and_scale, out, recipe=(1, 128, 128)):\n"
-        "    if not is_deep_gemm_supported():\n"
+        "    if current_platform.is_device_capability_family(120):\n"
         "        a_fp8, a_scale = a_and_scale\n"
         "        w_fp8, w_scale = b_and_scale\n"
         "        a_scale_f32 = a_scale.to(torch.float32)\n"

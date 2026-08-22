@@ -78,10 +78,8 @@ def main() -> int:
     from vllm.model_executor.layers.fused_moe.b12x import B12xExperts  # noqa: F401
 
     # SM12x guards
-    dg_src = inspect.getsource(is_deep_gemm_supported)
-    assert "is_device_capability_family(120)" in dg_src, "missing SM12x guard in is_deep_gemm_supported"
     einsum_src = inspect.getsource(fp8_einsum)
-    assert "is_deep_gemm_supported" in einsum_src, "fp8_einsum missing SM12x fallback"
+    assert "is_device_capability_family(120)" in einsum_src, "fp8_einsum missing SM12x fallback"
 
     mkk_src = inspect.getsource(mx.make_mxfp4_moe_kernel)
     assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"

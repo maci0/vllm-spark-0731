@@ -46,8 +46,8 @@ DeepGEMM and CUTLASS block-FP8 kernels target SM100+. On SM12x they crash.
 
 | Guard | File | Effect |
 |-------|------|--------|
-| `is_deep_gemm_supported()` | `utils/deep_gemm.py` | Returns False on family 120 |
-| `fp8_einsum` fallback | `utils/deep_gemm.py` | Dequant FP8 to bf16 + torch.einsum |
+| `support_deep_gemm()` | `platforms/cuda.py` | Returns True for family 120 (rc2 expects DeepGEMM on SM12x) |
+| `fp8_einsum` fallback | `utils/deep_gemm.py` | Checks `is_device_capability_family(120)` directly, dequant FP8 to bf16 + torch.einsum |
 | `cutlass_block_fp8_supported()` | `w8a8_utils.py` | Returns False on family 120 |
 | `compute_fp8_einsum_recipe` | `o_proj.py` | Returns ((1,128,128), False) on family 120 |
 | Triton e8m0fnu canonicalization | `torch_utils.py` | Maps e8m0fnu to u8 |
