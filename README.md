@@ -47,19 +47,21 @@ dtype alias. Build asserts reject a 432-byte GLM page.
 
 ## Serve (both nodes)
 
-Copy `configs/nodes.env.example` to `configs/nodes.env` and set fabric IPs.
+Copy `configs/nodes.env.example` to `configs/nodes.env` and set QSFP fabric IPs, not the LAN.
 
-Head (rank 0):
-
-```bash
-NODE_RANK=0 VLLM_HOST_IP=<head fabric> HEAD_IP=<head fabric> \
-  ./scripts/05-serve.sh fp8
-```
+Start the **worker first**, then the head. The worker is `--headless`; only rank 0 binds `:8000`. Dist init uses `--master-addr ${HEAD_IP}` (default without it is `127.0.0.1` and the cluster never forms).
 
 Worker (rank 1):
 
 ```bash
 NODE_RANK=1 VLLM_HOST_IP=<worker fabric> HEAD_IP=<head fabric> \
+  ./scripts/05-serve.sh fp8
+```
+
+Head (rank 0):
+
+```bash
+NODE_RANK=0 VLLM_HOST_IP=<head fabric> HEAD_IP=<head fabric> \
   ./scripts/05-serve.sh fp8
 ```
 
