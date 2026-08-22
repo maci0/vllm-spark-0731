@@ -86,9 +86,9 @@ def main() -> int:
     assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
 
     # FlashInfer DSV4 dispatch: (32, 192) must be registered for DSpark k=5
-    from vllm.utils.flashinfer import has_flashinfer_sparse_mla_sm120_config
-    assert has_flashinfer_sparse_mla_sm120_config(32, 192), (
-        "FlashInfer _DECODE_DSV4_DISPATCH missing (32, 192) for DSpark k=5"
+    from flashinfer.mla._sparse_mla_sm120 import _DECODE_DSV4_DISPATCH
+    assert (32, 192) in _DECODE_DSV4_DISPATCH, (
+        f"FlashInfer _DECODE_DSV4_DISPATCH missing (32, 192): {sorted(_DECODE_DSV4_DISPATCH)}"
     )
 
     print(

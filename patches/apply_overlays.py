@@ -650,8 +650,24 @@ def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
         return
     replace_once(
         path,
+        "_DECODE_DSV4_DISPATCH = frozenset(\n"
+        "    {\n"
+        "        (8, 128),\n"
+        "        (8, 512),\n"
+        "        (8, 1024),\n"
+        "        (16, 128),\n"
+        "        (16, 512),\n"
+        "        (16, 1024),\n"
         "        (32, 128),\n"
         "        (32, 512),\n",
+        "_DECODE_DSV4_DISPATCH = frozenset(\n"
+        "    {\n"
+        "        (8, 128),\n"
+        "        (8, 512),\n"
+        "        (8, 1024),\n"
+        "        (16, 128),\n"
+        "        (16, 512),\n"
+        "        (16, 1024),\n"
         "        (32, 128),\n"
         "        (32, 192),\n"
         "        (32, 512),\n",
