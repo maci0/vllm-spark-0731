@@ -12,6 +12,7 @@
 ARG BASE_RELEASE=v0.27.1
 FROM vllm/vllm-openai:${BASE_RELEASE}
 
+ARG BASE_RELEASE=v0.27.1
 ARG VLLM_RELEASE=v0.28.0rc2
 ARG B12X_VERSION=1.2.6
 ARG RECIPE_VERSION=0.2.0
@@ -39,6 +40,7 @@ COPY scripts /opt/spark-0731/scripts
 COPY VERSION /opt/spark-0731/VERSION
 
 RUN set -eux; \
+    apt-get update -qq && apt-get install -y -qq --no-install-recommends git && rm -rf /var/lib/apt/lists/*; \
     if ! command -v uv >/dev/null 2>&1; then \
       curl -LsSf https://astral.sh/uv/install.sh | sh; \
       export PATH="${HOME}/.local/bin:${PATH}"; \
