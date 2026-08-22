@@ -723,11 +723,10 @@ def patch_indexer_deepgemm_guard(vllm: Path) -> None:
 
 
 def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
-    """Add (32, 192) to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
+    """Add (H, 192) entries to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
 
     DSpark k=5 with window_size=128 requires top_k=ceil(133/64)*64=192.
-    The underlying SM120 split-K kernel handles arbitrary top_k (num_splits =
-    ceil(topk/64)), but the dispatch table only lists tested shapes.
+    All head counts get 192 to support any TP configuration.
     """
     path = site / "flashinfer/mla/_sparse_mla_sm120.py"
     if not path.is_file():
@@ -744,20 +743,99 @@ def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
         "        (16, 512),\n"
         "        (16, 1024),\n"
         "        (32, 128),\n"
-        "        (32, 512),\n",
+        "        (32, 512),\n"
+        "        (32, 1024),\n"
+        "        (64, 128),\n"
+        "        (64, 512),\n"
+        "        (64, 1024),\n"
+        "        (128, 128),\n"
+        "        (128, 512),\n"
+        "        (128, 1024),\n"
+        "    }\n"
+        ")\n",
         "_DECODE_DSV4_DISPATCH = frozenset(\n"
         "    {\n"
         "        (8, 128),\n"
+        "        (8, 192),\n"
         "        (8, 512),\n"
         "        (8, 1024),\n"
         "        (16, 128),\n"
+        "        (16, 192),\n"
         "        (16, 512),\n"
         "        (16, 1024),\n"
         "        (32, 128),\n"
         "        (32, 192),\n"
-        "        (32, 512),\n",
-        "flashinfer _DECODE_DSV4_DISPATCH +(32,192) for DSpark k=5",
+        "        (32, 512),\n"
+        "        (32, 1024),\n"
+        "        (64, 128),\n"
+        "        (64, 192),\n"
+        "        (64, 512),\n"
+        "        (64, 1024),\n"
+        "        (128, 128),\n"
+        "        (128, 192),\n"
+        "        (128, 512),\n"
+        "        (128, 1024),\n"
+        "    }\n"
+        ")\n",
+        "flashinfer _DECODE_DSV4_DISPATCH +TOPK=192 for DSpark k=5",
     )
+
+
+def patch_flashinfer_dsv4_cu_dispatch(site: Path) -> None:
+    """Add TOPK=192 dispatch entries to the FlashInfer DSV4 decode C++ kernel.
+
+    The JIT-compiled C++ source only dispatches TOPK in {128, 512, 1024}.
+    DSpark k=5 needs top_k=192. The template is generic over TOPK, so adding
+    new dispatch entries lets the JIT compiler instantiate the kernel for 192.
+    Also removes the pre-compiled .so so FlashInfer recompiles from source.
+    """
+    path = site / "flashinfer/data/csrc/sparse_mla_sm120_decode_dsv4.cu"
+    if not path.is_file():
+        print(f"skip flashinfer dsv4 cu dispatch: {path} not found")
+        return
+    replace_once(
+        path,
+        "  DSV4_DISPATCH(8, 128)\n"
+        "  DSV4_DISPATCH(8, 512)\n"
+        "  DSV4_DISPATCH(8, 1024)\n"
+        "  DSV4_DISPATCH(16, 128)\n"
+        "  DSV4_DISPATCH(16, 512)\n"
+        "  DSV4_DISPATCH(16, 1024)\n"
+        "  DSV4_DISPATCH(32, 128)\n"
+        "  DSV4_DISPATCH(32, 512)\n"
+        "  DSV4_DISPATCH(32, 1024)\n"
+        "  DSV4_DISPATCH(64, 128)\n"
+        "  DSV4_DISPATCH(64, 512)\n"
+        "  DSV4_DISPATCH(64, 1024)\n"
+        "  DSV4_DISPATCH(128, 128)\n"
+        "  DSV4_DISPATCH(128, 512)\n"
+        "  DSV4_DISPATCH(128, 1024)\n",
+        "  DSV4_DISPATCH(8, 128)\n"
+        "  DSV4_DISPATCH(8, 192)\n"
+        "  DSV4_DISPATCH(8, 512)\n"
+        "  DSV4_DISPATCH(8, 1024)\n"
+        "  DSV4_DISPATCH(16, 128)\n"
+        "  DSV4_DISPATCH(16, 192)\n"
+        "  DSV4_DISPATCH(16, 512)\n"
+        "  DSV4_DISPATCH(16, 1024)\n"
+        "  DSV4_DISPATCH(32, 128)\n"
+        "  DSV4_DISPATCH(32, 192)\n"
+        "  DSV4_DISPATCH(32, 512)\n"
+        "  DSV4_DISPATCH(32, 1024)\n"
+        "  DSV4_DISPATCH(64, 128)\n"
+        "  DSV4_DISPATCH(64, 192)\n"
+        "  DSV4_DISPATCH(64, 512)\n"
+        "  DSV4_DISPATCH(64, 1024)\n"
+        "  DSV4_DISPATCH(128, 128)\n"
+        "  DSV4_DISPATCH(128, 192)\n"
+        "  DSV4_DISPATCH(128, 512)\n"
+        "  DSV4_DISPATCH(128, 1024)\n",
+        "flashinfer DSV4 decode C++ dispatch +TOPK=192",
+    )
+    cached_so = site / "flashinfer_jit_cache/jit_cache/sparse_mla_sm120/sparse_mla_sm120.so"
+    if cached_so.is_file():
+        cached_so.unlink()
+        print("ok removed pre-compiled sparse_mla_sm120.so (forces JIT recompile)")
 
 
 def apply(vllm: Path) -> None:
@@ -774,6 +852,7 @@ def apply(vllm: Path) -> None:
     patch_fp8_einsum_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
     patch_flashinfer_dsv4_dispatch(vllm.parent)
+    patch_flashinfer_dsv4_cu_dispatch(vllm.parent)
     print(f"overlays applied under {vllm}")
 
 

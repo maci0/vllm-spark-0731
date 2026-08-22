@@ -96,11 +96,19 @@ def main() -> int:
     assert "process_weights_after_loading" in mkk_src, "make_mxfp4_moe_kernel missing process_weights call"
     assert "layer" in inspect.signature(mx.make_mxfp4_moe_kernel).parameters, "make_mxfp4_moe_kernel missing layer param"
 
-    # FlashInfer DSV4 dispatch: (32, 192) must be registered for DSpark k=5
+    # FlashInfer DSV4 dispatch: all (H, 192) must be registered for DSpark k=5
     from flashinfer.mla._sparse_mla_sm120 import _DECODE_DSV4_DISPATCH
-    assert (32, 192) in _DECODE_DSV4_DISPATCH, (
-        f"FlashInfer _DECODE_DSV4_DISPATCH missing (32, 192): {sorted(_DECODE_DSV4_DISPATCH)}"
-    )
+    for h in (8, 16, 32, 64, 128):
+        assert (h, 192) in _DECODE_DSV4_DISPATCH, (
+            f"FlashInfer _DECODE_DSV4_DISPATCH missing ({h}, 192): {sorted(_DECODE_DSV4_DISPATCH)}"
+        )
+
+    # FlashInfer DSV4 C++ source: TOPK=192 dispatch entries for JIT compilation
+    from pathlib import Path as P
+    cu_path = P("/usr/local/lib/python3.12/dist-packages/flashinfer/data/csrc/sparse_mla_sm120_decode_dsv4.cu")
+    if cu_path.is_file():
+        cu_src = cu_path.read_text()
+        assert "DSV4_DISPATCH(32, 192)" in cu_src, "C++ DSV4 dispatch missing TOPK=192"
 
     print(
         "image OK: b12x importable, moe/linear b12x, "
