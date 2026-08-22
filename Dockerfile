@@ -41,23 +41,33 @@ COPY VERSION /opt/spark-0731/VERSION
 
 RUN set -eux; \
     apt-get update -qq && apt-get install -y -qq --no-install-recommends git && rm -rf /var/lib/apt/lists/*; \
-    # CUDA dev symlinks for CMake (base image has versioned libs only) \
-    for lib in /usr/local/cuda/targets/sbsa-linux/lib/lib*.so.*; do \
-      base="$(echo "$lib" | sed 's/\.so\..*/\.so/')"; \
-      [ ! -e "$base" ] && ln -s "$lib" "$base" || true; \
-    done; \
-    ldconfig; \
     if ! command -v uv >/dev/null 2>&1; then \
       curl -LsSf https://astral.sh/uv/install.sh | sh; \
       export PATH="${HOME}/.local/bin:${PATH}"; \
     fi; \
-    # Remove v0.27.1 vLLM, keep PyTorch and system deps \
-    uv pip uninstall --python "$(command -v python3)" vllm || true; \
-    # Install vLLM rc2 from source \
-    CUDA_HOME=/usr/local/cuda \
-    TORCH_CUDA_ARCH_LIST="12.1a" \
-    uv pip install --python "$(command -v python3)" --no-cache \
-      "vllm @ git+https://github.com/vllm-project/vllm.git@${VLLM_RELEASE}"; \
+    # Overlay rc2 Python code onto v0.27.1's compiled extensions. \
+    # Base image has no CUDA dev headers, so building from source is not viable. \
+    # v0.27.1 .so extensions (FlashAttn, MLA, DeepGEMM, etc.) are ABI-stable. \
+    SITE="/usr/local/lib/python3.12/dist-packages"; \
+    git clone --depth 1 --branch "${VLLM_RELEASE}" \
+      https://github.com/vllm-project/vllm.git /tmp/vllm-rc2; \
+    # Preserve compiled extensions and metadata \
+    find "${SITE}/vllm" -name '*.so' -exec cp --parents -t /tmp/vllm-so {} +; \
+    find "${SITE}" -maxdepth 1 -name 'vllm-*.dist-info' -exec cp -r {} /tmp/ \;; \
+    # Replace Python code with rc2 \
+    rm -rf "${SITE}/vllm"; \
+    cp -r /tmp/vllm-rc2/vllm "${SITE}/vllm"; \
+    # Restore .so extensions \
+    cp -r /tmp/vllm-so/. /; \
+    # Update version in dist-info \
+    if [ -d /tmp/vllm-*.dist-info ]; then \
+      rm -rf "${SITE}"/vllm-*.dist-info; \
+      cp -r /tmp/vllm-*.dist-info "${SITE}/"; \
+    fi; \
+    rm -rf /tmp/vllm-rc2 /tmp/vllm-so /tmp/vllm-*.dist-info; \
+    # Clear stale bytecode \
+    find "${SITE}/vllm" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true; \
+    python3 -m compileall -q "${SITE}/vllm" || true; \
     # Install b12x \
     uv pip install --python "$(command -v python3)" --no-cache "b12x==${B12X_VERSION}"; \
     # Apply post-rc2 overlays (only patches not yet in rc2) \
