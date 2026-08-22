@@ -78,6 +78,9 @@ def main() -> int:
     from vllm.model_executor.layers.fused_moe.b12x import B12xExperts  # noqa: F401
 
     # SM12x guards
+    dg_src = inspect.getsource(is_deep_gemm_supported)
+    assert "is_device_capability_family(120)" in dg_src, "is_deep_gemm_supported missing SM12x exclusion"
+
     einsum_src = inspect.getsource(fp8_einsum)
     assert "is_device_capability_family(120)" in einsum_src, "fp8_einsum missing SM12x fallback"
 

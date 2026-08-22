@@ -548,6 +548,35 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
     )
 
 
+def patch_deep_gemm_sm12x_guard(vllm: Path) -> None:
+    """Exclude SM12x from is_deep_gemm_supported().
+
+    rc2's support_deep_gemm() returns True for family 120, but the v0.27.1
+    compiled DeepGEMM .so (hyperconnection, grouped_gemm, etc.) only targets
+    SM100/SM103. Every caller (mHC tilelang, fp8_einsum, e8m0) that trusts
+    is_deep_gemm_supported() would crash on SM12x without this guard.
+    """
+    path = vllm / "utils/deep_gemm.py"
+    replace_once(
+        path,
+        "def is_deep_gemm_supported() -> bool:\n"
+        '    """Return `True` if DeepGEMM is supported on the current platform.\n'
+        "    Currently, only Hopper and Blackwell GPUs are supported.\n"
+        '    """\n'
+        "    is_supported_arch = current_platform.support_deep_gemm()\n"
+        "    return envs.VLLM_USE_DEEP_GEMM and has_deep_gemm() and is_supported_arch\n",
+        "def is_deep_gemm_supported() -> bool:\n"
+        '    """Return `True` if DeepGEMM is supported on the current platform.\n'
+        "    Currently, only Hopper and Blackwell GPUs are supported.\n"
+        '    """\n'
+        "    is_supported_arch = current_platform.support_deep_gemm()\n"
+        "    if is_supported_arch and current_platform.is_device_capability_family(120):\n"
+        "        return False\n"
+        "    return envs.VLLM_USE_DEEP_GEMM and has_deep_gemm() and is_supported_arch\n",
+        "is_deep_gemm_supported SM12x exclusion",
+    )
+
+
 def patch_fp8_einsum_fallback(vllm: Path) -> None:
     path = vllm / "utils/deep_gemm.py"
     replace_once(
@@ -683,6 +712,7 @@ def apply(vllm: Path) -> None:
     patch_mxfp4_oracle(vllm)
     patch_mhc(vllm)
     patch_nvfp4_ds_mla(vllm)
+    patch_deep_gemm_sm12x_guard(vllm)
     patch_fp8_einsum_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
     patch_flashinfer_dsv4_dispatch(vllm.parent)
