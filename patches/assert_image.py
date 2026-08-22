@@ -84,6 +84,12 @@ def main() -> int:
     einsum_src = inspect.getsource(fp8_einsum)
     assert "is_device_capability_family(120)" in einsum_src, "fp8_einsum missing SM12x fallback"
 
+    from vllm.utils.deep_gemm import fp8_fp4_mqa_logits, fp8_fp4_paged_mqa_logits
+    mqa_src = inspect.getsource(fp8_fp4_mqa_logits)
+    assert "is_device_capability_family(120)" in mqa_src, "fp8_fp4_mqa_logits missing SM12x guard"
+    paged_src = inspect.getsource(fp8_fp4_paged_mqa_logits)
+    assert "is_device_capability_family(120)" in paged_src, "fp8_fp4_paged_mqa_logits missing SM12x guard"
+
     from vllm.model_executor.kernels.linear.scaled_mm.cutlass import CutlassFp8BlockScaledMMKernel
     cutlass_src = inspect.getsource(CutlassFp8BlockScaledMMKernel.is_supported)
     assert "is_device_capability_family(120)" in cutlass_src, "CUTLASS FP8 missing SM12x exclusion"

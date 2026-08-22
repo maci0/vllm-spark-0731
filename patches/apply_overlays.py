@@ -722,6 +722,206 @@ def patch_indexer_deepgemm_guard(vllm: Path) -> None:
     )
 
 
+def patch_mqa_logits_sm12x_fallback(vllm: Path) -> None:
+    """Add SM12x dequant fallbacks for fp8_fp4_mqa_logits (prefill) and
+    fp8_fp4_paged_mqa_logits (decode).
+
+    DeepGEMM's C++ kernel asserts arch_major in {9, 10}. On SM12x the
+    indexer's forward path calls both for scoring. We provide pure-PyTorch
+    dequant + matmul fallbacks. Uses weighted-Q to avoid materializing
+    a [M, H, N] intermediate.
+    """
+    path = vllm / "utils/deep_gemm.py"
+    replace_once(
+        path,
+        "def fp8_fp4_mqa_logits(\n"
+        "    q: tuple[torch.Tensor, torch.Tensor | None],\n"
+        "    kv: tuple[torch.Tensor, torch.Tensor],\n"
+        "    weights: torch.Tensor,\n"
+        "    cu_seqlen_ks: torch.Tensor,\n"
+        "    cu_seqlen_ke: torch.Tensor,\n"
+        "    clean_logits: bool,\n"
+        ") -> torch.Tensor:\n",
+        "def _sm12x_dequant_q_weighted(\n"
+        "    q_values: torch.Tensor,\n"
+        "    q_scale: torch.Tensor | None,\n"
+        "    weights: torch.Tensor,\n"
+        ") -> torch.Tensor:\n"
+        "    q_f = q_values.to(torch.float32)\n"
+        "    if q_scale is not None:\n"
+        "        q_sf = q_scale.to(torch.float32)\n"
+        "        if q_sf.shape != q_f.shape:\n"
+        "            q_sf = q_sf.expand_as(q_f)\n"
+        "        q_f = q_f * q_sf\n"
+        "    return torch.einsum('...hd,...h->...d', q_f, weights.float())\n\n\n"
+        "def _sm12x_dequant_k(\n"
+        "    k_packed: torch.Tensor,\n"
+        "    k_scales: torch.Tensor,\n"
+        ") -> torch.Tensor:\n"
+        "    k_f = k_packed.to(torch.float32)\n"
+        "    k_sf = k_scales.to(torch.float32)\n"
+        "    if k_sf.dim() == 1:\n"
+        "        return k_f * k_sf.unsqueeze(-1)\n"
+        "    return k_f * k_sf\n\n\n"
+        "def _sm12x_fp8_mqa_logits(\n"
+        "    q: tuple[torch.Tensor, torch.Tensor | None],\n"
+        "    kv: tuple[torch.Tensor, torch.Tensor],\n"
+        "    weights: torch.Tensor,\n"
+        "    cu_seqlen_ks: torch.Tensor,\n"
+        "    cu_seqlen_ke: torch.Tensor,\n"
+        "    clean_logits: bool,\n"
+        ") -> torch.Tensor:\n"
+        "    q_values, q_scale = q\n"
+        "    k_packed, k_scales = kv\n"
+        "    q_w = _sm12x_dequant_q_weighted(q_values, q_scale, weights)\n"
+        "    k_dq = _sm12x_dequant_k(k_packed, k_scales)\n"
+        "    logits = q_w @ k_dq.T\n"
+        "    if clean_logits:\n"
+        "        N = logits.shape[1]\n"
+        "        pos = torch.arange(N, device=logits.device).unsqueeze(0)\n"
+        "        mask = (pos >= cu_seqlen_ks.unsqueeze(1)) & (pos < cu_seqlen_ke.unsqueeze(1))\n"
+        "        logits = logits.masked_fill(~mask, float('-inf'))\n"
+        "    return logits\n\n\n"
+        "def _sm12x_fp8_paged_mqa_logits(\n"
+        "    q: tuple[torch.Tensor, torch.Tensor | None],\n"
+        "    kv_cache: torch.Tensor,\n"
+        "    weights: torch.Tensor,\n"
+        "    context_lens: torch.Tensor,\n"
+        "    block_tables: torch.Tensor,\n"
+        "    schedule_metadata: torch.Tensor,\n"
+        "    max_model_len: int,\n"
+        "    clean_logits: bool,\n"
+        "    indices: torch.Tensor | None = None,\n"
+        ") -> torch.Tensor:\n"
+        "    q_values, q_scale = q\n"
+        "    B = block_tables.shape[0]\n"
+        "    block_size = kv_cache.shape[1]\n"
+        "    head_size = kv_cache.shape[3]\n"
+        "    if context_lens.dim() == 2:\n"
+        "        ctx = context_lens[:, -1]\n"
+        "    else:\n"
+        "        ctx = context_lens\n"
+        "    max_ctx = int(ctx.max().item()) if ctx.numel() > 0 else 0\n"
+        "    if q_values.dim() == 4:\n"
+        "        Bq, next_n, H, D = q_values.shape\n"
+        "        q_flat = q_values.reshape(Bq * next_n, H, D)\n"
+        "    else:\n"
+        "        q_flat = q_values\n"
+        "        H, D = q_flat.shape[-2], q_flat.shape[-1]\n"
+        "        next_n = q_flat.shape[0] // B if B > 0 else 1\n"
+        "    M = q_flat.shape[0]\n"
+        "    q_w = _sm12x_dequant_q_weighted(\n"
+        "        q_flat, q_scale.reshape(M, H, -1) if q_scale is not None else None,\n"
+        "        weights[:M],\n"
+        "    )\n"
+        "    if max_ctx == 0:\n"
+        "        return q_w.new_zeros((M, max_model_len), dtype=torch.float32)\n"
+        "    pos = torch.arange(max_ctx, device=kv_cache.device)\n"
+        "    lb = pos // block_size\n"
+        "    off = pos % block_size\n"
+        "    max_blocks = block_tables.shape[1]\n"
+        "    lb_c = lb.clamp(max=max_blocks - 1)\n"
+        "    phys = block_tables[:, lb_c]\n"
+        "    k_raw = kv_cache[phys.reshape(-1), off.repeat(B), 0]\n"
+        "    k_raw = k_raw.reshape(B, max_ctx, head_size)\n"
+        "    k_fp8 = k_raw[:, :, :D].contiguous().view(torch.float8_e4m3fn)\n"
+        "    k_sf = k_raw[:, :, D:D+4].contiguous().view(torch.float32).squeeze(-1)\n"
+        "    k_dq = k_fp8.to(torch.float32) * k_sf.unsqueeze(-1)\n"
+        "    q_w_4d = q_w.reshape(B, next_n, D)\n"
+        "    logits_short = torch.bmm(q_w_4d, k_dq.transpose(1, 2))\n"
+        "    logits_short = logits_short.reshape(M, max_ctx)\n"
+        "    if max_ctx >= max_model_len:\n"
+        "        logits = logits_short[:, :max_model_len]\n"
+        "    else:\n"
+        "        logits = q_w.new_full((M, max_model_len), float('-inf') if clean_logits else 0.0, dtype=torch.float32)\n"
+        "        logits[:, :max_ctx] = logits_short\n"
+        "    ctx_exp = ctx.unsqueeze(1).expand(B, next_n).reshape(M, 1)\n"
+        "    pos_row = torch.arange(min(max_ctx, max_model_len), device=logits.device).unsqueeze(0)\n"
+        "    invalid = pos_row >= ctx_exp\n"
+        "    logits[:, :pos_row.shape[1]].masked_fill_(invalid, float('-inf') if clean_logits else 0.0)\n"
+        "    return logits\n\n\n"
+        "def fp8_fp4_mqa_logits(\n"
+        "    q: tuple[torch.Tensor, torch.Tensor | None],\n"
+        "    kv: tuple[torch.Tensor, torch.Tensor],\n"
+        "    weights: torch.Tensor,\n"
+        "    cu_seqlen_ks: torch.Tensor,\n"
+        "    cu_seqlen_ke: torch.Tensor,\n"
+        "    clean_logits: bool,\n"
+        ") -> torch.Tensor:\n",
+        "fp8_fp4_mqa_logits SM12x dequant fallback decl",
+    )
+    replace_once(
+        path,
+        "    _lazy_init()\n"
+        "    if _fp8_fp4_mqa_logits_impl is None:\n"
+        "        return _missing()\n"
+        "    return _fp8_fp4_mqa_logits_impl(\n"
+        "        q,\n"
+        "        kv,\n"
+        "        weights,\n"
+        "        cu_seqlen_ks,\n"
+        "        cu_seqlen_ke,\n"
+        "        clean_logits=clean_logits,\n"
+        "    )\n",
+        "    if current_platform.is_device_capability_family(120):\n"
+        "        return _sm12x_fp8_mqa_logits(\n"
+        "            q, kv, weights, cu_seqlen_ks, cu_seqlen_ke, clean_logits\n"
+        "        )\n"
+        "    _lazy_init()\n"
+        "    if _fp8_fp4_mqa_logits_impl is None:\n"
+        "        return _missing()\n"
+        "    return _fp8_fp4_mqa_logits_impl(\n"
+        "        q,\n"
+        "        kv,\n"
+        "        weights,\n"
+        "        cu_seqlen_ks,\n"
+        "        cu_seqlen_ke,\n"
+        "        clean_logits=clean_logits,\n"
+        "    )\n",
+        "fp8_fp4_mqa_logits SM12x dispatch guard",
+    )
+    replace_once(
+        path,
+        "    _lazy_init()\n"
+        "    if _fp8_fp4_paged_mqa_logits_impl is None:\n"
+        "        return _missing()\n"
+        "    kwargs = {} if indices is None else {\"indices\": indices}\n"
+        "    return _fp8_fp4_paged_mqa_logits_impl(\n"
+        "        q,\n"
+        "        kv_cache,\n"
+        "        weights,\n"
+        "        context_lens,\n"
+        "        block_tables,\n"
+        "        schedule_metadata,\n"
+        "        max_model_len,\n"
+        "        clean_logits=clean_logits,\n"
+        "        **kwargs,\n"
+        "    )\n",
+        "    if current_platform.is_device_capability_family(120):\n"
+        "        return _sm12x_fp8_paged_mqa_logits(\n"
+        "            q, kv_cache, weights, context_lens, block_tables,\n"
+        "            schedule_metadata, max_model_len, clean_logits,\n"
+        "            indices=indices,\n"
+        "        )\n"
+        "    _lazy_init()\n"
+        "    if _fp8_fp4_paged_mqa_logits_impl is None:\n"
+        "        return _missing()\n"
+        "    kwargs = {} if indices is None else {\"indices\": indices}\n"
+        "    return _fp8_fp4_paged_mqa_logits_impl(\n"
+        "        q,\n"
+        "        kv_cache,\n"
+        "        weights,\n"
+        "        context_lens,\n"
+        "        block_tables,\n"
+        "        schedule_metadata,\n"
+        "        max_model_len,\n"
+        "        clean_logits=clean_logits,\n"
+        "        **kwargs,\n"
+        "    )\n",
+        "fp8_fp4_paged_mqa_logits SM12x dispatch guard",
+    )
+
+
 def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
     """Add (H, 192) entries to FlashInfer's _DECODE_DSV4_DISPATCH for DSpark k=5.
 
@@ -850,6 +1050,7 @@ def apply(vllm: Path) -> None:
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
     patch_fp8_einsum_fallback(vllm)
+    patch_mqa_logits_sm12x_fallback(vllm)
     patch_mxfp4_process_weights(vllm)
     patch_flashinfer_dsv4_dispatch(vllm.parent)
     patch_flashinfer_dsv4_cu_dispatch(vllm.parent)
