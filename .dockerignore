@@ -1,0 +1,9 @@
+.git
+graphify-out
+**/__pycache__
+**/*.pyc
+docs
+tests
+*.md
+HANDOFF.md
+README.md

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared host/container env for DGX Spark (GB10, sm_121, UMA, ConnectX-7).
 # Sourced by launch scripts. Safe to source more than once.
 
@@ -8,7 +9,7 @@ export CONTAINER_NAME="${CONTAINER_NAME:-vllm-ds4-0731}"
 export SERVE_PORT="${SERVE_PORT:-8000}"
 export TP_SIZE="${TP_SIZE:-2}"
 export NNODES="${NNODES:-2}"
-export NODE_RANK="${NODE_RANK:-0}"
+export NODE_RANK="${NODE_RANK:-}"
 
 # Spark NICs from the official playbook. Override if your QSFP is on the other port.
 export SPARK_IFACES="${SPARK_IFACES:-enp1s0f1np1}"
@@ -28,7 +29,11 @@ export CUDA_DEVICE_MAX_CONNECTIONS="${CUDA_DEVICE_MAX_CONNECTIONS:-1}"
 export VLLM_HOST_IP="${VLLM_HOST_IP:-}"
 export HEAD_IP="${HEAD_IP:-}"
 
-export VLLM_USE_DEEP_GEMM_E8M0="${VLLM_USE_DEEP_GEMM_E8M0:-0}"
+export VLLM_USE_DEEP_GEMM_E8M0="${VLLM_USE_DEEP_GEMM_E8M0:-1}"
+# GB10: ptxas cannot assemble tcgen05 for sm_121a. NVRTC (no ptxas; the
+# driver JIT assembles for the real arch) is the working path — it is also
+# what the golden image (no nvcc) uses implicitly.
+export DG_JIT_USE_NVRTC="${DG_JIT_USE_NVRTC:-1}"
 export VLLM_USE_BREAKABLE_CUDAGRAPH="${VLLM_USE_BREAKABLE_CUDAGRAPH:-1}"
 export VLLM_PREFIX_CACHE_RETENTION_INTERVAL="${VLLM_PREFIX_CACHE_RETENTION_INTERVAL:-4096}"
 export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="${VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS:-1800}"

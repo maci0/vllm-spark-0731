@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1.6
+# Phase 2: keep/add SM12x overlays on the matched main image (docs/PLAN-MAIN.md).
+# Do not copy rc2 B12xExperts. Do not blanket-kill DeepGEMM on family 120.
+FROM vllm-spark-0731:main-b12x
+
+COPY patches/apply_overlays.py /opt/spark-0731/patches/apply_overlays.py
+COPY patches/assert_image.py /opt/spark-0731/patches/assert_image.py
+COPY patches/files /opt/spark-0731/patches/files
+COPY patches/upstream /opt/spark-0731/patches/upstream
+
+# Backport clean upstream git-diff patches first (source hunks apply under
+# vllm/; test-file hunks are skipped on this installed tree). Overlays are
+# idempotent and run after, so a patch that already landed is a no-op.
+RUN cd /opt/vllm \
+    && for p in /opt/spark-0731/patches/upstream/pr-*.diff; do \
+         patch -p1 --forward -N < "$p" >/dev/null 2>&1 \
+           && echo "applied $(basename "$p")" \
+           || echo "skip $(basename "$p")"; \
+       done \
+    && python3 /opt/spark-0731/patches/apply_overlays.py --stack main \
+    && python3 /opt/spark-0731/patches/assert_image.py --stack main
+
+WORKDIR /workspace
+ENTRYPOINT ["vllm", "serve"]
+CMD []

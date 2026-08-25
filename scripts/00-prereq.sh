@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+STACK="${1:-main}"
+case "${STACK}" in
+  main) PIN="${ROOT}/configs/pin.main.env" ;;
+  nvfp4) PIN="${ROOT}/configs/pin.nvfp4.env" ;;
+  fp8) PIN="${ROOT}/configs/pin.env" ;;
+  eugr) PIN="${ROOT}/configs/pin.eugr-b12x.env" ;;
+  golden) PIN="${ROOT}/configs/pin.golden.env" ;;
+  *) echo "usage: $0 [main|nvfp4|fp8|eugr|golden]" >&2; exit 2 ;;
+esac
+
+# shellcheck disable=SC1090
+source "${PIN}"
 # shellcheck disable=SC1091
-source "${ROOT}/configs/pin.env"
 source "${ROOT}/configs/env.spark.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -31,4 +43,4 @@ fi
 echo "prereq ok"
 echo "  image pin: ${IMAGE}"
 echo "  checkpoint pin: ${HF_MODEL_ID}"
-echo "  stack: ${STACK:-golden}"
+echo "  stack: ${STACK}"

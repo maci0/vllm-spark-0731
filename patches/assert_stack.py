@@ -10,7 +10,7 @@ import sys
 DSPARK_K = 5
 ALLOWED_KV = ("fp8_ds_mla", "nvfp4_ds_mla")
 ALLOWED_MOE = ("b12x", "flashinfer_b12x")
-EUGR_ATTN = "B12X_MLA_SPARSE"
+B12X_ATTN = "B12X_MLA_SPARSE"
 SM120_ATTN = "FLASHINFER_MLA_SPARSE_DSV4"
 
 
@@ -32,14 +32,6 @@ def check(
             f"num_speculative_tokens={num_speculative_tokens!r} is not an int"
         ) from None
 
-    if attn == EUGR_ATTN and kv.startswith("nvfp4"):
-        raise SystemExit(
-            "refusing mixed stack: B12X_MLA_SPARSE with "
-            f"{kv}. That pairing is the 432-vs-584 envelope overlay. "
-            "Use the 0.28 image (empty attention, nvfp4_ds_mla or fp8_ds_mla) "
-            "or eugr (B12X_MLA_SPARSE + fp8_ds_mla)."
-        )
-
     if spec != "dspark":
         raise SystemExit(
             f"refusing spec_method={spec!r}: this recipe serves DSpark only "
@@ -55,10 +47,10 @@ def check(
             f"unknown kv={kv!r}. expected one of {ALLOWED_KV}"
         )
 
-    if attn == EUGR_ATTN:
-        if kv != "fp8_ds_mla":
-            raise SystemExit("eugr stack is fp8_ds_mla only")
-        return "eugr"
+    if attn == B12X_ATTN:
+        # Overlay B12X_MLA_SPARSE is the DSV4 584-byte kernel path, so
+        # nvfp4_ds_mla (same envelope) is legal. Real 432/368 NVFP4 is not.
+        return "nvfp4-b12x" if kv == "nvfp4_ds_mla" else "fp8-b12x"
 
     if attn == SM120_ATTN:
         return "nvfp4" if kv == "nvfp4_ds_mla" else "fp8"
@@ -66,8 +58,7 @@ def check(
     if attn:
         raise SystemExit(
             f"refusing attention_backend={attn!r}. "
-            f"Use {SM120_ATTN} (SM12x) or leave empty. "
-            f"{EUGR_ATTN} is the eugr stack."
+            f"Use {B12X_ATTN} or {SM120_ATTN} (SM12x), or leave empty."
         )
 
     if moe and moe not in ALLOWED_MOE:

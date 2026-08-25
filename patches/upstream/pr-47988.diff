@@ -1,0 +1,82 @@
+diff --git a/vllm/model_executor/kernels/linear/scaled_mm/cutlass.py b/vllm/model_executor/kernels/linear/scaled_mm/cutlass.py
+index 9f69ab0c7377..15a4be4cc492 100644
+--- a/vllm/model_executor/kernels/linear/scaled_mm/cutlass.py
++++ b/vllm/model_executor/kernels/linear/scaled_mm/cutlass.py
+@@ -9,6 +9,9 @@
+ from vllm import _custom_ops as ops
+ from vllm.model_executor.layers.quantization.input_quant_fp8 import QuantFP8
+ from vllm.model_executor.layers.quantization.utils import replace_parameter
++from vllm.model_executor.layers.quantization.utils.fp8_utils import (
++    _upcast_e8m0_to_fp32,
++)
+ from vllm.model_executor.layers.quantization.utils.quant_utils import (
+     GroupShape,
+     QuantKey,
+@@ -307,8 +310,43 @@ def can_implement(cls, config: FP8ScaledMMLinearLayerConfig):
+                 "Supports only dynamic per token group activation "
+                 "quantization with group_shape=(1,128).",
+             )
++
++        # The SM12x blockwise kernels reject problems whose weight output
++        # dim is not a multiple of 128 (CUTLASS can_implement fails for
++        # every tile config, e.g. the N=576 kv_a_proj in DeepSeek models);
++        # fall through to the next kernel for those layers.
++        if (
++            current_platform.is_device_capability_family(120)
++            and config.weight_shape[0] % 128 != 0
++        ):
++            return (
++                False,
++                "SM12x CUTLASS block FP8 requires the weight output "
++                f"dimension to be divisible by 128, got "
++                f"{config.weight_shape[0]}.",
++            )
+         return True, None
+ 
++    def process_weights_after_loading(self, layer: torch.nn.Module) -> None:
++        super().process_weights_after_loading(layer)
++        params = self._get_layer_params(layer)
++        weight_scale = (
++            params.weight_scale
++            if params.weight_scale_inv is None
++            else params.weight_scale_inv
++        )
++        # cutlass_scaled_mm requires fp32 scales; E8M0 (exponent-only)
++        # checkpoint scales upcast losslessly.
++        if weight_scale is not None and weight_scale.dtype == torch.float8_e8m0fnu:
++            scale_attr_name = (
++                params.WEIGHT_SCALE
++                if params.weight_scale_inv is None
++                else params.WEIGHT_SCALE_INV
++            )
++            replace_parameter(
++                layer, scale_attr_name, _upcast_e8m0_to_fp32(weight_scale)
++            )
++
+     def apply_block_scaled_mm(
+         self,
+         A: torch.Tensor,
+diff --git a/vllm/model_executor/layers/quantization/utils/fp8_utils.py b/vllm/model_executor/layers/quantization/utils/fp8_utils.py
+index 5df6bcb73421..d9e695ce5b41 100644
+--- a/vllm/model_executor/layers/quantization/utils/fp8_utils.py
++++ b/vllm/model_executor/layers/quantization/utils/fp8_utils.py
+@@ -917,14 +917,13 @@ def w8a8_triton_block_scaled_mm(
+     assert len(block_size) == 2
+     block_n, block_k = block_size[0], block_size[1]
+ 
+-    # Triton cannot currently bind E8M0 scale tensors directly. On ROCm,
++    # Triton cannot currently bind E8M0 scale tensors directly.
+     # DeepSeek-V4 checkpoints store block scales in exponent-only E8M0 format,
+     # so decode them to fp32 before launching the kernel.
+-    if current_platform.is_rocm() or current_platform.is_xpu():
+-        if As.dtype == torch.float8_e8m0fnu:
+-            As = _upcast_e8m0_to_fp32(As).contiguous()
+-        if Bs.dtype == torch.float8_e8m0fnu:
+-            Bs = _upcast_e8m0_to_fp32(Bs).contiguous()
++    if As.dtype == torch.float8_e8m0fnu:
++        As = _upcast_e8m0_to_fp32(As).contiguous()
++    if Bs.dtype == torch.float8_e8m0fnu:
++        Bs = _upcast_e8m0_to_fp32(Bs).contiguous()
+ 
+     assert A.shape[-1] == B.shape[-1]
+     assert A.shape[:-1] == As.shape[:-1] and A.is_contiguous()

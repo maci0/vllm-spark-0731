@@ -3,7 +3,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck disable=SC1091
-source "${ROOT}/configs/pin.env"
+source "${ROOT}/configs/pin.main.env"
+# shellcheck disable=SC1091
 source "${ROOT}/configs/env.spark.sh"
 
 docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true

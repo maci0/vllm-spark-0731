@@ -2,13 +2,14 @@
 # Pull the prebuilt vLLM image for the selected stack. No source rebuild.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STACK="${1:-fp8}"
+STACK="${1:-main}"
 case "${STACK}" in
   fp8) PIN="${ROOT}/configs/pin.env" ;;
   nvfp4) PIN="${ROOT}/configs/pin.nvfp4.env" ;;
   eugr) PIN="${ROOT}/configs/pin.eugr-b12x.env" ;;
   golden) PIN="${ROOT}/configs/pin.golden.env" ;;
-  *) echo "usage: $0 [fp8|nvfp4|eugr|golden]" >&2; exit 2 ;;
+  main) PIN="${ROOT}/configs/pin.main.env" ;;
+  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main]" >&2; exit 2 ;;
 esac
 # shellcheck disable=SC1090
 source "${PIN}"

@@ -1,0 +1,316 @@
+# syntax=docker/dockerfile:1.6
+# Matched vLLM main on CUDA 13.3.1 + source PyTorch 2.14 (docs/PLAN-MAIN.md).
+# One devel image. Do not re-pip torch in a runner stage.
+# Phase 1 only: no apply_overlays.py.
+
+ARG CUDA_IMAGE=nvidia/cuda:13.3.1-cudnn-devel-ubuntu24.04
+FROM ${CUDA_IMAGE}
+
+ARG CUDA_IMAGE
+ARG TORCH_REPO=https://github.com/pytorch/pytorch.git
+ARG TORCH_REF=release/2.14
+ARG TORCHVISION_REPO=https://github.com/pytorch/vision.git
+ARG TORCHVISION_REF=release/0.29
+ARG TORCHVISION_VERSION=0.29.0
+ARG TRITON_VERSION=3.7.1
+ARG VLLM_REPO=https://github.com/vllm-project/vllm.git
+ARG VLLM_REF=main
+ARG B12X_REPO=https://github.com/local-inference-lab/b12x.git
+ARG B12X_REF=master
+ARG CUTLASS_DSL_VERSION=4.7.0
+ARG QUACK_KERNELS_VERSION=0.6.4
+ARG FLASHINFER_REPO=https://github.com/flashinfer-ai/flashinfer.git
+ARG FLASHINFER_REF=main
+ARG DEEPGEMM_REPO=https://github.com/deepseek-ai/DeepGEMM.git
+# nv_dev a6b593d = last known good for SM12x fp8 1d1d (the 8b1392b pin
+# regressed it: dropped sm100_fp8_gemm_1d1d + aliased fp8_gemm_nt to the fp4
+# dispatcher = silent corruption on GB10). Same freeze as eugr + the anemll
+# golden image (vLLM 0.25.1 pins a6b593d). See docs/knowledge/09.
+ARG DEEPGEMM_COMMIT=a6b593d2826719dcf4892609af7b84ee23aaf32a
+ARG INSTANTTENSOR_REPO=https://github.com/scitix/InstantTensor.git
+ARG INSTANTTENSOR_REF=main
+ARG FASTSAFETENSORS_REPO=https://github.com/foundation-model-stack/fastsafetensors.git
+ARG FASTSAFETENSORS_REF=main
+ARG LMCACHE_REPO=https://github.com/LMCache/LMCache.git
+ARG LMCACHE_REF=dev
+ARG TILELANG_VERSION=0.1.13
+ARG HUMMING_KERNELS_VERSION=0.1.13
+ARG APACHE_TVM_FFI_VERSION=0.1.12
+ARG TOKENSPEED_MLA_VERSION=0.2.5
+ARG NVIDIA_CUDA_NVDISASM_VERSION=13.3.73
+ARG NCCL_REPO=https://github.com/NVIDIA/nccl.git
+ARG NCCL_NVCC_GENCODE="-gencode=arch=compute_121,code=sm_121"
+ARG TORCH_CUDA_ARCH_LIST=12.1a
+ARG MAX_JOBS_TORCH=8
+ARG MAX_JOBS=16
+ARG RUSTUP_TOOLCHAIN=stable
+
+LABEL org.opencontainers.image.title="vllm-spark-0731-main" \
+      recipe.checkpoint="deepseek-ai/DeepSeek-V4-Flash-0731" \
+      recipe.vllm="main" \
+      recipe.cuda="13.3.1" \
+      recipe.torch="source-2.14" \
+      recipe.b12x="git-master"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    UV_SYSTEM_PYTHON=1 \
+    UV_BREAK_SYSTEM_PACKAGES=1 \
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=600 \
+    UV_HTTP_RETRIES=10 \
+    UV_PYTHON_DOWNLOADS=never \
+    PIP_BREAK_SYSTEM_PACKAGES=1 \
+    PIP_CACHE_DIR=/root/.cache/pip \
+    UV_CACHE_DIR=/root/.cache/uv \
+    DG_JIT_USE_NVRTC=0 \
+    USE_CUDNN=1 \
+    TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
+    FLASHINFER_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
+    TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas \
+    VLLM_PRESERVE_SM12X_TARGET=1 \
+    VLLM_ENABLE_CUDA_COMPATIBILITY=1 \
+    NVIDIA_DISABLE_REQUIRE=1 \
+    DEEPGEMM_SRC_DIR=/opt/DeepGEMM \
+    SPARK_SHA_DIR=/opt/spark-0731/sha \
+    CUDA_HOME=/usr/local/cuda \
+    MAX_JOBS=${MAX_JOBS} \
+    CMAKE_BUILD_PARALLEL_LEVEL=${MAX_JOBS} \
+    NINJAFLAGS="-j${MAX_JOBS}" \
+    MAKEFLAGS="-j${MAX_JOBS}" \
+    PATH=/usr/lib/ccache:/opt/cargo/bin:/usr/local/cuda/bin:${PATH} \
+    CCACHE_DIR=/root/.ccache \
+    CCACHE_MAXSIZE=50G \
+    CCACHE_COMPRESS=1 \
+    CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+    CMAKE_CUDA_COMPILER_LAUNCHER=ccache \
+    RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/opt/cargo \
+    LD_LIBRARY_PATH=/usr/local/cuda/compat:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates curl vim wget git \
+        python3 python3-dev python3-pip python3-venv \
+        cmake ninja-build build-essential ccache \
+        pkg-config protobuf-compiler libprotobuf-dev \
+        libibverbs1 libibverbs-dev rdma-core \
+        libopenblas-dev libjpeg-dev libpng-dev \
+        libnuma-dev \
+        devscripts debhelper fakeroot \
+    && (apt-get install -y --no-install-recommends cuda-compat-13-3 \
+        || echo "WARN: cuda-compat-13-3 not in apt") \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip install --no-cache-dir uv \
+    && mkdir -p /opt/spark-0731/sha /root/.ccache \
+    && (test -d /usr/local/cuda/compat || ln -s /usr/local/cuda-13.3/compat /usr/local/cuda/compat || true) \
+    && nvcc --version
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+        sh -s -- -y --profile minimal --default-toolchain ${RUSTUP_TOOLCHAIN} --no-modify-path \
+    && rustc --version && cargo --version
+
+# NCCL sm_121 (eugr). Record SHA. Do not later pip nvidia-nccl-cu13 over this.
+RUN git clone --depth 1 "${NCCL_REPO}" /opt/nccl \
+    && git -C /opt/nccl rev-parse HEAD > /opt/spark-0731/sha/nccl \
+    && make -C /opt/nccl -j "${MAX_JOBS}" src.build NVCC_GENCODE="${NCCL_NVCC_GENCODE}" \
+    && make -C /opt/nccl pkg.debian.build \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends --allow-downgrades --allow-change-held-packages \
+         /opt/nccl/build/pkg/deb/*.deb \
+    && rm -rf /var/lib/apt/lists/* /opt/nccl \
+    && cat /opt/spark-0731/sha/nccl
+
+# PyTorch source + compile in one layer so the clone is not stuck in the image.
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    set -eux; \
+    git clone --depth 1 --branch "${TORCH_REF}" "${TORCH_REPO}" /opt/pytorch; \
+    git -C /opt/pytorch submodule update --init --recursive --jobs 8; \
+    git -C /opt/pytorch rev-parse HEAD > /opt/spark-0731/sha/pytorch; \
+    cat /opt/spark-0731/sha/pytorch; \
+    cd /opt/pytorch; \
+    uv pip install -r requirements.txt; \
+    export MAX_JOBS="${MAX_JOBS_TORCH}"; \
+    export CMAKE_BUILD_PARALLEL_LEVEL="${MAX_JOBS_TORCH}"; \
+    export NINJAFLAGS="-j${MAX_JOBS_TORCH}"; \
+    export MAKEFLAGS="-j${MAX_JOBS_TORCH}"; \
+    export USE_CUDA=1 USE_CUDNN=1 USE_SYSTEM_NCCL=1 USE_DISTRIBUTED=1 USE_NCCL=1; \
+    export USE_MKLDNN=0 BUILD_TEST=0 USE_FBGEMM=0; \
+    export USE_NNPACK=0 USE_QNNPACK=0 USE_PYTORCH_QNNPACK=0; \
+    export USE_FLASH_ATTENTION=0 USE_MEM_EFF_ATTENTION=0; \
+    export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
+    export CUDA_HOME=/usr/local/cuda; \
+    export NCCL_INCLUDE_DIR=/usr/include; \
+    export NCCL_LIB_DIR=/usr/lib/aarch64-linux-gnu; \
+    uv pip install --no-build-isolation -v .; \
+    cd /; \
+    PYTHONPATH= python3 -c 'import torch; print(torch.__version__, torch.version.cuda, torch.cuda.get_arch_list())'; \
+    rm -rf /opt/pytorch
+
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    set -eux; \
+    git clone --depth 1 --branch "${TORCHVISION_REF}" "${TORCHVISION_REPO}" /opt/vision; \
+    git -C /opt/vision rev-parse HEAD > /opt/spark-0731/sha/torchvision; \
+    cd /opt/vision; \
+    uv pip install pillow; \
+    export MAX_JOBS="${MAX_JOBS_TORCH}"; \
+    export FORCE_CUDA=1 TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
+    export TORCHVISION_USE_FFMPEG=0 TORCHVISION_USE_VIDEO_CODEC=0; \
+    export BUILD_VERSION="${TORCHVISION_VERSION}"; \
+    python3 setup.py install; \
+    cd /; \
+    PYTHONPATH= python3 -c 'import torchvision; print(torchvision.__version__)'; \
+    rm -rf /opt/vision
+
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    set -eux; \
+    uv pip install \
+      "triton==${TRITON_VERSION}" \
+      "nvidia-cuda-nvdisasm==${NVIDIA_CUDA_NVDISASM_VERSION}" \
+      "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}" \
+      "humming-kernels[cu13]==${HUMMING_KERNELS_VERSION}" \
+      filelock requests tqdm packaging pillow; \
+    uv pip install pynvml || uv pip install nvidia-ml-py; \
+    uv pip install nvidia-nvshmem-cu13 || echo "WARN: nvidia-nvshmem-cu13 skipped"; \
+    uv pip install "apache-tvm-ffi==${APACHE_TVM_FFI_VERSION}"; \
+    uv pip install "tilelang==${TILELANG_VERSION}"; \
+    uv pip install --no-deps "tokenspeed-mla==${TOKENSPEED_MLA_VERSION}"; \
+    python3 -c "import importlib.metadata as m; print('cutlass', m.version('nvidia-cutlass-dsl')); print('triton', m.version('triton')); print('tvm-ffi', m.version('apache-tvm-ffi')); print('tilelang', m.version('tilelang'))"
+
+# FlashInfer git main as its own wheel (eugr). Keep source for the 192 gate.
+RUN git clone --recursive --depth 1 --branch "${FLASHINFER_REF}" \
+        "${FLASHINFER_REPO}" /opt/flashinfer \
+    && git -C /opt/flashinfer rev-parse HEAD > /opt/spark-0731/sha/flashinfer \
+    && cat /opt/spark-0731/sha/flashinfer
+
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    set -eux; \
+    cd /opt/flashinfer; \
+    export FLASHINFER_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
+    export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
+    export BUILD_NVEP=0 BUILD_NCCL_EP=0 BUILD_NIXL_EP=0; \
+    mkdir -p /opt/wheels; \
+    uv pip install packaging filelock; \
+    uv build --python /usr/bin/python3 --no-build-isolation --wheel . --out-dir=/opt/wheels -v; \
+    uv pip install /opt/wheels/*.whl; \
+    uv pip uninstall -y nvidia-nccl-cu13 || true; \
+    python3 -c 'import flashinfer; print("flashinfer", flashinfer.__version__)'
+
+RUN git clone --recursive "${DEEPGEMM_REPO}" /opt/DeepGEMM \
+    && git -C /opt/DeepGEMM checkout --detach "${DEEPGEMM_COMMIT}" \
+    && git -C /opt/DeepGEMM submodule update --init --recursive \
+    && git -C /opt/DeepGEMM rev-parse HEAD > /opt/spark-0731/sha/deepgemm \
+    && cat /opt/spark-0731/sha/deepgemm
+
+# DeepGEMM SM120 fixes, applied to the pinned source before vLLM compiles it
+# via DEEPGEMM_SRC_DIR. Additive patches; each one is idempotent and non-fatal
+# (some fixes are already in nv_dev, e.g. the SM120 SF layout from #403).
+COPY patches/upstream/*deepgemm*.diff /opt/spark-0731/patches/upstream/
+RUN cd /opt/DeepGEMM \
+    && for p in /opt/spark-0731/patches/upstream/*deepgemm*.diff; do \
+         patch -p1 --forward -N < "$p" >/dev/null 2>&1 \
+           && echo "applied $(basename "$p")" \
+           || echo "skip  $(basename "$p") (already applied)"; \
+       done \
+    && git diff --stat || true
+
+COPY docker/patch_vllm_preserve_sm12x_target.py /opt/spark-0731/patch_vllm_preserve_sm12x_target.py
+COPY patches/pin_cutlass_dsl.py /opt/spark-0731/pin_cutlass_dsl.py
+COPY docker/pin_quack.py /opt/spark-0731/pin_quack.py
+COPY docker/assert_main_image.py /opt/spark-0731/assert_main_image.py
+
+# VLLM_REF may be a branch name or a full commit SHA (GitHub serves arbitrary
+# reachable SHAs; --branch cannot take a SHA, so fetch + detach in that case).
+RUN if echo "${VLLM_REF}" | grep -qE '^[0-9a-f]{40}$'; then \
+      git clone --filter=blob:none --no-checkout "${VLLM_REPO}" /opt/vllm \
+      && git -C /opt/vllm fetch --depth 1 origin "${VLLM_REF}" \
+      && git -C /opt/vllm checkout --detach "${VLLM_REF}" \
+      && git -C /opt/vllm submodule update --init --recursive --depth 1; \
+    else \
+      git clone --recursive --depth 1 --branch "${VLLM_REF}" "${VLLM_REPO}" /opt/vllm; \
+    fi \
+    && git -C /opt/vllm rev-parse HEAD > /opt/spark-0731/sha/vllm \
+    && cat /opt/spark-0731/sha/vllm
+
+RUN --mount=type=cache,id=ccache,target=/root/.ccache \
+    --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    --mount=type=cache,id=cargo-registry,target=/opt/cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/opt/cargo/git \
+    set -eux; \
+    cd /opt/vllm; \
+    python3 /opt/spark-0731/patch_vllm_preserve_sm12x_target.py .; \
+    python3 /opt/spark-0731/pin_cutlass_dsl.py "${CUTLASS_DSL_VERSION}" \
+      --expected-count 1 requirements/cuda.txt; \
+    python3 use_existing_torch.py; \
+    sed -i '/flashinfer/d' requirements/cuda.txt; \
+    PINNED_TORCH="$(python3 -c 'import torch; print(torch.__version__)')"; \
+    printf '%s\n' \
+      "torch==${PINNED_TORCH}" \
+      "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}" \
+      "fastapi[standard]>=0.115.0,<0.137.0" \
+      > /tmp/wheel-override.txt; \
+    uv pip install -r requirements/build/cuda.txt "setuptools-rust>=1.9.0"; \
+    export DEEPGEMM_SRC_DIR=/opt/DeepGEMM; \
+    export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
+    export VLLM_REQUIRE_RUST_FRONTEND=1; \
+    export CARGO_BUILD_JOBS="${MAX_JOBS}"; \
+    uv pip install --no-build-isolation -e . --override /tmp/wheel-override.txt; \
+    python3 -c 'import vllm; print("vllm", vllm.__version__)'
+
+# Late copy so extras pin scripts can change without busting the vLLM compile layer.
+COPY patches/pin_cutlass_dsl.py /opt/spark-0731/pin_cutlass_dsl.py
+COPY docker/pin_quack.py /opt/spark-0731/pin_quack.py
+
+RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
+    set -eux; \
+    PINNED_TORCH="$(python3 -c 'import torch; print(torch.__version__)')"; \
+    printf '%s\n' \
+      "torch==${PINNED_TORCH}" \
+      "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}" \
+      > /tmp/git-override.txt; \
+    uv pip install --override /tmp/git-override.txt \
+      "git+${INSTANTTENSOR_REPO}@${INSTANTTENSOR_REF}" \
+      "git+${FASTSAFETENSORS_REPO}@${FASTSAFETENSORS_REF}" \
+      "git+${LMCACHE_REPO}@${LMCACHE_REF}"; \
+    git ls-remote "${INSTANTTENSOR_REPO}" "${INSTANTTENSOR_REF}" | awk '{print $1}' > /opt/spark-0731/sha/instanttensor; \
+    git ls-remote "${FASTSAFETENSORS_REPO}" "${FASTSAFETENSORS_REF}" | awk '{print $1}' > /opt/spark-0731/sha/fastsafetensors; \
+    git ls-remote "${LMCACHE_REPO}" "${LMCACHE_REF}" | awk '{print $1}' > /opt/spark-0731/sha/lmcache; \
+    git clone --depth 1 --branch "${B12X_REF}" "${B12X_REPO}" /tmp/b12x-source; \
+    git -C /tmp/b12x-source rev-parse HEAD > /opt/spark-0731/sha/b12x; \
+    python3 /opt/spark-0731/pin_cutlass_dsl.py "${CUTLASS_DSL_VERSION}" \
+      --expected-count 5 /tmp/b12x-source/pyproject.toml; \
+    uv pip install --reinstall --no-deps /tmp/b12x-source; \
+    mkdir -p /tmp/quack; \
+    python3 -m pip download "quack-kernels==${QUACK_KERNELS_VERSION}" --no-deps -d /tmp/quack --disable-pip-version-check; \
+    PYTHONPATH=/opt/spark-0731 python3 /opt/spark-0731/pin_quack.py \
+      "${CUTLASS_DSL_VERSION}" /tmp/quack; \
+    uv pip install --reinstall --no-deps "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}"; \
+    uv pip install --reinstall --override /tmp/git-override.txt "apache-tvm-ffi==${APACHE_TVM_FFI_VERSION}"; \
+    uv pip install --reinstall --no-deps --override /tmp/git-override.txt \
+      "humming-kernels[cu13]==${HUMMING_KERNELS_VERSION}" \
+      "tilelang==${TILELANG_VERSION}" \
+      "tokenspeed-mla==${TOKENSPEED_MLA_VERSION}"; \
+    uv pip install --reinstall --no-deps "nvidia-cutlass-dsl[cu13]==${CUTLASS_DSL_VERSION}"; \
+    rm -rf /tmp/b12x-source /tmp/quack /tmp/quack-unpacked; \
+    python3 -c "import importlib.metadata as m, torch, b12x, tilelang, sys; \
+tv=torch.__version__; \
+sys.exit('torch '+tv+' is not 2.14') if not tv.startswith('2.14') else None; \
+sys.exit('torch.cuda '+str(torch.version.cuda)+' is not 13.3') if not str(torch.version.cuda or '').startswith('13.3') else None; \
+checks=[('apache-tvm-ffi','${APACHE_TVM_FFI_VERSION}'),('tilelang','${TILELANG_VERSION}'),('humming-kernels','${HUMMING_KERNELS_VERSION}'),('tokenspeed-mla','${TOKENSPEED_MLA_VERSION}'),('nvidia-cutlass-dsl','${CUTLASS_DSL_VERSION}')]; \
+miss=[n+' '+m.version(n)+' != '+e for n,e in checks if m.version(n)!=e]; \
+sys.exit(miss[0]) if miss else print('torch', tv, torch.version.cuda, 'b12x', m.version('b12x'), 'cutlass', m.version('nvidia-cutlass-dsl'), 'tilelang', m.version('tilelang'), 'tvm-ffi', m.version('apache-tvm-ffi'), 'humming', m.version('humming-kernels'), 'tokenspeed', m.version('tokenspeed-mla'))"
+
+ENV CUTE_DSL_ARCH=sm_121a \
+    HF_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash-0731 \
+    VLLM_USE_DEEP_GEMM_E8M0=0 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+    PYTORCH_ALLOC_CONF=expandable_segments:True
+
+RUN python3 /opt/spark-0731/assert_main_image.py
+
+WORKDIR /workspace
+ENTRYPOINT ["vllm", "serve"]
+CMD []

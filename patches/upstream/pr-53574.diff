@@ -1,0 +1,18 @@
+diff --git a/vllm/models/deepseek_v4/sparse_mla.py b/vllm/models/deepseek_v4/sparse_mla.py
+index ebff031cea70..1f1721fc5dbf 100644
+--- a/vllm/models/deepseek_v4/sparse_mla.py
++++ b/vllm/models/deepseek_v4/sparse_mla.py
+@@ -268,9 +268,12 @@ def _build_c128a_metadata(
+ 
+         result: dict[str, torch.Tensor | None] = {}
+         if num_decode_tokens > 0:
++            # global_decode is a width-narrowed slice of the persistent buffer,
++            # so it keeps the buffer's row stride; the SM120 sparse-MLA kernel
++            # rejects a non-contiguous extra_indices (eidx). Copy it out.
+             result["c128a_global_decode_topk_indices"] = global_decode.view(
+                 num_decode_tokens, 1, -1
+-            )
++            ).contiguous()
+             result["c128a_decode_topk_lens"] = decode_lens
+         if num_prefill_tokens > 0:
+             result["c128a_prefill_topk_indices"] = prefill_local
