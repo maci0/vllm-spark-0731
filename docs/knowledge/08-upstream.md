@@ -1,12 +1,21 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Upstream Gaps & PRs
 
-Tracked in `docs/UPSTREAM.md`. **Do not open duplicate PRs** — comment with Spark evidence if a PR already covers it.
+The distilled decision layer for upstream work. **Canonical tracker:
+[docs/UPSTREAM.md](../UPSTREAM.md)** — pins, backports, eugr/nightly analysis,
+and the posted-comments log live there and are authoritative. This chapter
+keeps only what you need to act without opening the tracker: the pin
+quick-reference, current gap status, and the local triage decisions.
+
+> Rule: **Do not open duplicate PRs.** Comment with Spark evidence on the PR
+> that already covers the gap. Do not upstream measurements that failed on
+> this pair (capture size 6, gather of packed-at-store,
+> `preinitialize_invalid_logits=False`, multi-row scheduled paged scorer).
 
 ---
 
-## Pins (From `docs/UPSTREAM.md`)
+## Pins (canonical: [docs/UPSTREAM.md → Pins](../UPSTREAM.md#pins))
 
 | Tree | ID | When |
 |------|-----|------|
@@ -15,44 +24,41 @@ Tracked in `docs/UPSTREAM.md`. **Do not open duplicate PRs** — comment with Sp
 | vLLM main (PR check) | default branch | 2026-08-24 afternoon |
 | DeepGEMM in v0.27.1 / overlay `.so` | `e21c821f39a2` (DeepGEMM **main**, ~SM90/SM100) | 2026-08-04 |
 | DeepGEMM in v0.28.0rc2, vLLM main cmake, matched-main | `8b1392b978f5` (**nv_dev** HEAD) | 2026-08-11 |
-| DeepGEMM in eugr Dockerfile | `a6b593d28267` (nv_dev, frozen) | 2026-06-29 |
+| DeepGEMM in eugr Dockerfile / **matched-main now** | `a6b593d28267` (nv_dev, frozen) | 2026-06-29; matched-main re-pinned 2026-08-25 (see [09](09-golden-deepgemm.md)) |
 | FlashInfer overlay image | `0.6.16.post3` | from v0.27.1; overlay adds TOPK=192 |
 | FlashInfer matched-main | git **main** (192 present) | image build |
 | flashinfer-ai main | has 192 and 256 | #4380 merged 2026-08-08 |
 
 ---
 
-## Backport (Fix Exists — Apply as Git-Diff Patch)
+## Gap status (full detail: [docs/UPSTREAM.md](../UPSTREAM.md))
 
-| Gap | Fix | Status | Backport |
-|-----|-----|--------|----------|
-| MoE `--moe-backend b12x` | #52018 | **merged** 2026-08-21 | overlay `copy_new_modules` / `patch_moe_backend` / etc. (already in `apply_overlays.py`) |
-| KVBlockZeroer non-uniform pages | #49704 | **merged** 2026-07-24 | overlay `patch_kv_zeroer_skip` (ratio=1); do not re-PR |
-| FlashInfer DSV4 TOPK=192 (DSpark k=5) | #4380 | **merged** flashinfer-ai | already in git-main FlashInfer |
-| FlashInfer C128A eidx contiguity (DSV4 spec-decode boot crash) | #53574 | **open** 2026-08-24 | `pr-53574.diff` + overlay `flashinfer-eidx-contig` (consumer, defense-in-depth) |
-| Triton block-scaled MM E8M0 upcast (`KeyError: float8_e8m0fnu` on SM12x) | #47988 | **open** 2026-08-18 | `pr-47988.diff` (source hunks) + overlay `triton-e8m0-sm12x` (skips when #47988 form present) |
-| SM12x einsum recipe (SM90 `(1,128,128)` vs SM100 packed INT32) | #53521 | **open** | `pr-53521.diff` + overlay `einsum-sm12x` |
-| DeepGEMM SM120/SM121 SF layout (`csrc/apis/layout.hpp`) | DeepGEMM #403 | **merged** `nv_dev` | `deepgemm-pr-403.diff` (applied idempotently in `Dockerfile.main`) |
-| DeepGEMM SM120 pure-FP8 GEMM port (`sm100_fp8_gemm_1d1d` to `nv_dev`) | anemll 2.5.0 port | **staged local port** | `deepgemm-fp8-1d1d-port.diff` (applied in `Dockerfile.main`) |
+| Gap | Status | Backport / overlay |
+|-----|--------|--------------------|
+| MoE `--moe-backend b12x` (#52018) | **merged** 2026-08-21, 8 h after rc2 | `copy_new_modules` + `patch_moe_backend` + `patch_utils_b12x` + … |
+| KVBlockZeroer non-uniform pages (#49704) | **merged** 2026-07-24 | `patch_kv_zeroer_skip` (ratio=1); do not re-PR |
+| FlashInfer DSV4 TOPK=192 (DSpark k=5) | **merged** in flashinfer-ai | git-main FlashInfer; overlay `patch_flashinfer_dsv4_dispatch` for 0.6.16.post3 |
+| mHC broadcast + CUTLASS FP8 SM12x | **OPEN** [#53055](https://github.com/vllm-project/vllm/pull/53055) (older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase) | `pr-53055.diff`; overlays `patch_mhc` / `patch_cutlass_sm12x_guard` (applied in `--stack main`, not standalone `--only`) |
+| einsum SM12x recipe (SM90 vs SM100 packed INT32) | **OPEN** [#53521](https://github.com/vllm-project/vllm/pull/53521) | `pr-53521.diff` + `einsum-sm12x` |
+| DSV4 kernel block 64 on SM12x | **OPEN** [#53425](https://github.com/vllm-project/vllm/pull/53425) | `pr-53425.diff` + `dsv4-block64` |
+| Indexer paged MQA DeepGEMM gate | **OPEN** [#53522](https://github.com/vllm-project/vllm/pull/53522) (ours) | `pr-53522.diff` + `indexer-mqa` |
+| DSV4 spec-decode query shapes | **OPEN** [#52499](https://github.com/vllm-project/vllm/pull/52499) | `pr-52499.diff`; comment-only (not needed after TOPK=192) |
+| FlashInfer C128A eidx contiguity (boot crash) | **OPEN** [#53574](https://github.com/vllm-project/vllm/pull/53574) | `pr-53574.diff` + `flashinfer-eidx-contig` |
+| Triton E8M0 upcast (`KeyError: float8_e8m0fnu`) | **OPEN** [#47988](https://github.com/vllm-project/vllm/pull/47988) | `pr-47988.diff` + `triton-e8m0-sm12x` |
+| DeepGEMM SM120/SM121 SF layout | **merged** in nv_dev (DeepGEMM #403) | `deepgemm-pr-403.diff` (idempotent, `docker/Dockerfile.main`) |
+| DeepGEMM pure-FP8 1d1d port | analysis-only | `deepgemm-fp8-1d1d-port.diff`; superseded by the pin-back — see [09](09-golden-deepgemm.md) |
+| DeepGEMM pin `8b1392b` → `a6b593d` (SM12x fp8 regression) | **OPEN** vllm [#53680](https://github.com/vllm-project/vllm/pull/53680), DeepGEMM [#417](https://github.com/deepseek-ai/DeepGEMM/issues/417) | `docker/Dockerfile.main` `DEEPGEMM_COMMIT=a6b593d` (already applied locally) |
 
----
-
-## Open PRs (Comment / Contribute)
-
-| Gap | PR | Notes |
-|-----|-----|-------|
-| `mhc_pre_broadcast_tilelang` unguarded `tf32_hc_prenorm_gemm` | #53055 (also #50645) | Same PR covers CUTLASS FP8 `is_supported()` SM12x |
-| CUTLASS FP8 `is_supported()` ignores SM12x | #53055 | Overlay `patch_cutlass_sm12x_guard`; backport `pr-53055.diff` |
-| DSV4 sparse-MLA spec-decode query shapes | #52499 | Backport `pr-52499.diff` (`flashinfer_sparse.py` decode next_n shapes) |
-| DSV4 kernel block 64 | #53425 | Backport `pr-53425.diff` |
-| Indexer DeepGEMM gate | #53522 | Backport `pr-53522.diff` |
+`pr-41834` (SM12x umbrella) is not backported: diff exceeds the GitHub 20k-line
+limit and the PR needs-rebase — comment only, per `docs/UPSTREAM.md`.
 
 ---
 
 ## Triaged 2026-08-24 against vLLM main (`6648eb1`) — no new PRs needed
 
 Every gap below either has an open PR (backported as `patches/upstream/pr-*.diff`)
-or was verified not-a-bug. Do not open duplicate PRs.
+or was verified not-a-bug. Do not open duplicate PRs. Posted-comments log:
+[docs/UPSTREAM.md → Comments / PRs we posted](../UPSTREAM.md).
 
 1. **FlashInfer eidx contiguity** — covered by **#53574** (C128A builder fix).
    - Root cause confirmed on our pair: `_build_c128a_metadata` publishes a
@@ -93,15 +99,15 @@ or was verified not-a-bug. Do not open duplicate PRs.
 
 ---
 
-## Do NOT Send as "Fixes" (Measured Worse on This Pair)
+## Do NOT send as "fixes" (measured worse on this pair)
 
-- CUDA graph size 6
-- Extra capture sizes
-- `preinitialize_invalid_logits=False`
-- Multi-row scheduled paged scorer
-- Gather of packed-at-store with the interleaved FlashInfer gather (fixed: use `packed_gather_mqa_logits`, which reads the packed K-then-scale offsets)
-- Expand page64 tables ×4
-- Feed 1-row scheduled kernel into 8-row decode
+Full measured-worse list with numbers: [07-gotchas.md](07-gotchas.md)
+("Never Do These") and [docs/UPSTREAM.md → Do not send as fixes](../UPSTREAM.md).
+Highlights: CUDA graph size 6, extra capture sizes,
+`preinitialize_invalid_logits=False`, gather of packed-at-store, multi-row
+scheduled paged scorer, page64 `*4` expansion, 1-row scheduled into 8-row
+decode. The 1-way hole (~4 tok/s vs interleaved gather) is a kernel/grid
+question, not a missing vLLM flag — do not gather packed storage to close it.
 
 ---
 
@@ -128,15 +134,19 @@ or was verified not-a-bug. Do not open duplicate PRs.
 
 ---
 
-## DeepGEMM Pin Discipline (Not Interchangeable)
+## DeepGEMM pin discipline (not interchangeable)
+
+Detail and the eugr/nightly analysis: [docs/UPSTREAM.md → DeepGEMM](../UPSTREAM.md).
 
 | Image | DeepGEMM Commit | Branch | Notes |
 |-------|-----------------|--------|-------|
 | v0.27.1 / overlay `.so` | `e21c821` | main | No SM12x MQA |
-| v0.28.0rc2 / vLLM main cmake / matched-main | `8b1392b` | **nv_dev** | Has SM12x MQA |
-| eugr Dockerfile | `a6b593d` | nv_dev (frozen) | MXFP4 grouped-scale regression at `f8e8fb5` / PR #384 |
+| v0.28.0rc2 / vLLM main cmake | `8b1392b` | **nv_dev** | Has SM12x MQA, but **regressed** SM12x fp8 linear (see [09](09-golden-deepgemm.md)) |
+| eugr Dockerfile / **matched-main** | `a6b593d` | nv_dev (frozen) | Last known good for SM12x fp8; matched-main re-pinned here 2026-08-25 |
 
-**Do not mix these.** The nv_dev branch has SM12x MQA; main does not.
+**Do not mix these.** The nv_dev branch has SM12x MQA; main does not. `8b1392b`
+is only 3 SiTU commits after eugr's freeze and does not claim to fix the MXFP4
+grouped-scale regression — do not bump blindly without re-measuring.
 
 ---
 
@@ -145,5 +155,17 @@ or was verified not-a-bug. Do not open duplicate PRs.
 - [00-index.md](00-index.md) — Quick links
 - [01-hardware.md](01-hardware.md) — Why SM12x needs nv_dev
 - [03-kernels-attention.md](03-kernels-attention.md) — DeepGEMM/CUTLASS gaps
+- [05-performance.md](05-performance.md) — measurements behind the gaps
 - [06-deployment.md](06-deployment.md) — Build pins
 - [07-gotchas.md](07-gotchas.md) — "Do not send as fixes"
+- [09-golden-deepgemm.md](09-golden-deepgemm.md) — the DeepGEMM regression and pin-back
+- [docs/UPSTREAM.md](../UPSTREAM.md) — canonical tracker (pins, backports, eugr, posted comments)
+- [patches/upstream/README.md](../../patches/upstream/README.md) — backport patch registry
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/UPSTREAM_GAPS.md`](../field-notes/dgx-spark/UPSTREAM_GAPS.md) — what's still broken/missing upstream, filed for maintainers
+
+---
+
+**[← Prev](07-gotchas.md) · [Glossary](glossary.md) · [Next](09-golden-deepgemm.md) →**

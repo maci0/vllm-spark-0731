@@ -30,10 +30,12 @@ export VLLM_HOST_IP="${VLLM_HOST_IP:-}"
 export HEAD_IP="${HEAD_IP:-}"
 
 export VLLM_USE_DEEP_GEMM_E8M0="${VLLM_USE_DEEP_GEMM_E8M0:-1}"
-# GB10: ptxas cannot assemble tcgen05 for sm_121a. NVRTC (no ptxas; the
-# driver JIT assembles for the real arch) is the working path — it is also
-# what the golden image (no nvcc) uses implicitly.
-export DG_JIT_USE_NVRTC="${DG_JIT_USE_NVRTC:-1}"
+# GB10: ptxas cannot assemble tcgen05 for sm_121a on any CUDA 13.x tested.
+# NVRTC was tried as the workaround but its cubins are rejected by the driver
+# (CUDA_ERROR_INVALID_IMAGE), so DG_JIT_USE_NVRTC stays 0 (see
+# docs/knowledge/09-golden-deepgemm.md → Validation status). pin.main.env
+# forces it to 0 for the live stack; keep the default in sync.
+export DG_JIT_USE_NVRTC="${DG_JIT_USE_NVRTC:-0}"
 export VLLM_USE_BREAKABLE_CUDAGRAPH="${VLLM_USE_BREAKABLE_CUDAGRAPH:-1}"
 export VLLM_PREFIX_CACHE_RETENTION_INTERVAL="${VLLM_PREFIX_CACHE_RETENTION_INTERVAL:-4096}"
 export VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="${VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS:-1800}"

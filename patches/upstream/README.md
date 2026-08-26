@@ -19,12 +19,12 @@ overlays in `apply_overlays.py` run.
 `pr-41834` (SM12x umbrella) is **not** fetched: diff exceeds the 20k-line
 GitHub limit and the PR needs-rebase — comment only, per `docs/UPSTREAM.md`.
 
-## DeepGEMM backports (applied in `Dockerfile.main` via `*deepgemm*.diff`)
+## DeepGEMM backports (applied in `docker/Dockerfile.main` via `*deepgemm*.diff`)
 
 | Patch | PR | Fix | Status |
 |---|---|---|---|
-| `deepgemm-pr-403.diff` | [deepseek-ai/DeepGEMM#403](https://github.com/deepseek-ai/DeepGEMM/pull/403) | SM120/SM121 SF layout transformation in `csrc/apis/layout.hpp` | Merged in `nv_dev 8b1392b978f5`; applied idempotently in `Dockerfile.main` before vLLM compilation |
-| `deepgemm-fp8-1d1d-port.diff` | anemll 2.5.0 port | Port of golden anemll 2.5.0 `sm100_fp8_gemm_1d1d` kernel and dispatch to `nv_dev` | Staged local port for SM120 pure-FP8 GEMM; applied in `Dockerfile.main` before compilation |
+| `deepgemm-pr-403.diff` | [deepseek-ai/DeepGEMM#403](https://github.com/deepseek-ai/DeepGEMM/pull/403) | SM120/SM121 SF layout transformation in `csrc/apis/layout.hpp` | Merged in `nv_dev 8b1392b978f5`; applied idempotently in `docker/Dockerfile.main` before vLLM compilation |
+| `deepgemm-fp8-1d1d-port.diff` | anemll 2.5.0 port | Port of golden anemll 2.5.0 `sm100_fp8_gemm_1d1d` kernel and dispatch to `nv_dev` | Staged local port for SM120 pure-FP8 GEMM; applied in `docker/Dockerfile.main` before compilation |
 
 ## Merged-fix patches (already in the build)
 

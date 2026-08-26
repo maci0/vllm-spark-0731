@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Gotchas & Constraints
 
@@ -93,3 +93,12 @@ The hard "do not" list accumulated across the project. Each item was measured an
 - [05-performance.md](05-performance.md) — Benchmark impact of each gotcha
 - [06-deployment.md](06-deployment.md) — Correct serve/stop order
 - [08-upstream.md](08-upstream.md) — Upstream fixes for some gotchas
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/TROUBLESHOOTING.md`](../field-notes/dgx-spark/TROUBLESHOOTING.md) — symptom → cause → fix table for every failure hit
+- [`../field-notes/dgx-spark/BUG_REPORT_b12x_2node_deadlock.md`](../field-notes/dgx-spark/BUG_REPORT_b12x_2node_deadlock.md) — the b12x 2-node deadlock write-up
+
+---
+
+**[← Prev](06-deployment.md) · [Glossary](glossary.md) · [Next](08-upstream.md) →**

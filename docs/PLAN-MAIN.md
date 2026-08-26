@@ -103,7 +103,7 @@ torch, NCCL, vLLM, FlashInfer, DeepGEMM. Do not start from `-base` or
 | Python | distro 3.12 + `uv` (`UV_SYSTEM_PYTHON=1`) |
 | Pattern | eugr `Dockerfile` (CUDA devel, not their `13.0.2` / cu130 wheels) |
 
-Do not use vLLM `docker/Dockerfile` two-stage (manylinux builder + pip torch).
+Do not use vLLM's `docker/Dockerfile` two-stage (manylinux builder + pip torch).
 Do not use `nvcr.io/nvidia/pytorch:26.07-py3` or `nvcr.io/nvidia/vllm:26.07-py3`.
 Do not use ubuntu26.04 CUDA tags. There is no `nvidia/cuda:13.4-*` on Hub.
 
@@ -568,7 +568,7 @@ Plan + pins + provenance. Gate: this file and `pin.main.env` exist.
 ### Phase 1: matched image on Spark
 
 Build on spark1 (copy the image to spark2). Custom Dockerfile, eugr-shaped
-(section 4.1 / 4.4). Do not start from vLLM `docker/Dockerfile`. Do not
+(section 4.1 / 4.4). Do not start from vLLM's `docker/Dockerfile`. Do not
 start from NGC pytorch.
 
 - `FROM nvidia/cuda:13.3.1-cudnn-devel-ubuntu24.04` (one image, not eugr's

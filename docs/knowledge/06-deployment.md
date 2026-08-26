@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Deployment & Images
 
@@ -12,15 +12,12 @@
 | eugr `spark-vllm-b12x` (≤512K, spec off) | main | FP8 UE8M0 | — | ~326 tok/s @ c48 |
 | **main-b12x (this repo)** | main `e25c586b9` | nvfp4_ds_mla (584 B) | 97,737 | ~25.8 / — / 172 @ c32 |
 
-### Golden re-measured 2026-08-24 (after the fix backlog)
+### Golden re-measured 2026-08-24 (numbers in [05-performance.md](05-performance.md))
 
-Deployed stock on this cluster and validated (see HANDOFF Status → Golden):
-
-- France temp 0, 128 tok: **c1 65.2, c6 216.8, c16 183.9, c32 186.2** —
-  2.5× our c1. Plateau past c6 by design (`max_num_seqs=6`).
-- Golden harness (BST coding, temp 0.7): c1 54.6–58.1, c3 108.5, c5 124.2,
-  c6 155.0 — reproduces the 2026-08-22 table.
-- KV **2,047,170 tokens** @ 7,650 B/token.
+Deployed stock on this cluster and validated (see HANDOFF Status → Golden).
+Measured numbers live in the performance chapter: c1 **65.2** / c6 **216.8**,
+KV **2,047,170 tokens** @ 7,650 B/token — 2.5× our c1, plateau past c6 by
+design (`max_num_seqs=6`).
 
 ### Golden deploy procedure (anemll)
 
@@ -74,7 +71,7 @@ InstantTensor + hybrid lazy draft
 - **vLLM**: Git `main`, `--no-build-isolation`
 - **b12x**: Git master + **cutlass-dsl 4.7.0** (metadata rewrite, not 4.6.2)
 - **FlashInfer**: Git main (DSV4 TOPK 192)
-- **DeepGEMM**: nv_dev commit `8b1392b`
+- **DeepGEMM**: nv_dev commit `a6b593d` (pinned back 2026-08-25 — `8b1392b` regressed SM12x pure-FP8 linear; see [09-golden-deepgemm.md](09-golden-deepgemm.md))
 - **InstantTensor**: For fast cold start
 
 ---
@@ -116,11 +113,11 @@ ssh -o ControlPath=none spark2 'cd /tmp/vllm-spark-0731 && bash scripts/05-serve
 
 | Stack | Pin File | Image Tag | Attention Backend | Linear / MoE | KV Cache | Status / Role |
 |-------|----------|-----------|-------------------|--------------|----------|---------------|
-| `fp8` | `configs/pin.env` | `vllm-spark-0731:v0.28.0rc2-b12x` | `FLASHINFER_MLA_SPARSE_DSV4` | `b12x` / `b12x` | `fp8_ds_mla` | Legacy fallback (576 B) |
+| `fp8` | `configs/pin.env` | `vllm-spark-0731:v0.28.0rc2-b12x` | `FLASHINFER_MLA_SPARSE_DSV4` | — / `b12x` | `fp8_ds_mla` | Legacy fallback (576 B); linear backend unset in pin |
 | `nvfp4` | `configs/pin.nvfp4.env` | `vllm-spark-0731:v0.28.0rc2-b12x` | `FLASHINFER_MLA_SPARSE_DSV4` | `b12x` / `b12x` | `nvfp4_ds_mla` | Overlay fallback (584 B) |
 | `eugr` | `configs/pin.eugr-b12x.env` | `dgx-vllm-eugr-nightly-b12x:2026081903` | `B12X_MLA_SPARSE` | `b12x` / `b12x` | `fp8_ds_mla` | Upstream comparison |
 | `main` | `configs/pin.main.env` | `vllm-spark-0731:main-b12x` | `B12X_MLA_SPARSE` | `b12x` / `b12x` | `nvfp4_ds_mla` | **Live Production** (matched-main `e25c586b9`) |
-| `golden` | `configs/pin.golden.env` (or sparkrun `anemll-nvfp4.yaml`) | `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` | `FLASHINFER_MLA_SPARSE_DSV4` | Stock / `flashinfer_b12x` | `nvfp4_ds_mla` (real NVFP4 writer) | Reference benchmark (2.05M pool) |
+| `golden` | `configs/pin.golden.env` (or sparkrun `anemll-nvfp4.yaml`) | `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` | unset (image default; v0.25.2 has no `FLASHINFER_MLA_SPARSE_DSV4`) | — / `flashinfer_b12x` | `nvfp4_ds_mla` (real NVFP4 writer) | Reference benchmark (2.05M pool) |
 
 ---
 
@@ -199,3 +196,13 @@ ssh spark2 "cd /tmp/vllm-spark-0731 && ./scripts/07-stop.sh"
 - [04-quantization-kv.md](04-quantization-kv.md) — KV dtype details
 - [05-performance.md](05-performance.md) — Expected numbers
 - [07-gotchas.md](07-gotchas.md) — Common failure modes
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/PRODUCTION.md`](../field-notes/dgx-spark/PRODUCTION.md) — the shipped eugr fp8 prod config, every value measured
+- [`../field-notes/dgx-spark/EUGR_B12X_PROD.md`](../field-notes/dgx-spark/EUGR_B12X_PROD.md) — eugr b12x production path and why nvfp4_ds_mla is closed there
+- [`../field-notes/nvfp4/EUGR_NVFP4.md`](../field-notes/nvfp4/EUGR_NVFP4.md) — 89-line NVFP4-on-eugr experiment (works, not competitive)
+
+---
+
+**[← Prev](05-performance.md) · [Glossary](glossary.md) · [Next](07-gotchas.md) →**

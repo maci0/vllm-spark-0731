@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Quantization & KV Cache
 
@@ -120,3 +120,14 @@ gds_backend: cufile
 - [05-performance.md](05-performance.md) — KV capacity vs throughput
 - [06-deployment.md](06-deployment.md) — How to enable/disable offload
 - [08-upstream.md](08-upstream.md) — Real NVFP4 writer PR needed
+
+### Raw evidence (field notes)
+
+- [`../field-notes/nvfp4/README.md`](../field-notes/nvfp4/README.md) — the NVFP4 MLA KV patch: 584 B envelope, alignment sites, dead ends
+- [`../field-notes/nvfp4/KV_OFFLOAD_MLA.md`](../field-notes/nvfp4/KV_OFFLOAD_MLA.md) — why disk offload faults under every KV dtype
+- [`../field-notes/dgx-spark/KV_CEILING.md`](../field-notes/dgx-spark/KV_CEILING.md) — why ~2.5M KV is unreachable; the util→pool ladder
+- [`../field-notes/dgx-spark/PROD_C5_SSD.md`](../field-notes/dgx-spark/PROD_C5_SSD.md) — c5 SSD recipe (two claims disproven by later tests)
+
+---
+
+**[← Prev](03-kernels-attention.md) · [Glossary](glossary.md) · [Next](05-performance.md) →**

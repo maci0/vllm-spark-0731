@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Hardware: DGX Spark (GB10, SM12x)
 
@@ -20,8 +20,8 @@
 
 ### Key Implications for Kernels
 
-- **DeepGEMM**: Compiled for SM12x in matched-main (`main-b12x`) via nv_dev (`8b1392b`), where `is_deep_gemm_supported()` is True. However, specific unsupported shapes and ops (like 2-state MQA or mHC broadcast) require fallbacks/guards.
-  > ⚠️ **CRITICAL WARNING — Pure-FP8 Linear Dispatch**: In upstream `nv_dev 8b1392b`, `csrc/apis/gemm.hpp:851` aliases `fp8_gemm_nt` to `fp8_fp4_gemm_nt`. On SM12x (`arch_major == 12`), that dispatcher calls `sm120_fp8_fp4_gemm_1d1d` unconditionally, feeding FP8 weights to an FP4 kernel and producing silent output corruption (e.g. `' Septy…'`). Therefore, **`LINEAR_BACKEND=deep_gemm` is strictly blocked on SM12x** until `deepgemm-fp8-1d1d-port.diff` is upstreamed and merged. Linear layers must remain pinned to `--linear-backend b12x` (see [09-golden-deepgemm.md](09-golden-deepgemm.md)).
+- **DeepGEMM**: Compiled for SM12x in matched-main (`main-b12x`) via nv_dev (`a6b593d`, pinned back from `8b1392b` 2026-08-25), where `is_deep_gemm_supported()` is True. However, specific unsupported shapes and ops (like 2-state MQA or mHC broadcast) require fallbacks/guards.
+  > ⚠️ **CRITICAL WARNING — Pure-FP8 Linear Dispatch**: In upstream `nv_dev 8b1392b`, `csrc/apis/gemm.hpp:851` aliases `fp8_gemm_nt` to `fp8_fp4_gemm_nt`. On SM12x (`arch_major == 12`), that dispatcher calls `sm120_fp8_fp4_gemm_1d1d` unconditionally, feeding FP8 weights to an FP4 kernel and producing silent output corruption (e.g. `' Septy…'`). The matched-main pin-back to `a6b593d` removes the aliasing, but GB10 validation is still blocked at the JIT toolchain level — **`LINEAR_BACKEND=deep_gemm` stays off**; linear layers remain pinned to `--linear-backend b12x` (see [09-golden-deepgemm.md](09-golden-deepgemm.md)).
 - **CUTLASS block-FP8**: SM90/SM100 only. **Does not run on SM12x**. Falls back to PyTorch/Triton/TileLang.
 - **b12x**: Purpose-built for SM120/SM121. **This is the primary kernel path** on Spark.
 - **FlashInfer**: Has SM12x support for DSV4 MLA (TOPK 192 added in #4380).
@@ -85,7 +85,7 @@ export HEAD_IP=10.0.1.1
 | b12x | master | `local-inference-lab/b12x` |
 | cutlass-dsl | **4.7.0** | metadata rewrite (not 4.6.2 from vLLM cuda.txt) |
 | FlashInfer | main | DSV4 TOPK 192 present |
-| DeepGEMM | nv_dev `8b1392b` | **not** main (SM12x MQA only in nv_dev) |
+| DeepGEMM | nv_dev `a6b593d` | pinned back from `8b1392b` 2026-08-25 (SM12x fp8 regression; see [09-golden-deepgemm.md](09-golden-deepgemm.md)) |
 | DeepEP | main | for EP if needed |
 
 ---
@@ -109,3 +109,12 @@ export HEAD_IP=10.0.1.1
 - [03-kernels-attention.md](03-kernels-attention.md) — Why b12x is the only viable kernel path
 - [06-deployment.md](06-deployment.md) — Build and run procedures
 - [08-upstream.md](08-upstream.md) — SM12x gaps tracked upstream
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/README.md`](../field-notes/dgx-spark/README.md) — cluster topology, 1M recipe, measured ceilings
+- [`../field-notes/nvfp4/MHC_DEEPGEMM_SM121.md`](../field-notes/nvfp4/MHC_DEEPGEMM_SM121.md) — the SM121 mHC assertion that motivates the guards
+
+---
+
+**[← Index](00-index.md) · [Glossary](glossary.md) · [Next](02-model.md) →**

@@ -146,7 +146,7 @@ overlay's "padded `nvfp4_ds_mla` writer" existed for.
 
 NVFP4 KV **is** reachable, but only on the stage-c stack, whose overlay supplies
 the missing sm12x DeepSeek-V4 writer. That is measured, not theoretical:
-`examples/stagec-nvfp4-prod.yaml` serves **2,198,373 tokens** with
+`../../../configs/examples/stagec-nvfp4-prod.yaml` serves **2,198,373 tokens** with
 `kv_cache_dtype=nvfp4_ds_mla` confirmed live in the log. See §9 for the
 head-to-head.
 

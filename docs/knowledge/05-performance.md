@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Performance
 
@@ -165,8 +165,18 @@ curl -X POST http://10.0.1.1:8000/v1/completions \
 
 ## Related Docs
 
+- [02-model.md](02-model.md) — DSpark acceptance impact on throughput
 - [03-kernels-attention.md](03-kernels-attention.md) — Kernel differences causing the gap
 - [04-quantization-kv.md](04-quantization-kv.md) — KV capacity vs util
 - [06-deployment.md](06-deployment.md) — Config values for max_num_seqs, util
 - [07-gotchas.md](07-gotchas.md) — "Do not raise spark2 to util 0.85"
 - [08-upstream.md](08-upstream.md) — b12x kernel optimization PRs needed
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/TUNING.md`](../field-notes/dgx-spark/TUNING.md) — the util→KV-pool lever, 0.85 startup cliff, k>=5 constraint
+- [`../field-notes/dgx-spark/GOLDEN.md`](../field-notes/dgx-spark/GOLDEN.md) — three-lineage head-to-head on one harness
+
+---
+
+**[← Prev](04-quantization-kv.md) · [Glossary](glossary.md) · [Next](06-deployment.md) →**

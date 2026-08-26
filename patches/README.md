@@ -73,11 +73,19 @@ Standalone validation and analysis tools in `patches/`:
 | Dir | Contents |
 |---|---|
 | `hotfixes/` | Full-file versions used during v0.27.1 bring-up (kept for reference) |
-| `upstream/` | Active vLLM main open PR backports (`pr-*.diff`) and DeepGEMM diffs (`deepgemm-*.diff`) |
+| `upstream/` | Active vLLM main open PR backports (`pr-*.diff`), DeepGEMM diffs (`deepgemm-*.diff`), and historical donor diffs (`0001*`, `0002*`, `0003*`, `*-vllm-only.diff`, `kv-offload-bounds-check.patch`) |
+| `v0.27.1/` | Historical verified patch set for the pristine `v0.27.1` image (`combined-v0.27.1.patch`, `eugr-nvfp4.patch`) — see `docker/Dockerfile.nvfp4` |
+| `v0.28/` | Legacy git-diff patch set for the rc2 overlay track (`0001`–`0008`); superseded by `apply_overlays.py --stack rc2`, kept for history |
 
-## Do not use
+## Do not use (historical donor patches — not for standalone application)
 
-- `maci0/vllm-spark-nvfp4` `nvfp4-ds-mla-v0.27.1.patch` (191-line envelope)
-- `eugr-nvfp4.patch` (89-line; 432 vs 584)
+- `upstream/0003-nvfp4-ds-mla-v0.27.1.patch` — the 191-line v0.27.1 NVFP4
+  envelope. Only the rc2 fallback applies it (via `patch_nvfp4_ds_mla`);
+  do **not** apply it to the matched-main image (main handles the dtype via
+  the `b12x-sparse` overlay).
+- `v0.27.1/eugr-nvfp4.patch` — 89-line eugr-image-only patch (432 vs 584);
+  not for this repo's images.
+- `v0.27.1/combined-v0.27.1.patch` — applies to a pristine v0.27.1 tree only;
+  superseded by the overlays on both live stacks (`--stack rc2` / `--stack main`).
 - GLM 432/368 writer
 - Stage-C `head_bytes = 584` probe without a writer

@@ -39,7 +39,8 @@ via `patches/files/dsv4_b12x_sparse.py` onto the same 584 B page (b12x
 
 Measured real NVFP4 KV on 2x Spark remains anemll `dspark-vllm-gx10:0.1.1`
 (7,650 B/token). See parent research note
-`docs/NVFP4_DS_MLA_LINEAGE.md` in the TRT-LLM tree. The predecessor repos
+`NVFP4_DS_MLA_LINEAGE.md` in the TRT-LLM tree (external repo). The predecessor
+repos
 (`vllm-spark-main-b12x`, `vllm-spark-nvfp4`,
 `dgx-spark-deepseek-v4-flash-0731`) were absorbed here on 2026-08-25; raw
 archives: [docs/field-notes/](field-notes/README.md).

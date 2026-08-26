@@ -171,7 +171,7 @@ Source: [eugr/spark-vllm-docker `Dockerfile`](https://github.com/eugr/spark-vllm
 | Freeze at `a6b593d` instead of nv_dev tip | "SM121 DeepSeek-V4 MXFP4 grouped scale-factor regression first observed at nv_dev `f8e8fb5` (PR #384); last known good" | **No.** rc2/main FetchContent tag is `8b1392b` (PR #396 SiTU, 2026-08-11). | `8b1392b` is only 3 SiTU commits after `f8e8fb5`. It does **not** claim to fix grouped MXFP4 scales. eugr still frozen. Do not bump blindly. |
 | `DG_JIT_USE_NVRTC=0` | build + runner. "disable for conflicts with DeepGEMM" / "compatibility with DeepGEMM changes" | Not a vLLM source pin. nv_dev JIT vs NVRTC. | Irrelevant here while DeepGEMM is forced off. Keep if anyone rebuilds nv_dev. |
 | `transform_sf_into_required_layout` missing `arch_major=12` for `(gran_mn=1, gran_k=32)` | nv_dev pin already has `arch_major == 12` | DeepGEMM **main** still SM100-only | [deepseek-ai/DeepGEMM#372](https://github.com/deepseek-ai/DeepGEMM/issues/372) / [#403](https://github.com/deepseek-ai/DeepGEMM/pull/403). Merged in `nv_dev 8b1392b`. Backported as `deepgemm-pr-403.diff` for clean builds. |
-| DeepGEMM SM120 pure-FP8 GEMM port (`sm100_fp8_gemm_1d1d` kernel to `nv_dev`) | anemll 2.5.0 port | staged local port | Tracked as `deepgemm-fp8-1d1d-port.diff` (applied in `Dockerfile.main` before compilation). |
+| DeepGEMM SM120 pure-FP8 GEMM port (`sm100_fp8_gemm_1d1d` kernel to `nv_dev`) | anemll 2.5.0 port | staged local port | Tracked as `deepgemm-fp8-1d1d-port.diff` (applied in `docker/Dockerfile.main` before compilation). |
 | CUDA 13 `CUDA_SUPPORTED_ARCHS` drops 12.1 | opt-in `patch_vllm_preserve_sm12x_target.py` | rc2 CUDA 13 DeepGEMM list uses family `12.0f`, not `12.1a` | Already in [#52708](https://github.com/vllm-project/vllm/pull/52708) (and older [#38484](https://github.com/vllm-project/vllm/pull/38484)). Comment only; do not duplicate. Not this overlay image. |
 
 **Do not** open another DeepGEMM SM12x-enable PR. #372 covers main. nv_dev already has the kernels. vLLM #41062 (extend DeepGEMM MoE gates to SM12x) is closed, not merged; cmake moved to nv_dev instead.
@@ -215,7 +215,7 @@ CUDA 13.3.1 + torch 2.14 `12.1a`. Do not pull `cu130-nightly`.
 Docker, or a from-source build on the Spark.
 
 **Official arch list is `12.0`, not `12.1a`.**
-`docker/versions.json` `TORCH_CUDA_ARCH_LIST` default:
+vLLM's `docker/versions.json` `TORCH_CUDA_ARCH_LIST` default:
 `7.5 8.0 8.6 8.9 9.0 10.0 11.0 12.0`. CUDA 13 CMake
 `CUDA_SUPPORTED_ARCHS` also drops 12.1 (family 12.0). eugr compiles
 `12.1a` on purpose. Family `12.0f` is supposed to run on GB10; that is
@@ -295,4 +295,6 @@ Different stack (`B12X_MLA_SPARSE`, their nightly + rebuilt nv_dev DeepGEMM). No
 | 2026-08-24 | vllm #53574 | C128A eidx root-cause confirmation + C4A-branch-contiguous finding | https://github.com/vllm-project/vllm/pull/53574#issuecomment-5398599445 |
 | 2026-08-24 | vllm #47988 | SM121a `KeyError: float8_e8m0fnu` confirmation; backporting the unconditional upcast | https://github.com/vllm-project/vllm/pull/47988#issuecomment-5398601080 |
 | 2026-08-24 | vllm #53521 | production confirmation: o_proj noise → coherent with SM90 recipe | https://github.com/vllm-project/vllm/pull/53521#issuecomment-5398604045 |
+| 2026-08-25 | vllm #53680 | **opened** DeepGEMM pin-back to a6b593d (SM12x fp8 regression in 8b1392b) | https://github.com/vllm-project/vllm/pull/53680 |
+| 2026-08-25 | DeepGEMM #417 | **opened** regression issue (removed kernels + fp4 alias) | https://github.com/deepseek-ai/DeepGEMM/issues/417 |
 | 2026-08-24 | vllm #53607 | **opened** DSV4 CPU KV-offload flat-layout root-cause issue (GDS/LMCache track) | https://github.com/vllm-project/vllm/issues/53607 |

@@ -23,6 +23,8 @@
 | **Gotchas & Constraints** | [07-gotchas.md](07-gotchas.md) — The "do not" list (hard-learned) |
 | **Upstream Gaps & PRs** | [08-upstream.md](08-upstream.md) — What's open/merged/missing upstream |
 | **Golden image analysis** | [09-golden-deepgemm.md](09-golden-deepgemm.md) — Exact speed difference + DeepGEMM lift plan |
+| **Raw evidence & field notes** | [docs/field-notes/README.md](../field-notes/README.md) — per-chapter mapping to the unedited source documents |
+| **Glossary** | [glossary.md](glossary.md) — shared vocabulary (b12x, DSV4, mHC, eidx, nv_dev, …) |
 
 ---
 
@@ -92,7 +94,7 @@ VALIDATE_STACK=main ./scripts/06-validate.sh
 | **vLLM** | git `main`, `--no-build-isolation` |
 | **FlashInfer** | git `main` (DSV4 TOPK 192) |
 | **b12x** | git master + **cutlass-dsl 4.7.0** metadata rewrite |
-| **DeepGEMM** | `nv_dev` commit `8b1392b978f5` |
+| **DeepGEMM** | `nv_dev` commit `a6b593d` (pinned back 2026-08-25 — `8b1392b` regressed SM12x fp8 linear; see [09](09-golden-deepgemm.md)) |
 | **Load** | InstantTensor + hybrid lazy safetensors for DSpark draft |
 | **KV** | `nvfp4_ds_mla` (584 B DSV4 envelope, **not** GLM 432/368) |
 | **Linear / MoE** | `--linear-backend b12x`, `--moe-backend b12x` |
@@ -106,9 +108,11 @@ VALIDATE_STACK=main ./scripts/06-validate.sh
 ## How to Use This Knowledge Base
 
 1. **Start here** — This index links to all topics
-2. **Follow cross-references** — Documents link to each other extensively
-3. **Check timestamps** — Some sections note "as of 2026-08-24"; verify if stale
-4. **Contribute** — Found a gap? Add to the relevant doc and update this index
+2. **Read in order 01 → 09 for a guided tour** — Chapters build on each other; each ends with a *Next →* link. Keep the [glossary](glossary.md) at hand for vocabulary.
+3. **Follow cross-references** — Documents link to each other extensively
+4. **Drill into raw evidence** — Each chapter ends with *Raw evidence* links into [docs/field-notes/](../field-notes/README.md)
+5. **Check timestamps** — Some sections note "as of 2026-08-24"; verify if stale
+6. **Contribute** — Found a gap? Add to the relevant doc and update this index
 
 ---
 

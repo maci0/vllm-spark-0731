@@ -32,7 +32,7 @@ Plan, pins, and provenance: [docs/PLAN-MAIN.md](docs/PLAN-MAIN.md). Comprehensiv
 > [docs/knowledge/05-performance.md](docs/knowledge/05-performance.md) and
 > [HANDOFF.md](HANDOFF.md) → Status → Golden.
 > 
-> ⚠️ **Kernel Warning:** `LINEAR_BACKEND=deep_gemm` is currently blocked on SM12x (produces silent output corruption due to upstream `fp8_fp4_gemm_nt` aliasing in `nv_dev 8b1392b`). Keep `--linear-backend b12x` pinned until `deepgemm-fp8-1d1d-port.diff` is upstreamed.
+> ⚠️ **Kernel Warning:** `LINEAR_BACKEND=deep_gemm` is blocked on SM12x at the `8b1392b` pin (upstream `fp8_fp4_gemm_nt` aliasing → silent output corruption). The local pin-back to `a6b593d` removes the aliasing, but GB10 validation is still blocked at the JIT toolchain level — keep `--linear-backend b12x` pinned. Upstream: [vLLM #53680](https://github.com/vllm-project/vllm/pull/53680) / [DeepGEMM #417](https://github.com/deepseek-ai/DeepGEMM/issues/417); see [docs/knowledge/09-golden-deepgemm.md](docs/knowledge/09-golden-deepgemm.md).
 Open upstream PRs: [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
 ## History

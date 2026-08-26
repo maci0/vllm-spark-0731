@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Model: DeepSeek-V4-Flash-0731
 
@@ -104,3 +104,12 @@ The formula uses **ReLU(score)** — dropping ReLU selects the wrong kernel. Thi
 - [04-quantization-kv.md](04-quantization-kv.md) — KV cache dtype details
 - [05-performance.md](05-performance.md) — DSpark acceptance impact on throughput
 - [07-gotchas.md](07-gotchas.md) — "Do not serve without DSpark k=5"
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/MODEL_VARIANTS.md`](../field-notes/dgx-spark/MODEL_VARIANTS.md) — which HF checkpoints fit this setup
+- [`../field-notes/dgx-spark/CLIENT_INTEGRATION.md`](../field-notes/dgx-spark/CLIENT_INTEGRATION.md) — OpenAI-compat harness quirks (reasoning field)
+
+---
+
+**[← Prev](01-hardware.md) · [Glossary](glossary.md) · [Next](03-kernels-attention.md) →**

@@ -1,4 +1,4 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
 # Kernel Stack & Attention Backends
 
@@ -145,3 +145,13 @@ Stock FlashInfer has {128, 512, 1024, 2048}.
 - [04-quantization-kv.md](04-quantization-kv.md) — KV cache dtypes and page layouts
 - [05-performance.md](05-performance.md) — Benchmark impact of kernel choices
 - [08-upstream.md](08-upstream.md) — Upstream PRs for SM12x support
+- [09-golden-deepgemm.md](09-golden-deepgemm.md) — DeepGEMM regression and pin-back
+
+### Raw evidence (field notes)
+
+- [`../field-notes/nvfp4/DEEPGEMM_CALL_SITES.md`](../field-notes/nvfp4/DEEPGEMM_CALL_SITES.md) — every unguarded DeepGEMM call site on SM120
+- [`../field-notes/nvfp4/MHC_DEEPGEMM_SM121.md`](../field-notes/nvfp4/MHC_DEEPGEMM_SM121.md) — mHC pre-broadcast assertion and the #50645 guard
+
+---
+
+**[← Prev](02-model.md) · [Glossary](glossary.md) · [Next](04-quantization-kv.md) →**

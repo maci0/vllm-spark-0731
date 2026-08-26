@@ -1,6 +1,6 @@
-[← Back to Knowledge Index](00-index.md)
+[← Index](00-index.md) · [Glossary](glossary.md)
 
-# The golden image's speed: exact difference + lift plan (2026-08-24)
+# Golden Image Analysis: Speed Gap, Root Cause & Lift Plan
 
 Why `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` serves France c1 at **65.2 tok/s**
 while our matched-main (vLLM `e25c586b9`, Aug main) serves ~25.8 — and what
@@ -115,10 +115,11 @@ and its extra headers are just a6b593d's tree as packaged by vLLM 0.25.1.
 ## The fix (minimal, applied)
 
 1. `docker/Dockerfile.main`: `DEEPGEMM_COMMIT=a6b593d` (done).
-2. NVRTC JIT mode (`DG_JIT_USE_NVRTC=1` in `configs/env.spark.sh`): ptxas
-   cannot assemble tcgen05 for sm_121a on any CUDA 13.x tested (13.0 and
-   13.3), but NVRTC → driver-JIT works — the golden (a runtime image without
-   nvcc) uses NVRTC implicitly.
+2. NVRTC JIT mode was tried (`DG_JIT_USE_NVRTC=1`) because ptxas cannot
+   assemble tcgen05 for sm_121a on any CUDA 13.x tested (13.0 and 13.3).
+   **It did not land** — see Validation status below: NVRTC cubins were
+   rejected by the driver (`CUDA_ERROR_INVALID_IMAGE`). `DG_JIT_USE_NVRTC`
+   stays **0** (`configs/pin.main.env`, `docs/PLAN-MAIN.md` §4.4).
 3. `VLLM_USE_DEEP_GEMM_E8M0=1` (matches the golden).
 
 No kernel porting, no vendored headers, no wrapper surgery needed. The
@@ -126,12 +127,15 @@ kernel-port work done earlier (`dg25_fp8`, wrapper, dispatch patch) served to
 isolate the regression and is preserved as analysis, not shipped
 (`patches/upstream/deepgemm-fp8-1d1d-port.diff` is analysis-only).
 
-## Upstream legs
+## Upstream legs (shipped 2026-08-25)
 
-- **vLLM PR**: pin the cmake DeepGEMM tag from `8b1392b` back to `a6b593d`
-  (branch `fix-deepgemm-sm12x-fp8-regression` on maci0/vllm, commit c43c627).
-- **DeepGEMM issue**: [deepseek-ai/DeepGEMM#417](https://github.com/deepseek-ai/DeepGEMM/issues/417)
-  filed (2026-08-25) with the regression evidence.
+- **vLLM PR [#53680](https://github.com/vllm-project/vllm/pull/53680)**: pin
+  the cmake DeepGEMM tag from `8b1392b` back to `a6b593d` (branch
+  `fix-deepgemm-sm12x-fp8-regression` on maci0/vllm).
+- **DeepGEMM issue [deepseek-ai/DeepGEMM#417](https://github.com/deepseek-ai/DeepGEMM/issues/417)**:
+  the `8b1392b` SM12x fp8 regression (removed kernels + fp4 alias).
+- In-repo: `DEEPGEMM_COMMIT=a6b593d` in `docker/Dockerfile.main` +
+  `configs/pin.main.env`.
 
 ## Validation status (2026-08-25)
 
@@ -165,3 +169,11 @@ Rollback tags on the nodes: `vllm-spark-0731:main-b12x-orig` = known-good
 - [03-kernels-attention.md](03-kernels-attention.md) — b12x vs FlashInfer vs DeepGEMM kernels
 - [05-performance.md](05-performance.md) — Concurrency scaling & throughput benchmarks
 - [06-deployment.md](06-deployment.md) — Image build, lineage, and golden runbooks
+
+### Raw evidence (field notes)
+
+- [`../field-notes/dgx-spark/GOLDEN.md`](../field-notes/dgx-spark/GOLDEN.md) — the shipped golden deployment: recipe, harness, three-lineage comparison
+
+---
+
+**[← Prev](08-upstream.md) · [Glossary](glossary.md) · [Next](glossary.md) →**
