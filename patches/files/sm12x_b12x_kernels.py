@@ -589,6 +589,15 @@ def _cached_wo_a_bmm_weight(
         # [G*D, R] -> [G, D, R] -> [G, R, D] for bmm(a[G,T,R], w[G,R,D])
         w_bmm = w_dq.view(n_groups, o_lora_rank, group_width).transpose(1, 2).contiguous()
     else:
+        global _w_bmm_none_logged
+        if not _w_bmm_none_logged:
+            _w_bmm_none_logged = True
+            print(
+                "DBG wo_proj w_bmm NONE: "
+                f"w_dq={tuple(w_dq.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)}) "
+                f"want rows=G*R={n_groups * o_lora_rank} cols=gw={group_width}",
+                flush=True,
+            )
         return None
     wo_a._b12x_w_bmm = w_bmm
     print(
@@ -853,11 +862,39 @@ def try_b12x_wo_proj(
     head_dim = nope_dim + rope_dim
     n_heads = n_groups * heads_per_group
     group_width = heads_per_group * head_dim
+    dbg_n = getattr(try_b12x_wo_proj, "_n", 0) + 1
+    try_b12x_wo_proj._n = dbg_n
+    if dbg_n <= 8:
+        wa = getattr(wo_a, "weight", None)
+        wb = getattr(wo_b, "weight", None)
+        sa = getattr(wo_a, "weight_scale", None)
+        if sa is None:
+            sa = getattr(wo_a, "weight_scale_inv", None)
+        print(
+            "DBG wo_proj ENTRY#%d: o=%s dim=%d g=%d hpg=%d nope=%d rope=%d gw=%d "
+            "rank=%d wa=%s sa=%s wb=%s capt=%s"
+            % (
+                dbg_n, tuple(o_in.shape), o_in.dim(), n_groups, heads_per_group,
+                nope_dim, rope_dim, group_width, o_lora_rank,
+                tuple(wa.shape) if wa is not None else None,
+                tuple(sa.shape) if sa is not None else None,
+                tuple(wb.shape) if wb is not None else None,
+                torch.cuda.is_current_stream_capturing(),
+            ),
+            flush=True,
+        )
     if o_in.dim() == 2 and o_in.shape[-1] == n_heads * head_dim:
         o_in = o_in.view(o_in.shape[0], n_heads, head_dim)
     elif o_in.dim() == 4:
         o_in = o_in.reshape(o_in.shape[0], n_heads, head_dim)
     if o_in.dim() != 3 or o_in.shape[0] > 256:
+        er = getattr(try_b12x_wo_proj, "_er", 0)
+        if er < 8:
+            try_b12x_wo_proj._er = er + 1
+            print(
+                f"DBG wo_proj EARLY-RETURN#{er + 1}: dim={o_in.dim()} shape={tuple(o_in.shape)}",
+                flush=True,
+            )
         return None
     try:
         o_fp8, o_scale = fused_inv_rope_fp8_quant(
@@ -870,6 +907,14 @@ def try_b12x_wo_proj(
             rope_dim=rope_dim,
             tma_aligned_scales=False,
         )
+        fk = getattr(try_b12x_wo_proj, "_fk", 0)
+        if fk < 8:
+            try_b12x_wo_proj._fk = fk + 1
+            print(
+                f"DBG wo_proj FUSED#{fk + 1}: o_fp8={tuple(o_fp8.shape)} {o_fp8.dtype} "
+                f"o_scale={tuple(o_scale.shape)} {o_scale.dtype}",
+                flush=True,
+            )
         tgd = _dequant_grouped_fp8(o_fp8, o_scale)
         if tgd is None:
             return None
@@ -878,6 +923,14 @@ def try_b12x_wo_proj(
         )
         if w_bmm is None:
             return None
+        ok = getattr(try_b12x_wo_proj, "_ok", 0)
+        if ok < 8:
+            try_b12x_wo_proj._ok = ok + 1
+            print(
+                f"DBG wo_proj OK#{ok + 1}: o={tuple(o.shape)} g={n_groups} hpg={heads_per_group} "
+                f"gw={group_width} rank={o_lora_rank} tgd={tuple(tgd.shape)} w_bmm={tuple(w_bmm.shape)}",
+                flush=True,
+            )
         tokens = int(tgd.shape[0])
         ws = _ensure_bmm_ws(
             tgd.device, tokens, n_groups, group_width, o_lora_rank
@@ -900,10 +953,18 @@ def try_b12x_wo_proj(
             _wo_bmm_ok_logged = True
         return out
     except Exception as exc:
-        global _o_proj_fail_logged
-        if not _o_proj_fail_logged:
-            print(f"b12x wo_proj fallback: {type(exc).__name__}: {exc}", flush=True)
-            _o_proj_fail_logged = True
+        fl = getattr(try_b12x_wo_proj, "_fl", 0)
+        if fl < 3:
+            try_b12x_wo_proj._fl = fl + 1
+            import traceback as _tb
+
+            _stack = _tb.format_exception(type(exc), exc, exc.__traceback__)
+            print(
+                f"b12x wo_proj fallback#{fl + 1} (o={tuple(o_in.shape)}): "
+                f"{type(exc).__name__}: {exc}\n"
+                + "".join(_stack[-8:]),
+                flush=True,
+            )
         return None
 
 
