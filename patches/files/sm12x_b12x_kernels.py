@@ -582,6 +582,12 @@ def b12x_profile_decode_once(fn):
     def wrapper(self, *args, **kwargs):
         import torch
 
+        # Never profile during CUDA graph capture (torch.profiler recording
+        # invalidates stream capture -> cudaErrorStreamCaptureInvalidated).
+        # The first _run_model call is the FULL-graph capture; the first real
+        # decode step (a graph replay) gets profiled instead.
+        if torch.cuda.is_current_stream_capturing():
+            return fn(self, *args, **kwargs)
         with torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CUDA,
