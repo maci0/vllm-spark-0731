@@ -117,10 +117,15 @@ if [[ "${ENABLE_PREFIX_CACHING:-0}" == "1" ]]; then
 fi
 
 PROFILE_ARGS=()
-if [[ -n "${PROFILE_CONFIG:-}" ]]; then
-  # e.g. PROFILE_CONFIG='{"profiler":"torch","torch_profiler_dir":"/tmp/profile"}'
-  # exposes POST /start_profile + /stop_profile (v0.28.0 on-demand profiler).
-  PROFILE_ARGS+=(--profiler-config "${PROFILE_CONFIG}")
+if [[ "${PROFILE_ENABLE:-0}" == "1" ]]; then
+  # Canonical dotted form (the JSON-string form parses on the API frontend
+  # but is dropped in the engine -> workers' ProfilerConfig, "Profiling is
+  # not enabled"). Exposes POST /start_profile + /stop_profile.
+  PROFILE_ARGS+=(--profiler-config.profiler torch)
+  PROFILE_ARGS+=(--profiler-config.torch_profiler_dir "${PROFILE_DIR:-/tmp/profile}")
+  if [[ "${PROFILE_IGNORE_FRONTEND:-0}" == "1" ]]; then
+    PROFILE_ARGS+=(--profiler-config.ignore_frontend true)
+  fi
 fi
 
 HOST_KV_OFFLOAD_DIR="${HOST_KV_OFFLOAD_DIR:-${HOME}/lmcache-0731}"
