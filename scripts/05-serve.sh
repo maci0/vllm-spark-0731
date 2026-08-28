@@ -128,6 +128,12 @@ if [[ "${PROFILE_ENABLE:-0}" == "1" ]]; then
   fi
 fi
 
+# Serve under the checkpoint's own id unless an alias is explicitly wanted.
+SERVED_MODEL_ARGS=()
+if [[ -n "${SERVED_MODEL_NAME:-}" ]]; then
+  SERVED_MODEL_ARGS+=(--served-model-name ${SERVED_MODEL_NAME})
+fi
+
 HOST_KV_OFFLOAD_DIR="${HOST_KV_OFFLOAD_DIR:-${HOME}/lmcache-0731}"
 KV_TRANSFER_ARGS=()
 KV_OFFLOAD_DOCKER_ARGS=()
@@ -290,7 +296,7 @@ docker run -d -i --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host
     --reasoning-parser "${REASONING_PARSER:-deepseek_v4}" \
     --tool-call-parser "${TOOL_CALL_PARSER:-deepseek_v4}" \
     --enable-auto-tool-choice \
-    --served-model-name ${SERVED_MODEL_NAME} \
+    ${SERVED_MODEL_ARGS[@]} \
     --trust-remote-code
 
 echo "started ${CONTAINER_NAME} $(docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}")"
