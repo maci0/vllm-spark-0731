@@ -107,82 +107,95 @@ def deepseek_v4_mhc_layer_warmup(
         "Warming up DSv4 mHC layer TileLang kernels for token sizes: %s",
         sizes,
     )
-    with torch.inference_mode():
-        for size in sizes:
-            x = torch.zeros(
-                size, hc_mult, hidden, dtype=torch.bfloat16, device=device
-            )
-            post_mix, comb_mix, layer_input = mhc_pre_tilelang(
-                x,
-                layer.hc_attn_fn,
-                layer.hc_attn_scale,
-                layer.hc_attn_base,
-                layer.rms_norm_eps,
-                layer.hc_eps,
-                layer.hc_eps,
-                layer.hc_post_alpha,
-                layer.hc_sinkhorn_iters,
-                norm_weight=attn_norm_w,
-                norm_eps=attn_norm_e,
-            )
-            residual = layer_input
-            for fn, scale, base, nw, ne in (
-                (
+    try:
+        with torch.inference_mode():
+            for size in sizes:
+                x3d = torch.zeros(
+                    size, hc_mult, hidden, dtype=torch.bfloat16, device=device
+                )
+                post_mix, comb_mix, layer_input = mhc_pre_tilelang(
+                    x3d,
                     layer.hc_attn_fn,
                     layer.hc_attn_scale,
                     layer.hc_attn_base,
-                    attn_norm_w,
-                    attn_norm_e,
-                ),
-                (
-                    layer.hc_ffn_fn,
-                    layer.hc_ffn_scale,
-                    layer.hc_ffn_base,
-                    ffn_norm_w,
-                    ffn_norm_e,
-                ),
-            ):
-                residual, post_mix, comb_mix, layer_input = (
-                    mhc_fused_post_pre_tilelang(
-                        layer_input,
-                        residual,
-                        post_mix,
-                        comb_mix,
-                        fn,
-                        scale,
-                        base,
-                        layer.rms_norm_eps,
-                        layer.hc_eps,
-                        layer.hc_eps,
-                        layer.hc_post_alpha,
-                        layer.hc_sinkhorn_iters,
-                        n_splits=1,
-                        tile_n=1,
-                        norm_weight=nw,
-                        norm_eps=ne,
-                    )
+                    layer.rms_norm_eps,
+                    layer.hc_eps,
+                    layer.hc_eps,
+                    layer.hc_post_alpha,
+                    layer.hc_sinkhorn_iters,
+                    norm_weight=attn_norm_w,
+                    norm_eps=attn_norm_e,
                 )
+                # layer_input is [T, hidden] (2D); residual stays the
+                # multi-stream [T, hc_mult, hidden] tensor — matches the
+                # model's fused call.
+                residual = x3d
+                for fn, scale, base, nw, ne in (
+                    (
+                        layer.hc_attn_fn,
+                        layer.hc_attn_scale,
+                        layer.hc_attn_base,
+                        attn_norm_w,
+                        attn_norm_e,
+                    ),
+                    (
+                        layer.hc_ffn_fn,
+                        layer.hc_ffn_scale,
+                        layer.hc_ffn_base,
+                        ffn_norm_w,
+                        ffn_norm_e,
+                    ),
+                ):
+                    residual, post_mix, comb_mix, layer_input = (
+                        mhc_fused_post_pre_tilelang(
+                            layer_input,
+                            residual,
+                            post_mix,
+                            comb_mix,
+                            fn,
+                            scale,
+                            base,
+                            layer.rms_norm_eps,
+                            layer.hc_eps,
+                            layer.hc_eps,
+                            layer.hc_post_alpha,
+                            layer.hc_sinkhorn_iters,
+                            n_splits=1,
+                            tile_n=1,
+                            norm_weight=nw,
+                            norm_eps=ne,
+                        )
+                    )
 
-        # hc_head (model level) — same dispatch as upstream's warmup.
-        hc_head_op = getattr(model, "hc_head_op", None)
-        if hc_head_op is not None:
-            hc_head_fn = getattr(model, "hc_head_fn", None)
-            hc_head_scale = getattr(model, "hc_head_scale", None)
-            hc_head_base = getattr(model, "hc_head_base", None)
-            if all(t is not None for t in (hc_head_fn, hc_head_scale, hc_head_base)):
-                hh = torch.zeros(
-                    max_t, hc_mult, hidden, dtype=torch.bfloat16, device=device
-                )
-                for size in sizes:
-                    hc_head_op(
-                        hh[:size],
-                        hc_head_fn,
-                        hc_head_scale,
-                        hc_head_base,
-                        model.rms_norm_eps,
-                        model.hc_eps,
+            # hc_head (model level) — same dispatch as upstream's warmup.
+            hc_head_op = getattr(model, "hc_head_op", None)
+            if hc_head_op is not None:
+                hc_head_fn = getattr(model, "hc_head_fn", None)
+                hc_head_scale = getattr(model, "hc_head_scale", None)
+                hc_head_base = getattr(model, "hc_head_base", None)
+                if all(
+                    t is not None for t in (hc_head_fn, hc_head_scale, hc_head_base)
+                ):
+                    hh = torch.zeros(
+                        max_t, hc_mult, hidden, dtype=torch.bfloat16, device=device
                     )
-        torch.accelerator.synchronize()
+                    for size in sizes:
+                        hc_head_op(
+                            hh[:size],
+                            hc_head_fn,
+                            hc_head_scale,
+                            hc_head_base,
+                            model.rms_norm_eps,
+                            model.hc_eps,
+                        )
+            torch.accelerator.synchronize()
+    except Exception as exc:  # warmup must never take the worker down
+        logger.warning(
+            "DSv4 mHC layer warmup failed (serving without it): %s: %s",
+            type(exc).__name__,
+            exc,
+        )
+        return
     logger.info(
         "DSv4 mHC layer warmup finished in %.2f seconds.",
         time.perf_counter() - started,
@@ -214,29 +227,39 @@ def dspark_gumbel_warmup(
 
     started = time.perf_counter()
     logger.info("Warming up DSpark gumbel sampler kernels (vocab %d).", vocab_size)
-    with torch.inference_mode():
-        for use_fp64 in (False, True):
-            for apply_temperature in (False, True):
-                for per_token_col in (False, True):
-                    cache = None
-                    cache_col = None
-                    if per_token_col:
-                        cache = torch.zeros(
-                            1, 1, vocab_size, dtype=torch.bfloat16, device=device
+    try:
+        with torch.inference_mode():
+            for use_fp64 in (False, True):
+                for apply_temperature in (False, True):
+                    for per_token_col in (False, True):
+                        cache = None
+                        cache_col = None
+                        if per_token_col:
+                            cache = torch.zeros(
+                                1, 1, vocab_size, dtype=torch.bfloat16, device=device
+                            )
+                            cache_col = torch.zeros(
+                                1, dtype=torch.int64, device=device
+                            )
+                        gumbel_sample(
+                            logits,
+                            idx_map,
+                            temperature,
+                            seed,
+                            pos,
+                            apply_temperature,
+                            cache,
+                            cache_col,
+                            use_fp64,
                         )
-                        cache_col = torch.zeros(1, dtype=torch.int64, device=device)
-                    gumbel_sample(
-                        logits,
-                        idx_map,
-                        temperature,
-                        seed,
-                        pos,
-                        apply_temperature,
-                        cache,
-                        cache_col,
-                        use_fp64,
-                    )
-        torch.accelerator.synchronize()
+            torch.accelerator.synchronize()
+    except Exception as exc:  # warmup must never take the worker down
+        logger.warning(
+            "DSpark gumbel warmup failed (serving without it): %s: %s",
+            type(exc).__name__,
+            exc,
+        )
+        return
     logger.info(
         "DSpark gumbel warmup finished in %.2f seconds.",
         time.perf_counter() - started,
