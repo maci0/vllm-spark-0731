@@ -1,17 +1,29 @@
 # Upstream tracker
 
-Last verified: 2026-08-24 (afternoon). Open PRs below were re-checked
-`OPEN` at that time. None merged since morning.
+Last verified: **2026-08-28**. Recipe repo (public, reproducible):
+**https://github.com/maci0/vllm-spark-0731** — all overlays, backport diffs,
+knowledge docs, and measured numbers referenced below live there.
 
-Live runtime is **matched vLLM main**, not the rc2 overlay. Image
-`vllm-spark-0731:main-b12x` (`v0.1.dev1+ge25c586b9.d20260823`, CUDA 13.3.1,
-torch 2.14 `12.1a`). Canonical Architecture & Codebase Audit: [outputs/vllm-spark-0731-docs-audit.md](../outputs/vllm-spark-0731-docs-audit.md) ([Plan](../outputs/.plans/vllm-spark-0731-docs.md)). Ops and measured numbers: [HANDOFF.md](../HANDOFF.md).
-Build: [PLAN-MAIN.md](PLAN-MAIN.md).
+Live runtime (2026-08-28): **v0.28.0 release** (`2cf0a6915ce5`, "DeepSeek V4:
+sparse MLA works end-to-end for plain decode, MTP, and DSpark speculative
+decoding (#51538)") as image `vllm-spark-0731:main-b12x-028-rdma` =
+`main-b12x-028-p1` (full CUDA 13.3.1 / torch 2.14 `12.1a` build) + rdma-core
+v54 libmlx5 overlay (NCCL RoCE; see docs/knowledge/05-performance.md) +
+`patches/files` donors + warmup ext. Canonical audit:
+[outputs/vllm-spark-0731-docs-audit.md](../outputs/vllm-spark-0731-docs-audit.md).
+Ops and measured numbers: [HANDOFF.md](../HANDOFF.md). Build:
+[PLAN-MAIN.md](PLAN-MAIN.md).
+
+Measured 2026-08-28 (2x GB10, TP=2, DSpark k=5, `B12X_MLA_SPARSE`,
+`nvfp4_ds_mla`, util 0.8): **c1 steady-state 40.2-43.5 tok/s, c8 117, c16
+183, c24 261, c32 306.8 agg** (SM util 95%). France greedy
+`' Paris...'` logprob -0.254 (matches golden einsum exactly); o_proj decode
+bmm active with **0 fallbacks**.
 
 The rc2 overlay (`vllm/vllm-openai:v0.27.1` arm64 runtime + v0.28.0rc2
-Python `74a6576` + `patches/apply_overlays.py`) is the fallback if
-main-b12x is down. v0.28.0rc2 has no arm64 image. "In rc2" means the
-**Python tag**, not the v0.27.1 `.so` / FlashInfer wheel.
+Python `74a6576` + `patches/apply_overlays.py`) is the historical fallback;
+the v0.28.0 release stack superseded it. "In v0.28.0" means the **release
+Python tag**, not the v0.27.1 `.so` / FlashInfer wheel.
 
 Do not open duplicate PRs. Comment with Spark evidence if a PR already
 covers it. Do not upstream Spark measurements that failed on this pair
@@ -20,13 +32,14 @@ multi-row scheduled paged scorer).
 
 For the full backport patch registry, including active upstream PR backports (`pr-*.diff`), DeepGEMM backports (`deepgemm-*.diff`), and historical donor diffs (`0001*`, `0002*`, `0003*`, `b12x-utils-main.py`), see [patches/upstream/README.md](../patches/upstream/README.md).
 
+
 ## Pins
 
 | Tree | ID | When |
 |------|-----|------|
-| vLLM matched-main (live image) | `e25c586b9` (`v0.1.dev1+ge25c586b9.d20260823`) | 2026-08-23 |
-| vLLM v0.28.0rc2 (overlay fallback) | `74a6576b9b58` | 2026-08-21 06:47 UTC |
-| vLLM main (PR check) | default branch | 2026-08-24 afternoon; #53425 #53522 #53055 #52499 #41834 #52708 #53574 #47988 still OPEN; #53521 #53898 CLOSED 2026-08-27 (einsum misread resolved as misdiagnosis — kernel correct, see table) |
+| vLLM **v0.28.0 release** (live image `main-b12x-028-rdma`) | `2cf0a6915ce5` | 2026-08-27 (rebase) |
+| vLLM v0.28.0rc2 (historical overlay fallback) | `74a6576b9b58` | 2026-08-21 06:47 UTC |
+| vLLM main (PR check) | default branch | 2026-08-28: #53425 #53522 #53680 #53055 #52499 #41834 #52708 #53574 #47988 still OPEN; #53521 #53898 CLOSED 2026-08-27 (einsum misread resolved as misdiagnosis — kernel correct, see table); **#46716 rebased 2026-08-28** |
 | DeepGEMM in v0.27.1 / overlay `.so` | `e21c821f39a2` (DeepGEMM **main**, ~SM90/SM100) | 2026-08-04 |
 | DeepGEMM in v0.28.0rc2, vLLM main cmake, and matched-main | `8b1392b978f5` (**nv_dev** HEAD) | 2026-08-11 |
 | DeepGEMM in eugr Dockerfile | `a6b593d28267` (nv_dev, frozen) | 2026-06-29 |
@@ -34,7 +47,11 @@ For the full backport patch registry, including active upstream PR backports (`p
 | FlashInfer matched-main | git **main** (192 present) | image build |
 | flashinfer-ai main | has 192 and 256 | #4380 merged 2026-08-08 |
 
-## Matched-main live (2026-08-24)
+## Matched-main live (2026-08-24, historical)
+
+> Superseded 2026-08-27/28 by the **v0.28.0 release** stack (see header). The
+> overlays below still apply (they are the same `apply_main` set the v0.28.0
+> image uses); the numbers are the pre-v0.28.0 baseline.
 
 `vllm-spark-0731:main-b12x` already left the 0.27.1 overlay behind. Remaining
 gaps vs stock vLLM main are overlays and local helpers, not "switch to nightly".
@@ -68,48 +85,74 @@ PIECEWISE 11/11, FULL 7/7, DSpark backbone FULL 6/6 (sample eager).
 The 1-way hole (~4 tok/s vs interleaved gather) is still a kernel/grid
 question, not a missing vLLM flag. Do not gather packed storage to close it.
 
-## Already in v0.28.0rc2
+## Already in v0.28.0 release
 
-No overlay needed for these **source** pieces. SM12x still needs other overlays
-(DeepGEMM `.so`, CUTLASS `.so`, FlashInfer wheel, dtype list).
+No overlay needed for these **source** pieces (the v0.28.0 changelog: "DeepSeek
+V4 sparse MLA works end-to-end for plain decode, MTP, and DSpark speculative
+decoding (#51538), AMD Quark NVFP4 (#47972), sparse top-k metadata kernel
+optimizations (#52084, #51967), narrowed eager CUDA graph regions (#51430,
+#52401)"). SM12x still needs other overlays (DeepGEMM `.so`, CUTLASS `.so`,
+FlashInfer wheel, dtype list).
 
-| Piece | Where in rc2 | Upstream PR | Notes |
+| Piece | Where in v0.28.0 | Upstream PR | Notes |
 |-------|--------------|-------------|-------|
 | DSpark `method=dspark` | `config/speculative.py`, `models/deepseek_v4/nvidia/dspark.py`, `v1/worker/gpu/spec_decode/dspark/` | several, including #51538 (2026-08-15), #52288 (2026-08-15) | 0731 still locks **k=5** |
 | `FLASHINFER_MLA_SPARSE_DSV4` | `models/deepseek_v4/nvidia/flashinfer_sparse.py` | #51538 | SM12x accepts `fp8` / `fp8_e4m3` / `fp8_ds_mla` only. Not `nvfp4_ds_mla`. Kernel block `[256]`. |
-| Linear `--linear-backend b12x` | `LinearBackend` includes `"b12x"`; `warmup/b12x_warmup.py` warms FP8/MXFP4/NVFP4 linears | #52016 merged **2026-08-14** (before rc2) | Live kernel `B12xFp8BlockScaledMMKernel` |
-| Linear `flashinfer_b12x` | same `LinearBackend` | rc2 | CuteDSL NVFP4 GEMM. Different from MoE `b12x`. |
-| MoE `flashinfer_b12x` | `MoEBackend` | rc2 | CuteDSL fused MoE. **Not** MXFP4 `B12xExperts`. |
-| mHC siblings TileLang fallback | `mhc_pre_tilelang`, `mhc_fused_post_pre_tilelang` use `is_deep_gemm_supported()` | already in rc2 | **`mhc_pre_broadcast_tilelang` is not guarded** (see below) |
-| `support_deep_gemm()` includes family 120 | `platforms/cuda.py` | rc2 | Matches rc2 cmake (`nv_dev` SM12x). This image still ships the v0.27.1 **main** DeepGEMM `.so`, so the gate is a footgun here. |
-| KVBlockZeroer non-uniform pages | `v1/worker/utils.py` | #49704 merged 2026-07-24 | rc2 still **`assert shape[block_dim] % ratio == 0`**. SM12x 64-vs-256 hits that. |
+| MoE `--moe-backend b12x` + linear b12x + `b12x_warmup.py` | `MoEBackend`, `fused_moe/b12x.py`, `LinearBackend`, `warmup/b12x_warmup.py` | #52018 (merged 2026-08-21, **8h after the rc2 tag**; in the release) | Overlay `patch_moe_backend` / `patch_utils_b12x` / `patch_mxfp4_oracle` **auto-skip** on v0.28.0 ("already applied"). Live kernel `B12xFp8BlockScaledMMKernel` / b12x MoE. |
+| mHC siblings TileLang fallback | `mhc_pre_tilelang`, `mhc_fused_post_pre_tilelang` use `is_deep_gemm_supported()` | already in release | **`mhc_pre_broadcast_tilelang` is not guarded** (see below); not exercised by the nvidia 0731 model (embed pre-broadcasts to 3D). |
+| `support_deep_gemm()` includes family 120 | `platforms/cuda.py` | in release | Matches release cmake (`nv_dev` SM12x). This image ships the v0.27.1 **main** DeepGEMM `.so`, so the gate is a footgun here (`patch_deep_gemm_sm12x_guard`). |
+| KVBlockZeroer rewrite (no unaligned assert) | `v1/worker/utils.py` (address-table zeroer) | evolved past #49704 | `patch_kv_zeroer_skip` still applied defensively. |
 
-## Not in rc2, merged on vLLM main after the tag
+## 2026-08-28 session findings (new)
 
-Cherry-pick / overlay until the next release that contains the merge.
+1. **o_proj decode bmm — root cause + correct dequant (perf, not
+   correctness).** vLLM's DSV4 `wo_a` post-loads via
+   `deepgemm_post_process_fp8_weight_block` with `is_bmm=True` into **3D**
+   `[G, R, D]` (TP=2: `[4, 1024, 4096]`) and the scale becomes DeepGEMM's
+   **MN-major TMA-aligned packed UE8M0** `[G, R, D/512]` int32 (4 ue8m0
+   exponents per int32, byte `j` = k-block `4i+j`, rows per-gran-block
+   broadcast). The decode bmm dequant must unpack that layout; multiplying
+   by the raw int32 produces garbage (measured). Fixed + validated
+   numerically against the reference block-scale expansion. Local overlay
+   `o-proj-b12x` (`patches/files/sm12x_b12x_kernels.py`); not upstreamable
+   as-is (the upstream einsum path is correct — this only avoids the slow
+   einsum at decode). Measured: c1 29.8 → 33-38 (TTFT-incl.) /
+   40.2-43.5 steady-state.
+2. **`deepseek_v4_mhc_warmup` is a silent no-op on the NVIDIA DSV4 layer —
+   OPEN UPSTREAM BUG (PR opened 2026-08-28, see Comments table).** The
+   v0.28.0/main nvidia `DeepseekV4DecoderLayer` has no `hc_pre`/`hc_post`
+   methods (it calls `mhc_pre_tilelang` / `mhc_fused_post_pre_tilelang`
+   directly), so the warmup's layer gate never matches and every boot's
+   first request pays the TileLang JIT (~30-120 s; the c16 collapse).
+   Local fix: `patches/files/dsv4_warmup_ext.py` (drives the real layer
+   calls + `hc_head_op` + DSpark gumbel sampler) — c16 44.5 → 183.0,
+   c32 306.8 agg.
+3. **c16 collapse + 300+ agg both resolved** — see header numbers. SM util
+   went 47% → 95% (compute-bound now).
+4. **Recipe repo is public**: https://github.com/maci0/vllm-spark-0731
+   (pushed 2026-08-28; all PRs above link it as the reproducible source).
 
-| Piece | Merged | PR | Overlay |
-|-------|--------|-----|---------|
-| MoE `--moe-backend b12x` (`MoEBackend`, `fused_moe/b12x.py`, `quantization/utils/b12x_moe.py`, mxfp4 oracle `B12X_MXFP4_*`, `get_b12x_fused_moe`, `B12xWarmupUnit`) | 2026-08-21 15:04 UTC, **8h after rc2** | [#52018](https://github.com/vllm-project/vllm/pull/52018) | `copy_new_modules`, `patch_moe_backend`, `patch_envs`, `patch_utils_b12x`, `patch_mxfp4_oracle`, `patch_mxfp4_process_weights` |
-| Newer KVBlockZeroer (no unaligned assert) | after rc2 (main rewrite) | evolved past #49704 | `patch_kv_zeroer_skip` (ratio=1). Do not re-PR #49704. |
 
-## Not in rc2, still open on vLLM main
 
-Same bug in the tag **and** on main today. Comment or small PR. Do not duplicate.
+## Not in v0.28.0, still open on vLLM main
 
-| Piece | rc2 | main 2026-08-24 | Action |
+Same bug in the release **and** on main today. Comment or small PR. Do not duplicate.
+
+| Piece | v0.28.0 | main 2026-08-28 | Action |
 |-------|-----|-----------------|--------|
-| `mhc_pre_broadcast_tilelang` unguarded `tf32_hc_prenorm_gemm` | unguarded | still unguarded | [#53055](https://github.com/vllm-project/vllm/pull/53055) (also CUTLASS + sm121 carve-out). Older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase. Backport: `pr-53055.diff`; Overlay: `patch_mhc`. Comment only; do not duplicate. |
+| `mhc_pre_broadcast_tilelang` unguarded `tf32_hc_prenorm_gemm` | unguarded | still unguarded | [#53055](https://github.com/vllm-project/vllm/pull/53055) (also CUTLASS + sm121 carve-out). Older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase. Backport: `pr-53055.diff`; Overlay: `patch_mhc`. Comment only; do not duplicate. Not exercised by the 0731 nvidia model (3D pre-broadcast), kept defensively. |
 | CUTLASS FP8 `is_supported()` ignores SM12x | `CutlassFp8BlockScaledMMKernel` returns True if `CUTLASS_BLOCK_FP8_SUPPORTED` | #53055 still open | Backport: `pr-53055.diff`; Overlay: `patch_cutlass_sm12x_guard`. Same PR as mHC. |
-| `compute_fp8_einsum_recipe`: `major >= 10` → SM100 packed INT32 | yes | stock config is correct | [#53521](https://github.com/vllm-project/vllm/pull/53521) **CLOSED 2026-08-27** (not needed). Stock SM12x `(1,1,128)` + `tma_aligned_scales=True` verified numerically correct on GB10 (einsum mean_rel 0.000000 vs bf16 ref; E2E France coherent). The "~2³²" observation behind the override was the dequant-fallback's packed-int32-as-fp32 bug (see below), not a kernel misread. |
-| `fp8_einsum` on SM12x | yes | **stock kernel path is CORRECT** with packed E8M0 scales + `(1,1,128)` (mean_rel 0.000000 on GB10) | [#53898](https://github.com/vllm-project/vllm/pull/53898) **CLOSED 2026-08-27** (fallback not needed). The "290% kernel error" was the packer mantissa-leak hit by synthetic FP32 scales — real fix upstream: deepseek-ai/DeepGEMM **#337**. The "~2³²" was our own overlay fallback reading packed int32 as fp32 — it was the true E2E-garbage source. Final image `main-b12x-mn2` = stock einsum path + packed scales, verified E2E (France coherent, 65536 ctx, KV 9.38 GiB). |
-| DSV4 kernel block `[256]` on SM12x | `[256]` on sparse MLA, FlashInfer DSV4, V4 indexer | **still `[256]`** | [#53425](https://github.com/vllm-project/vllm/pull/53425) OPEN — fixed 2026-08-26 (ed71de5): `indexer → vllm.models.deepseek_v4.sparse_mla` module-level import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import inside `get_supported_kernel_block_sizes()`. Repro + 2 tests pass. Backport: `pr-53425.diff`; Overlay: `patch_dsv4_sm12x_block_size`. |
-| Indexer paged MQA metadata uses `has_deep_gemm()` not `is_deep_gemm_supported()` | yes | still that pattern | Not in #41834 / #53055. Opened [#53522](https://github.com/vllm-project/vllm/pull/53522) (`is_deep_gemm_supported()` + `num_states in (32, 64)`). **ivanusto reviewed 2026-08-24: test passed, gate scoped correctly (non-blocking note on test not pinning `build()` call site)**. Backport: `pr-53522.diff`; Overlay: `patch_indexer_deepgemm_guard`. |
-| DSpark SM120 spec-decode query rank / `num_tokens > 64` | #51538 is in rc2 (backend + top-k selection). Flat 3-D spec query may remain. | [#52499](https://github.com/vllm-project/vllm/pull/52499) open | Backport: `pr-52499.diff`; Comment only. We did not need this after TOPK=192. |
+| `compute_fp8_einsum_recipe`: `major >= 10` → SM100 packed INT32 | yes | stock config is correct | [#53521](https://github.com/vllm-project/vllm/pull/53521) **CLOSED 2026-08-27** (not needed). Stock SM12x `(1,1,128)` + `tma_aligned_scales=True` verified numerically correct on GB10 (einsum mean_rel 0.000000 vs bf16 ref; E2E France coherent). |
+| `fp8_einsum` on SM12x | yes | **stock kernel path is CORRECT** with packed E8M0 scales + `(1,1,128)` (mean_rel 0.000000 on GB10) | [#53898](https://github.com/vllm-project/vllm/pull/53898) **CLOSED 2026-08-27** (fallback not needed). Real fix upstream: deepseek-ai/DeepGEMM **#337**. |
+| DSV4 kernel block `[256]` on SM12x | `[256]` on sparse MLA, FlashInfer DSV4, V4 indexer | **still `[256]`** | [#53425](https://github.com/vllm-project/vllm/pull/53425) OPEN — fixed 2026-08-26 (ed71de5): `indexer → vllm.models.deepseek_v4.sparse_mla` module-level import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import inside `get_supported_kernel_block_sizes()`. Backport: `pr-53425.diff`; Overlay: `patch_dsv4_sm12x_block_size`. |
+| Indexer paged MQA metadata uses `has_deep_gemm()` not `is_deep_gemm_supported()` | yes | still that pattern | [#53522](https://github.com/vllm-project/vllm/pull/53522) OPEN (`is_deep_gemm_supported()` + `num_states in (32, 64)`). **ivanusto reviewed 2026-08-24: test passed, gate scoped correctly**. Backport: `pr-53522.diff`; Overlay: `patch_indexer_deepgemm_guard`. |
+| DSpark SM120 spec-decode query rank / `num_tokens > 64` | #51538 in release (backend + top-k). Flat 3-D spec query may remain. | [#52499](https://github.com/vllm-project/vllm/pull/52499) open | Comment only. Not needed after TOPK=192. |
 | FlashInfer eidx contiguity (C128A builder) | `_build_c128a_metadata` view of a width-sliced `global_decode_buffer`; DSpark batches >64 tokens crash at boot | **still unpatched** 2026-08-24; [#53574](https://github.com/vllm-project/vllm/pull/53574) OPEN | Backport: `pr-53574.diff`; Overlay: `flashinfer-eidx-contig`. C4A branch verified contiguous — no C4A bug. |
-| Triton E8M0 upcast gated on rocm/xpu | `KeyError: 'float8_e8m0fnu'` on SM12x | **still gated** 2026-08-24; [#47988](https://github.com/vllm-project/vllm/pull/47988) OPEN (unconditional upcast) | Backport: `pr-47988.diff`; Overlay: `triton-e8m0-sm12x` skips when #47988 form present. |
-| SM12x DSv4 umbrella | partial (backend exists) | [#41834](https://github.com/vllm-project/vllm/pull/41834) needs-rebase | Comment only. `sm12x_mqa.py` lives there. Pointed at the focused PRs. |
-| `fp8_einsum` SM12x Python dequant | rc2 is DeepGEMM-or-missing | #52357 Triton path closed | Overlay: `patch_fp8_einsum_fallback` — **REMOVED in main-b12x-mn2** (fallback was the E2E-garbage source; stock kernel path verified correct). |
+| Triton E8M0 upcast gated on rocm/xpu | `KeyError: 'float8_e8m0fnu'` on SM12x | **still gated** 2026-08-24; [#47988](https://github.com/vllm-project/vllm/pull/47988) OPEN | Backport: `pr-47988.diff`; Overlay: `triton-e8m0-sm12x`. |
+| SM12x DSv4 umbrella | partial (backend exists) | [#41834](https://github.com/vllm-project/vllm/pull/41834) needs-rebase | Comment only. Pointed at the focused PRs. |
+| **DSv4 mHC TileLang warmup no-ops on the NVIDIA layer** | `deepseek_v4_mhc_warmup` gates on `layer.hc_pre`/`hc_post` which the nvidia layer lacks (it calls `mhc_pre_tilelang` / `mhc_fused_post_pre_tilelang` directly; AMD/XPU layers do have the CustomOps) | **still broken on main** | [#52941](https://github.com/vllm-project/vllm/pull/52941) OPEN (same fix + tests; older attempts #51802, #49707). **Evidence commented 2026-08-28** (c16 44.5 → 183.0, c32 306.8 agg; AMD/XPU keep-path note). Local equivalent: `patches/files/dsv4_warmup_ext.py`. Do not open a duplicate. |
+| `fp8_einsum` SM12x Python dequant | release is DeepGEMM-or-missing | #52357 Triton path closed | Overlay: `patch_fp8_einsum_fallback` — **REMOVED in v0.28.0 stack** (fallback was the E2E-garbage source; stock kernel path verified correct). |
+
 
 ## FlashInfer (not vLLM rc2)
 
@@ -164,15 +207,18 @@ Three different trees:
   (`deepgemm-fp8-1d1d-port.diff`) re-adds the 1d1d kernel + the fp8xfp8 branch.
   A/B of the a6 wheel vs 8b wheel is in progress to pin the exact surface.
 
-Matched-main is now pinned back to `a6b593d` (the eugr/golden freeze);
+Matched-main was pinned back to `a6b593d` (the eugr/golden freeze);
 vLLM PR [#53680](https://github.com/vllm-project/vllm/pull/53680) moves the
 cmake tag back to `a6b593d`; DeepGEMM issue
 [#417](https://github.com/deepseek-ai/DeepGEMM/issues/417) tracks the upstream
 restore — **landed 2026-08-26 as [DeepGEMM#419](https://github.com/deepseek-ai/DeepGEMM/pull/419)**
 (restore + TU header fixes; driver-JIT PTX route tested and blocked, see
-[docs/knowledge/09](knowledge/09-golden-deepgemm.md)). Updated 2026-08-26:
-with the a6 wheel, `fp8_einsum` o_proj runs on SM121a (T=10/96/8192);
-remaining gap is the 1d1d tcgen05 JIT toolchain.
+[docs/knowledge/09](knowledge/09-golden-deepgemm.md)). **2026-08-27/28
+status: all ds-review-bot criticals/warnings addressed in `44d9d2e` (no
+AB-swap for pure fp8, `allow_swap_ab` filter in SM100 heuristics, arch-10
+fp4_A×fp8_B routing, epilogue_type, math.cuh include); lucifer1004's SMEM
+capacity note fixed in `54d5a3e` (stages sized from the device's actual
+`sharedMemPerBlockOptin`). Mergeable; no new findings.**
 
 SM12x kernels live on DeepGEMM `nv_dev` ([PR #324](https://github.com/deepseek-ai/DeepGEMM/pull/324) / issue #324). They are **not** on DeepGEMM `main`.
 
@@ -316,3 +362,30 @@ Different stack (`B12X_MLA_SPARSE`, their nightly + rebuilt nv_dev DeepGEMM). No
 | 2026-08-25 | vllm #53680 | **opened** DeepGEMM pin-back to a6b593d (SM12x fp8 regression in 8b1392b) | https://github.com/vllm-project/vllm/pull/53680 |
 | 2026-08-25 | DeepGEMM #417 | **opened** regression issue (removed kernels + fp4 alias) | https://github.com/deepseek-ai/DeepGEMM/issues/417 |
 | 2026-08-24 | vllm #53607 | **opened** DSV4 CPU KV-offload flat-layout root-cause issue (GDS/LMCache track) | https://github.com/vllm-project/vllm/issues/53607 |
+| 2026-08-26 | DeepGEMM #419 | all review criticals addressed in `44d9d2e` | https://github.com/deepseek-ai/DeepGEMM/pull/419#issuecomment-… |
+| 2026-08-26 | vllm #53522 | ivanusto review + test pass | https://github.com/vllm-project/vllm/pull/53522#issuecomment-… |
+| 2026-08-26 | vllm #53425 | import-cycle fixed in `ed71de5` (kitch2400 trace) | https://github.com/vllm-project/vllm/pull/53425#issuecomment-… |
+| 2026-08-26/27 | vllm #53680 | kitch2400 a6b593d validation; relationship note | https://github.com/vllm-project/vllm/pull/53680#issuecomment-… |
+| 2026-08-27 | DeepGEMM #419 | lucifer1004 SMEM capacity; fixed `54d5a3e` | https://github.com/deepseek-ai/DeepGEMM/pull/419#issuecomment-… |
+| 2026-08-28 | vllm #46716 | **rebased** onto current main (clean, +9/-1), bug still present upstream | https://github.com/vllm-project/vllm/pull/46716#issuecomment-5451316380 |
+| 2026-08-28 | all 6 PRs | **recipe repo linked** (maci0/vllm-spark-0731) as reproducible source | see each PR |
+| 2026-08-28 | vllm #52941 | DSv4 mHC warmup no-op: 2x GB10 evidence (c16 44.5→183, c32 306.8 agg) + AMD/XPU keep-path note; no duplicate opened | https://github.com/vllm-project/vllm/pull/52941#issuecomment-5453460872 |
+
+## Patch necessity verdict (2026-08-28 audit, `patches/apply_overlays.py`)
+
+54 overlay functions; **38 applied by `apply_main`** (the v0.28.0 stack) —
+each maps to an open upstream PR backport, a local SM12x fallback, or a
+Spark-specific workaround (tables above). The remaining ~16 are **defined
+but not applied** (history/experiments, kept for `--only` runs):
+`patch_fp8_einsum_fallback` / `patch_einsum_sm12x_recipe` /
+`patch_einsum_sm12x_scale_upcast` (superseded — #53898/#53521 CLOSED),
+`patch_logit_dump` (diagnostic), `patch_lm_head_restore_after_graphs`,
+`patch_dspark_hidden_fix`, `patch_dspark_disable_graphs`,
+`patch_dspark_backbone_none`, `patch_dspark_fullstep_graph`,
+`patch_dspark_fullstep_revert` (DSpark graph-mode experiments),
+`patch_indexer_packed_insert_revert` (history), `patch_tp_allreduce_piecewise_workspace`
+(alternative mode). `patch_mhc`'s broadcast guard is not exercised by the
+0731 nvidia model (embed pre-broadcasts to 3D) but kept for #53055 + other
+DSV4 variants. On v0.28.0 the #52018 MoE-b12x overlays auto-skip (already
+in the release).
+
