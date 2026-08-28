@@ -95,6 +95,19 @@ saved at c1 if the estimate holds; rebuild via
 `scripts/ov-rebuild-rdma.sh`, verify `DBG wo_proj OK#N` + `b12x wo_proj bmm
 ok` in the worker log, then re-bench.
 
+**Phase 2 warmup — JIT gap found + FIXED in code (2026-08-28, commit
+2e92fa5, pending rebuild/deploy):** upstream `deepseek_v4_mhc_warmup` only
+warms the 3D per-layer mHC path; the first layer's
+`mhc_pre_broadcast_tilelang` (2D residual + `fn_broadcast`, runs every
+decode step) and the DSpark `gumbel_sample` triton kernels were never
+warmed → first request after boot pays TileLang (~30-120 s) + DeepGEMM
+per-M + triton compiles, the c16-collapse suspect. New
+`vllm/model_executor/warmup/dsv4_warmup_ext.py` warms both (called from
+`kernel_warmup` after the upstream warmup). Verify at boot: worker log
+`Warming up DSv4 mHC broadcast ...` + `DSpark gumbel sampler kernels ...`
++ `finished in X.XX seconds` before health 200, then re-run the c8/c16/c24
+concurrency sweep.
+
 **Fallback:** `vllm-spark-0731:v0.28.0rc2-b12x` (v0.28.0rc2 Python on
 v0.27.1 arm64 base). Same greedy string. Attention is FlashInfer DSV4,
 not b12x. Pin: `scripts/05-serve.sh nvfp4`. Rest of this file is overlay

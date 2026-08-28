@@ -188,6 +188,28 @@ saturation/stall at higher concurrency is JIT-compiles during inference
 (mHC TileLang kernels + DSpark gumbel sampler compile on first use for new
 shapes - warmup gaps) and per-layer kernel overhead (SM util still ~47%).
 
+**Warmup gaps identified (Phase 2, fixed in code 2026-08-28, commit
+2e92fa5 — pending rebuild/deploy):**
+- Upstream `deepseek_v4_mhc_warmup` (v0.28.0) drives `layer.hc_pre()` with
+  a **3D** `[T, hc_mult, H]` residual (per-layer path). The **first**
+  `DeepseekV4DecoderLayer` instead runs `mhc_pre_broadcast_tilelang()` with
+  a 2D `[T, H]` residual + `fn_broadcast` — never warmed. First served
+  decode step pays a TileLang JIT for
+  `mhc_pre_big_fuse_broadcast_with_norm_tilelang` (~30-120 s) plus per-M
+  DeepGEMM `tf32_hc_prenorm_gemm` compiles. (`n_splits=16` is constant for
+  decode sizes — the TileLang kernel compiles once per boot, but that once
+  lands in the first request.)
+- The DSpark draft path samples eagerly via `gumbel_sample()` (triton) —
+  warmed nowhere; first request pays the compile (once per constexpr
+  combo: `APPLY_TEMPERATURE × USE_FP64 × PER_TOKEN_COL`).
+- Fix: `vllm/model_executor/warmup/dsv4_warmup_ext.py` —
+  `deepseek_v4_mhc_broadcast_warmup` (mirrors the exact layer-0 call for
+  every capture token size) + `dspark_gumbel_warmup` (all 8 combos), wired
+  into `kernel_warmup` right after the upstream mHC warmup. Verify at boot:
+  worker log lines `Warming up DSv4 mHC broadcast ...` / `DSpark gumbel
+  sampler kernels ...` followed by the `finished in X.XX seconds` lines
+  **before** the health check completes.
+
 **NCCL env caveat**: with the v54 libmlx5, forcing `NCCL_IB_GID_INDEX=3` /
 `NCCL_NET_GDR_LEVEL=PHB` / `NCCL_IB_HCA=mlx5` re-breaks the path (0.37ms);
 leave them unset (defaults auto-select rocep1s0f1 + roceP2p1s0f1 at
