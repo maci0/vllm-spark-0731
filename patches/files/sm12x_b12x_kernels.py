@@ -580,23 +580,33 @@ def b12x_profile_decode_once(fn):
         return fn
 
     def wrapper(self, *args, **kwargs):
+        import time
+
         import torch
 
-        # Never profile during CUDA graph capture (torch.profiler recording
-        # invalidates stream capture -> cudaErrorStreamCaptureInvalidated).
-        # The first _run_model call is the FULL-graph capture; the first real
-        # decode step (a graph replay) gets profiled instead.
+        # Never profile during CUDA graph capture. The first _run_model call
+        # is the FULL-graph capture; the first real decode step (a graph
+        # replay) gets timed instead.
         if torch.cuda.is_current_stream_capturing():
             return fn(self, *args, **kwargs)
-        with torch.profiler.profile(
-            activities=[
-                torch.profiler.ProfilerActivity.CUDA,
-                torch.profiler.ProfilerActivity.CPU,
-            ]
-        ) as prof:
-            out = fn(self, *args, **kwargs)
-        prof.export_chrome_trace("/tmp/decode_profile.json")
-        print("b12x decode profile dumped to /tmp/decode_profile.json", flush=True)
+        # CUDA-event timing only: torch.profiler's kineto/CUPTI activity
+        # segfaults against vLLM's always-on SyncActivityProfilerHandler.
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        e0 = torch.cuda.Event(enable_timing=True)
+        e1 = torch.cuda.Event(enable_timing=True)
+        e0.record()
+        out = fn(self, *args, **kwargs)
+        e1.record()
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
+        wall_ms = 1000.0 * (t1 - t0)
+        gpu_ms = e0.elapsed_time(e1)
+        print(
+            f"b12x decode step: wall={wall_ms:.1f}ms gpu={gpu_ms:.1f}ms "
+            f"overhead={wall_ms - gpu_ms:.1f}ms",
+            flush=True,
+        )
         return out
 
     return wrapper
