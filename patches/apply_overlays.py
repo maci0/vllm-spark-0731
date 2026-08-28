@@ -3014,6 +3014,7 @@ def apply(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
+    patch_decode_profiler(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
@@ -4261,6 +4262,7 @@ def apply_main(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
+    patch_decode_profiler(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
     # v0.28.0: einsum fallback/recipe/upcast overlays removed (kernel verified
