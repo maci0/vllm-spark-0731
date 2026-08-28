@@ -1,5 +1,11 @@
 # Golden deployment: anemll NVFP4, ~2.0M KV, 2x DGX Spark
 
+> **Canonical reference:** [docs/knowledge/14-golden-setup.md](../../knowledge/14-golden-setup.md)
+> — the setup summary, "why faster" decomposition, reproduction paths, and
+> measured numbers live there. This field note keeps the operational detail
+> (ceiling experiments, workload sensitivity, failure modes, operating
+> notes) that the knowledge chapter deliberately omits.
+
 The shipped configuration as of 2026-08-22. Every number below is measured on
 this cluster with one harness, not quoted from upstream.
 

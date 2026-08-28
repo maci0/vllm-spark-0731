@@ -5,7 +5,7 @@
 Deploy `deepseek-ai/DeepSeek-V4-Flash-0731` across 2x DGX Spark nodes.
 
 **Audit Artifact:** [outputs/vllm-spark-0731-docs-audit.md](outputs/vllm-spark-0731-docs-audit.md) — Comprehensive architecture & codebase audit ([Plan](outputs/.plans/vllm-spark-0731-docs.md)).  
-**Knowledge Base:** [docs/knowledge/00-index.md](docs/knowledge/00-index.md) — Definitive 10-chapter reference guide.
+**Knowledge Base:** [docs/knowledge/00-index.md](docs/knowledge/00-index.md) — Definitive 10-chapter reference guide. **Golden (anemll) reference target:** [docs/knowledge/14-golden-setup.md](docs/knowledge/14-golden-setup.md) (+ field detail [docs/field-notes/dgx-spark/GOLDEN.md](docs/field-notes/dgx-spark/GOLDEN.md)).
 
 **Live (2026-08-26, re-served):** `vllm-spark-0731:main-b12x` (matched vLLM
 `v0.1.dev1+ge25c586b9.d20260823`, CUDA 13.3.1, torch 2.14 `12.1a`). b12x
