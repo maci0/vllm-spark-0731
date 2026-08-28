@@ -64,6 +64,30 @@ reboots/dies mid-rendezvous, the peer can wedge the same way — cycle it;
 gb10-clockcap` after a cycle. Verified stack (a6fix, TP=2, deep_gemm) is
 left RUNNING for interactive testing; stop with `07-stop.sh` on both.
 
+**Boot runbook (2026-08-28, Phase 4 — retry pattern so benchmark cycles
+aren't wasted):** the 2-node NCCL rendezvous fails intermittently (~50%,
+spark2 worker logs `Connection reset by peer` during init). Do NOT burn a
+benchmark cycle on a half-booted stack:
+1. Pre-flight: both nodes pingable; `docker images` on spark1 shows the
+   target tag; repo synced to `/tmp/vllm-spark-0731` on spark1.
+2. Clean slate on BOTH nodes: `docker rm -f vllm-ds4-0731` (plus
+   `scripts/07-stop.sh` if a stack is up).
+3. Boot worker FIRST (spark2), then head ~90s later (spark1):
+   `VLLM_USE_AOT_COMPILE=0 nohup bash scripts/05-serve.sh main-dg`.
+   `VLLM_USE_AOT_COMPILE=0` until the inductor/AOT caches are warm (a fresh
+   image with AOT=1 can wedge the host in memory-thrash).
+4. Wait for `/health` 200 on the head (~200 s), then verify BOTH worker and
+   head logs converged (TP init succeeded — `NCCL` all-reduce microbench
+   ~0.03-0.045 ms in the log, no `NET/IB: No device found`, no
+   `Connection reset by peer`).
+5. If the worker died mid-rendezvous: `docker rm -f` on BOTH nodes, wait
+   30 s (let the SHM/NCCL segments drain — see `spark-launch.sh` shm_sweep),
+   repeat from step 3. Do not restart only one side.
+6. Benchmark only after the health gate passes; warmup compiles (mHC
+   broadcast ~30-120 s, gumbel ~seconds) run during model load — the
+   `Warming up ... finished in X.XX seconds` lines must appear BEFORE the
+   first request, or the first measurement includes the JIT stall.
+
 Re-served 2026-08-26 (spark2 worker then spark1 head): `/health` 200 in
 ~200s, France greedy coherent (`" Paris. The capital of Italy is Rome…"`),
 c1 ~21.8 tok/s incl. TTFT (decode-only ~26, matches the 25.8 baseline).
