@@ -136,7 +136,8 @@ concurrency sweep.
 dequant + mHC/gumbel warmup):**
 | concurrency | agg tok/s | note |
 |------|------|------|
-| c1 | **33-38** | vs 29.8 pre-fix (o_proj bmm was garbage-first, then correct) |
+| c1 (128 tok incl. TTFT) | 33-38 | vs 29.8 pre-fix |
+| **c1 (256-512 tok steady-state)** | **40.2-43.5** | **40-50 target HIT** — 128-tok runs are TTFT-dominated |
 | c8 | **117.2** | |
 | c16 | **183.0** | was **44.5 (collapse)** → FIXED by warmup |
 | c24 | **260.7** | |
