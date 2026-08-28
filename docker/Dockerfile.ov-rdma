@@ -1,0 +1,25 @@
+# Reproducible overlay for the v0.28.0 RoCE image.
+#
+#   FROM main-b12x-028-rdma  (already carries the rdma-core v54 libmlx5 fix)
+#   re-copy the patches/files donors over the site-packages vllm tree
+#   (the p1 base baked the overlays at build time; this re-copies the
+#   latest tracked versions of the donor files without re-running
+#   apply_overlays.py, which is not idempotent on an already-patched tree)
+#
+# Build (on spark1, repo synced to /tmp/vllm-spark-0731):
+#   docker build -f docker/Dockerfile.ov-rdma -t vllm-spark-0731:main-b12x-028-rdma .
+#
+# Then sync to spark2:
+#   docker save vllm-spark-0731:main-b12x-028-rdma | ssh spark2 docker load
+
+FROM vllm-spark-0731:main-b12x-028-rdma
+
+COPY patches /opt/spark-0731/patches
+
+RUN set -eux; \
+    SITE="$(python3 -c 'import vllm, os; print(os.path.dirname(vllm.__file__))')"; \
+    cp /opt/spark-0731/patches/files/fused_moe_b12x.py "$SITE/model_executor/layers/fused_moe/b12x.py"; \
+    cp /opt/spark-0731/patches/files/b12x_moe.py "$SITE/model_executor/layers/quantization/utils/b12x_moe.py"; \
+    cp /opt/spark-0731/patches/files/dsv4_b12x_sparse.py "$SITE/models/deepseek_v4/nvidia/b12x_sparse.py"; \
+    cp /opt/spark-0731/patches/files/sm12x_b12x_kernels.py "$SITE/utils/sm12x_b12x_kernels.py"; \
+    python3 -c 'import inspect, vllm.utils.sm12x_b12x_kernels as m; print("ov sm12x ok", len(inspect.getsource(m)))'
