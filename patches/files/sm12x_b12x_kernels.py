@@ -568,6 +568,34 @@ def _expand_block_scales(scale: torch.Tensor, rows: int, cols: int) -> torch.Ten
     return s[..., :rows, :cols]
 
 
+def b12x_profile_decode_once(fn):
+    """One-shot torch.profiler wrap for the first decode ``execute_model``
+    call. Enabled by ``VLLM_PROFILE_DECODE=1``; dumps the chrome trace to
+    /tmp/decode_profile.json so a decode step can be broken down per-op
+    without the (broken in v0.28.0) engine-side profiler plumbing.
+    """
+    import os
+
+    if os.environ.get("VLLM_PROFILE_DECODE") != "1":
+        return fn
+
+    def wrapper(self, *args, **kwargs):
+        import torch
+
+        with torch.profiler.profile(
+            activities=[
+                torch.profiler.ProfilerActivity.CUDA,
+                torch.profiler.ProfilerActivity.CPU,
+            ]
+        ) as prof:
+            out = fn(self, *args, **kwargs)
+        prof.export_chrome_trace("/tmp/decode_profile.json")
+        print("b12x decode profile dumped to /tmp/decode_profile.json", flush=True)
+        return out
+
+    return wrapper
+
+
 def _cached_wo_a_bmm_weight(
     wo_a: Any,
     n_groups: int,

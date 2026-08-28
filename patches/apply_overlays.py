@@ -121,6 +121,40 @@ def copy_dsv4_warmup_ext(vllm: Path) -> None:
     print(f"ok copied {dest.relative_to(vllm.parent)}")
 
 
+def patch_decode_profiler(vllm: Path) -> None:
+    """One-shot torch.profiler on the first decode execute_model call.
+
+    v0.28.0's --profiler-config parses on the API frontend but the engine
+    workers never receive ProfilerConfig ("Profiling is not enabled"), so
+    the on-demand /start_profile API cannot reach the GPU kernels. This
+    wraps GPUModelRunner.execute_model with b12x_profile_decode_once
+    (env VLLM_PROFILE_DECODE=1 -> /tmp/decode_profile.json).
+    """
+    path = vllm / "v1/worker/gpu_model_runner.py"
+    replace_once(
+        path,
+        "    def execute_model(\n"
+        "        self,\n"
+        "        scheduler_output: \"SchedulerOutput\",\n"
+        "        intermediate_tensors: IntermediateTensors | None = None,\n"
+        "    ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors | None:\n",
+        "    @b12x_profile_decode_once\n"
+        "    def execute_model(\n"
+        "        self,\n"
+        "        scheduler_output: \"SchedulerOutput\",\n"
+        "        intermediate_tensors: IntermediateTensors | None = None,\n"
+        "    ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors | None:\n",
+        "decode profiler decorator",
+    )
+    replace_once(
+        path,
+        "from vllm.utils import length_from_prompt_token_ids_or_embeds\n",
+        "from vllm.utils import length_from_prompt_token_ids_or_embeds\n"
+        "from vllm.utils.sm12x_b12x_kernels import b12x_profile_decode_once\n",
+        "decode profiler import",
+    )
+
+
 def patch_kernel_warmup_ext(vllm: Path) -> None:
     """Call the mHC layer + gumbel warmups right after the upstream
     deepseek_v4_mhc_warmup (which is a no-op for the v0.28.0 nvidia layer).
@@ -4315,6 +4349,7 @@ def main() -> int:
             "ar-static-ws",
             "ar-piecewise-ws",
             "dsv4-warmup-ext",
+            "decode-profiler",
         ],
         default=None,
         help="Apply a single overlay (for patching an already-built image).",
@@ -4426,6 +4461,9 @@ def main() -> int:
         return 0
     if args.only == "ar-piecewise-ws":
         patch_tp_allreduce_piecewise_workspace(vllm)
+        return 0
+    if args.only == "decode-profiler":
+        patch_decode_profiler(vllm)
         return 0
     if args.only == "dsv4-warmup-ext":
         copy_dsv4_warmup_ext(vllm)
