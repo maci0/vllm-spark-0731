@@ -125,6 +125,10 @@ def patch_kernel_warmup_ext(vllm: Path) -> None:
     """Call the mHC-broadcast + gumbel warmups right after the upstream
     deepseek_v4_mhc_warmup (which only warms the 3D per-layer mHC path)."""
     path = vllm / "model_executor/warmup/kernel_warmup.py"
+    text = path.read_text()
+    if "deepseek_v4_mhc_broadcast_warmup" in text:
+        print("skip kernel_warmup dsv4 warmup ext (already present)")
+        return
     replace_once(
         path,
         "    deepseek_v4_mhc_warmup(\n"

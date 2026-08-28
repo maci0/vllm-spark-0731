@@ -22,4 +22,7 @@ RUN set -eux; \
     cp /opt/spark-0731/patches/files/b12x_moe.py "$SITE/model_executor/layers/quantization/utils/b12x_moe.py"; \
     cp /opt/spark-0731/patches/files/dsv4_b12x_sparse.py "$SITE/models/deepseek_v4/nvidia/b12x_sparse.py"; \
     cp /opt/spark-0731/patches/files/sm12x_b12x_kernels.py "$SITE/utils/sm12x_b12x_kernels.py"; \
-    python3 -c 'import inspect, vllm.utils.sm12x_b12x_kernels as m; print("ov sm12x ok", len(inspect.getsource(m)))'
+    cp /opt/spark-0731/patches/files/dsv4_warmup_ext.py "$SITE/model_executor/warmup/dsv4_warmup_ext.py"; \
+    python3 /opt/spark-0731/patches/apply_overlays.py --only dsv4-warmup-ext; \
+    python3 -c 'import inspect, vllm.utils.sm12x_b12x_kernels as m; print("ov sm12x ok", len(inspect.getsource(m)))'; \
+    python3 -c 'from vllm.model_executor.warmup import kernel_warmup as k; import inspect; assert "deepseek_v4_mhc_broadcast_warmup" in inspect.getsource(k.kernel_warmup); print("ov warmup ok")'
