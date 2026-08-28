@@ -1046,3 +1046,23 @@ Call path: `cudagraph_utils.py:capture` (FULL) -> `sparse_attn_indexer.py:603`
 
 Fix: gather length is `min(max_blocks * block_size, max_model_len)` from
 Python shapes. Context is applied as a mask, never as a host-side size.
+
+**Phase 3 profile — c1 now limited by DSpark cycle efficiency, not kernels
+(2026-08-29).** CUDA-event timing (env `VLLM_PROFILE_DECODE=1`, diag
+overlay `decode-profiler` + `layer-profiler`; the v0.28.0 on-demand
+`--profiler-config` is broken — parses on the API frontend but workers
+never get ProfilerConfig, and torch.profiler's kineto/CUPTI activity
+segfaults against vLLM's always-on SyncActivityProfilerHandler):
+- Decode step **GPU-bound** (overhead 0.0-0.1 ms), ~22 ms unprofiled for a
+  5-draft-token step (toks=5; 39 ms with the per-step synchronize).
+- Step time is roughly batch-invariant (5→160 tokens: 20-26 ms) —
+  fixed per-step cost, small batches are NOT slower than large.
+- **c1 acceptance: 145 decode steps produced a 128-token generation →
+  ~0.9 tokens/step at k=5** (vs golden's ~66.7% accept). The 40-43 tok/s
+  c1 = 0.9 tokens × (1/22 ms). If acceptance matched the golden, c1 would
+  be ~4-5× higher (1+5×0.6 tokens per 22 ms step ≈ 180+ tok/s).
+- Conclusion: the c1 gap is the **DSpark draft acceptance** (draft sampler
+  / markov bias / verification), NOT the per-layer kernels (MQA fallback /
+  attention / MoE at small batch are all inside the fast 22 ms step). Next
+  lever: measure and tune draft acceptance (greedy/temperature, markov
+  bias, verify path) — compare against the golden's 66.7%.
