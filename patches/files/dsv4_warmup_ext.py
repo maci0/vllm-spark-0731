@@ -1,12 +1,11 @@
-"""Warm the mHC first-layer broadcast path + DSpark gumbel sampler kernels.
+"""Warm the DSv4 mHC TileLang kernels + DSpark gumbel sampler kernels.
 
-Upstream ``deepseek_v4_mhc_warmup`` drives ``layer.hc_pre()`` with a 3D
-``[T, hc_mult, H]`` residual (the per-layer, non-broadcast path). The first
-``DeepseekV4DecoderLayer`` instead calls ``mhc_pre_broadcast_tilelang()``
-with a 2D ``[T, H]`` residual plus ``fn_broadcast`` -- never warmed. On the
-first served request after boot the TileLang kernel
-``mhc_pre_big_fuse_broadcast_with_norm_tilelang`` JITs (~30-120 s) and the
-DeepGEMM ``tf32_hc_prenorm_gemm`` compiles once per token count.
+The v0.28.0 nvidia DeepseekV4DecoderLayer calls ``mhc_pre_tilelang`` /
+``mhc_fused_post_pre_tilelang`` directly (it has no ``hc_pre``/``hc_post``
+methods), so upstream ``deepseek_v4_mhc_warmup`` (which gates on those
+methods) is a silent no-op here — every boot the first served request pays
+a TileLang JIT (~30-120 s) plus the hc_head compile. This warmup drives the
+same functions the layer calls, for every serving token size.
 
 The DSpark draft path samples eagerly through ``gumbel_sample()`` (triton);
 no upstream warmup covers it, so the first request pays the triton compile.
@@ -38,75 +37,83 @@ def _token_sizes(*, cudagraph_capture_sizes: list[int]) -> list[int]:
     return sorted(sizes)
 
 
-def _find_first_broadcast_mhc_layer(
-    model: torch.nn.Module,
-) -> torch.nn.Module | None:
-    """First decoder layer whose mHC pre runs the 2D broadcast path."""
+def _find_first_mhc_layer(model: torch.nn.Module) -> torch.nn.Module | None:
+    """First decoder layer carrying the direct-call mHC params."""
     for module in model.modules():
         if module.__class__.__name__ != "DeepseekV4DecoderLayer":
             continue
         if not all(
             hasattr(module, attr)
             for attr in (
-                "hc_pre",
+                "hidden_size",
+                "hc_mult",
                 "hc_attn_fn",
                 "hc_attn_scale",
                 "hc_attn_base",
-                "hc_attn_fn_broadcast",
+                "hc_ffn_fn",
+                "hc_ffn_scale",
+                "hc_ffn_base",
                 "attn_norm",
+                "ffn_norm",
+                "rms_norm_eps",
+                "hc_eps",
+                "hc_post_alpha",
+                "hc_sinkhorn_iters",
             )
         ):
             continue
-        if getattr(module, "hc_attn_fn_broadcast", None) is not None:
-            return module
+        return module
     return None
 
 
-def deepseek_v4_mhc_broadcast_warmup(
+def deepseek_v4_mhc_layer_warmup(
     model: torch.nn.Module,
     *,
     cudagraph_capture_sizes: list[int] | None = None,
 ) -> None:
-    """Pre-compile the first-layer mHC broadcast kernels for serving shapes.
+    """Pre-compile the mHC pre / fused-post-pre / hc_head TileLang kernels.
 
-    Mirrors the exact call the model makes for layer 0
-    (``mhc_pre_broadcast_tilelang`` with ``fn_broadcast``), which runs
-    DeepGEMM ``tf32_hc_prenorm_gemm`` (compiles per M) and the TileLang
-    ``mhc_pre_big_fuse_broadcast_with_norm_tilelang``.
+    Mirrors the calls the v0.28.0 nvidia layer makes every decode step:
+    ``mhc_pre_tilelang`` (layer 0, hc_attn_fn) then, per layer,
+    ``mhc_fused_post_pre_tilelang`` (hc_attn_fn + hc_ffn_fn pairs), plus the
+    model-level ``hc_head_op``.
     """
     if not _is_deepseek_v4(model):
         return
-    layer = _find_first_broadcast_mhc_layer(model)
+    layer = _find_first_mhc_layer(model)
     if layer is None:
-        logger.info_once(
-            "Skipping mHC broadcast warmup: no first-layer broadcast mHC found."
-        )
+        logger.info_once("Skipping mHC layer warmup: no DSv4 mHC layer found.")
         return
 
     from vllm.model_executor.kernels.mhc.tilelang import (
-        mhc_pre_broadcast_tilelang,
+        mhc_fused_post_pre_tilelang,
+        mhc_pre_tilelang,
     )
 
-    sizes = _token_sizes(cudagraph_capture_sizes=cudagraph_capture_sizes or [])
     device = layer.hc_attn_fn.device
     if device.type != "cuda":
         return
-
-    hidden_size = int(layer.hidden_size)
+    sizes = _token_sizes(cudagraph_capture_sizes=cudagraph_capture_sizes or [])
+    hidden = int(layer.hidden_size)
+    hc_mult = int(layer.hc_mult)
     max_t = max(sizes)
-    residual = torch.zeros(max_t, hidden_size, dtype=torch.bfloat16, device=device)
-    norm_weight = layer.attn_norm.weight.data
-    norm_eps = layer.attn_norm.variance_epsilon
+    attn_norm_w = layer.attn_norm.weight.data
+    attn_norm_e = layer.attn_norm.variance_epsilon
+    ffn_norm_w = layer.ffn_norm.weight.data
+    ffn_norm_e = layer.ffn_norm.variance_epsilon
 
     started = time.perf_counter()
     logger.info(
-        "Warming up DSv4 mHC broadcast TileLang + DeepGEMM kernels for token sizes: %s",
+        "Warming up DSv4 mHC layer TileLang kernels for token sizes: %s",
         sizes,
     )
     with torch.inference_mode():
         for size in sizes:
-            mhc_pre_broadcast_tilelang(
-                residual[:size],
+            x = torch.zeros(
+                size, hc_mult, hidden, dtype=torch.bfloat16, device=device
+            )
+            post_mix, comb_mix, layer_input = mhc_pre_tilelang(
+                x,
                 layer.hc_attn_fn,
                 layer.hc_attn_scale,
                 layer.hc_attn_base,
@@ -115,13 +122,69 @@ def deepseek_v4_mhc_broadcast_warmup(
                 layer.hc_eps,
                 layer.hc_post_alpha,
                 layer.hc_sinkhorn_iters,
-                norm_weight=norm_weight,
-                norm_eps=norm_eps,
-                fn_broadcast=layer.hc_attn_fn_broadcast,
+                norm_weight=attn_norm_w,
+                norm_eps=attn_norm_e,
             )
+            residual = layer_input
+            for fn, scale, base, nw, ne in (
+                (
+                    layer.hc_attn_fn,
+                    layer.hc_attn_scale,
+                    layer.hc_attn_base,
+                    attn_norm_w,
+                    attn_norm_e,
+                ),
+                (
+                    layer.hc_ffn_fn,
+                    layer.hc_ffn_scale,
+                    layer.hc_ffn_base,
+                    ffn_norm_w,
+                    ffn_norm_e,
+                ),
+            ):
+                residual, post_mix, comb_mix, layer_input = (
+                    mhc_fused_post_pre_tilelang(
+                        layer_input,
+                        residual,
+                        post_mix,
+                        comb_mix,
+                        fn,
+                        scale,
+                        base,
+                        layer.rms_norm_eps,
+                        layer.hc_eps,
+                        layer.hc_eps,
+                        layer.hc_post_alpha,
+                        layer.hc_sinkhorn_iters,
+                        n_splits=1,
+                        tile_n=1,
+                        norm_weight=nw,
+                        norm_eps=ne,
+                    )
+                )
+
+        # hc_head (model level) — same dispatch as upstream's warmup.
+        hc_head_op = getattr(model, "hc_head_op", None)
+        if hc_head_op is not None:
+            hc_head_fn = getattr(model, "hc_head_fn", None)
+            hc_head_scale = getattr(model, "hc_head_scale", None)
+            hc_head_base = getattr(model, "hc_head_base", None)
+            if all(t is not None for t in (hc_head_fn, hc_head_scale, hc_head_base)):
+                hh = torch.zeros(
+                    max_t, hc_mult, hidden, dtype=torch.bfloat16, device=device
+                )
+                for size in sizes:
+                    hc_head_op(
+                        hh[:size],
+                        hc_head_fn,
+                        hc_head_scale,
+                        hc_head_base,
+                        model.rms_norm_eps,
+                        model.hc_eps,
+                    )
         torch.accelerator.synchronize()
     logger.info(
-        "DSv4 mHC broadcast warmup finished in %.2f seconds.",
+        "DSv4 mHC layer warmup finished in %.2f seconds.",
         time.perf_counter() - started,
     )
 

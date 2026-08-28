@@ -595,13 +595,36 @@ def _cached_wo_a_bmm_weight(
                 _w_bmm_none_logged = True
                 print(
                     "DBG wo_proj w_bmm NONE (3D): "
-                    f"w={tuple(w.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)}) "
+                    f"w={tuple(w.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)} {scale.dtype}) "
                     f"want [g={n_groups}, r={o_lora_rank}, d={group_width}]",
                     flush=True,
                 )
             return None
-        # [G, R/128, D/128] -> [G, R, D]
-        s = _expand_block_scales(scale, o_lora_rank, group_width)
+        if (
+            scale.dim() == 3
+            and scale.dtype == torch.int32
+            and scale.shape[2] * 4 == group_width // 128
+        ):
+            # DeepGEMM MN-major TMA-aligned packed UE8M0 scale
+            # [G, R, D/512] int32: each int32 packs 4 ue8m0 exponents, byte j
+            # = k-block 4i+j (little-endian); rows are already per-gran-block
+            # broadcast. Unpack -> [G, R, 32] fp32 -> repeat to [G, R, D].
+            s32 = scale.contiguous()  # data order == contiguous (copy_ applied)
+            e = s32.view(torch.uint8).to(torch.int32)  # [G, R, D/512, 4]
+            fp = (e << 23).view(torch.float32)  # [G, R, D/512, 4], k-block = 4i+j
+            s = fp.reshape(g, r, -1).repeat_interleave(128, dim=-1)  # [G, R, D]
+        elif (
+            scale.dim() == 3
+            and scale.dtype == torch.uint8
+            and scale.shape[2] == group_width // 128
+        ):
+            # Raw UE8M0 exponents [G, R, D/128] (no packing).
+            e = scale.to(torch.int32)
+            fp = (e << 23).view(torch.float32)  # [G, R, D/128]
+            s = fp.repeat_interleave(128, dim=-1)  # [G, R, D]
+        else:
+            # [G, R/128, D/128] -> [G, R, D]
+            s = _expand_block_scales(scale, o_lora_rank, group_width)
         w_dq = w.to(torch.bfloat16) * s.to(dtype=torch.bfloat16, device=w.device)
         # [G, R, D] -> [G, D, R] for bmm(a[G,T,D], w[G,D,R])
         w_bmm = w_dq.transpose(1, 2).contiguous()

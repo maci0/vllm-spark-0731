@@ -126,7 +126,7 @@ def patch_kernel_warmup_ext(vllm: Path) -> None:
     deepseek_v4_mhc_warmup (which only warms the 3D per-layer mHC path)."""
     path = vllm / "model_executor/warmup/kernel_warmup.py"
     text = path.read_text()
-    if "deepseek_v4_mhc_broadcast_warmup" in text:
+    if "deepseek_v4_mhc_layer_warmup" in text:
         print("skip kernel_warmup dsv4 warmup ext (already present)")
         return
     replace_once(
@@ -147,11 +147,11 @@ def patch_kernel_warmup_ext(vllm: Path) -> None:
         "    # and the DSpark draft gumbel sampler are not covered by the upstream\n"
         "    # warmups; JIT them here so the first served request is compile-free.\n"
         "    from vllm.model_executor.warmup.dsv4_warmup_ext import (\n"
-        "        deepseek_v4_mhc_broadcast_warmup,\n"
+        "        deepseek_v4_mhc_layer_warmup,\n"
         "        dspark_gumbel_warmup,\n"
         "    )\n"
         "\n"
-        "    deepseek_v4_mhc_broadcast_warmup(\n"
+        "    deepseek_v4_mhc_layer_warmup(\n"
         "        worker.get_model(),\n"
         "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
         "    )\n"
