@@ -122,12 +122,22 @@ def copy_dsv4_warmup_ext(vllm: Path) -> None:
 
 
 def patch_kernel_warmup_ext(vllm: Path) -> None:
-    """Call the mHC-broadcast + gumbel warmups right after the upstream
-    deepseek_v4_mhc_warmup (which only warms the 3D per-layer mHC path)."""
+    """Call the mHC layer + gumbel warmups right after the upstream
+    deepseek_v4_mhc_warmup (which is a no-op for the v0.28.0 nvidia layer).
+    Idempotent across the old broadcast-warmup name (the image tag
+    accumulates overlay state across rebuilds)."""
     path = vllm / "model_executor/warmup/kernel_warmup.py"
     text = path.read_text()
     if "deepseek_v4_mhc_layer_warmup" in text:
-        print("skip kernel_warmup dsv4 warmup ext (already present)")
+        print("skip kernel_warmup dsv4 warmup ext (new patch already present)")
+        return
+    if "deepseek_v4_mhc_broadcast_warmup" in text:
+        # Migrate the pre-rename patch state (same block, new function name).
+        text = text.replace(
+            "deepseek_v4_mhc_broadcast_warmup", "deepseek_v4_mhc_layer_warmup"
+        )
+        path.write_text(text)
+        print("migrated kernel_warmup dsv4 warmup ext (old name -> layer)")
         return
     replace_once(
         path,
@@ -142,10 +152,11 @@ def patch_kernel_warmup_ext(vllm: Path) -> None:
         "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
         "    )\n"
         "\n"
-        "    # First-layer mHC broadcast path (mhc_pre_broadcast_tilelang ->\n"
-        "    # tf32_hc_prenorm_gemm + mhc_pre_big_fuse_broadcast_with_norm_tilelang)\n"
-        "    # and the DSpark draft gumbel sampler are not covered by the upstream\n"
-        "    # warmups; JIT them here so the first served request is compile-free.\n"
+        "    # v0.28.0 nvidia decoder layers call mhc_pre_tilelang /\n"
+        "    # mhc_fused_post_pre_tilelang directly (no hc_pre/hc_post methods),\n"
+        "    # so the upstream mHC warmup silently no-ops; the DSpark draft gumbel\n"
+        "    # sampler is warmed nowhere either. JIT both here so the first\n"
+        "    # served request is compile-free.\n"
         "    from vllm.model_executor.warmup.dsv4_warmup_ext import (\n"
         "        deepseek_v4_mhc_layer_warmup,\n"
         "        dspark_gumbel_warmup,\n"
