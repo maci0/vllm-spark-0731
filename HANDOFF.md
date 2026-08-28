@@ -78,6 +78,23 @@ stays live. The ~2× gap to the anemll/eugr images is a whole-stack
 difference (older vLLM, real NVFP4 writer), not this image's config. Do not
 mark the 1-way gap closed.
 
+**o_proj (WO) decode bmm — ROOT CAUSE FOUND + FIXED (2026-08-28, commit
+0d52159, pending rebuild/deploy):** `try_b12x_wo_proj` fell back to the slow
+einsum on every decode call because `_cached_wo_a_bmm_weight` only handled
+the 2D checkpoint layout `[G*R, D]`, while vLLM's DSV4 `wo_a` post-loads via
+`deepgemm_post_process_fp8_weight_block` with `is_bmm=True` (set in
+`attention.py`) into the **3D** local shard `[G, R, D]` (TP=2: `[4, 1024,
+4096]`, scale `[4, 8, 32]`). The function misread rows/cols from the 3D
+weight, expanded the scale to a garbage shape and threw
+`size of tensor a (4096) must match size of tensor b (1024) at non-singleton
+dimension 2` — the bmm path never ran. Fix handles both layouts (3D:
+`transpose(1,2)` for `bmm(a[G,T,D], w[G,D,R])`; 2D: existing view). Also made
+`_ensure_bmm_ws` require the group dim to match exactly (was `>=` — stale
+8-group workspaces could be reused for 4-group calls). Expect ~8-10 ms/step
+saved at c1 if the estimate holds; rebuild via
+`scripts/ov-rebuild-rdma.sh`, verify `DBG wo_proj OK#N` + `b12x wo_proj bmm
+ok` in the worker log, then re-bench.
+
 **Fallback:** `vllm-spark-0731:v0.28.0rc2-b12x` (v0.28.0rc2 Python on
 v0.27.1 arm64 base). Same greedy string. Attention is FlashInfer DSV4,
 not b12x. Pin: `scripts/05-serve.sh nvfp4`. Rest of this file is overlay
