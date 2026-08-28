@@ -186,6 +186,14 @@ def main(argv: list[str] | None = None) -> int:
     from vllm.utils import sm12x_b12x_kernels as b12x_k
     assert hasattr(b12x_k, "try_paged_mqa_logits")
     assert hasattr(b12x_k, "try_b12x_wo_proj")
+
+    from vllm.model_executor.warmup import dsv4_warmup_ext
+    assert hasattr(dsv4_warmup_ext, "deepseek_v4_mhc_broadcast_warmup")
+    assert hasattr(dsv4_warmup_ext, "dspark_gumbel_warmup")
+    from vllm.model_executor.warmup import kernel_warmup as _kw
+    assert "deepseek_v4_mhc_broadcast_warmup" in inspect.getsource(
+        _kw.kernel_warmup
+    ), "kernel_warmup missing mHC broadcast warmup call"
     mqa_fn = inspect.getsource(dg._sm12x_fp8_mqa_logits)
     assert "relu" in mqa_fn, "prefill MQA fallback missing ReLU"
     assert "contiguous_logits" in mqa_fn, "prefill MQA missing B12x contiguous scorer"

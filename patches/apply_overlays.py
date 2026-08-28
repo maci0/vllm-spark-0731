@@ -111,6 +111,54 @@ def copy_sm12x_b12x_kernels(vllm: Path) -> None:
     print(f"ok copied {dest.relative_to(vllm.parent)}")
 
 
+def copy_dsv4_warmup_ext(vllm: Path) -> None:
+    src = FILES / "dsv4_warmup_ext.py"
+    dest = vllm / "model_executor/warmup/dsv4_warmup_ext.py"
+    if not src.is_file():
+        raise SystemExit(f"missing {src}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dest)
+    print(f"ok copied {dest.relative_to(vllm.parent)}")
+
+
+def patch_kernel_warmup_ext(vllm: Path) -> None:
+    """Call the mHC-broadcast + gumbel warmups right after the upstream
+    deepseek_v4_mhc_warmup (which only warms the 3D per-layer mHC path)."""
+    path = vllm / "model_executor/warmup/kernel_warmup.py"
+    replace_once(
+        path,
+        "    deepseek_v4_mhc_warmup(\n"
+        "        worker.get_model(),\n"
+        "        max_tokens=worker.scheduler_config.max_num_batched_tokens,\n"
+        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        "    )\n",
+        "    deepseek_v4_mhc_warmup(\n"
+        "        worker.get_model(),\n"
+        "        max_tokens=worker.scheduler_config.max_num_batched_tokens,\n"
+        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        "    )\n"
+        "\n"
+        "    # First-layer mHC broadcast path (mhc_pre_broadcast_tilelang ->\n"
+        "    # tf32_hc_prenorm_gemm + mhc_pre_big_fuse_broadcast_with_norm_tilelang)\n"
+        "    # and the DSpark draft gumbel sampler are not covered by the upstream\n"
+        "    # warmups; JIT them here so the first served request is compile-free.\n"
+        "    from vllm.model_executor.warmup.dsv4_warmup_ext import (\n"
+        "        deepseek_v4_mhc_broadcast_warmup,\n"
+        "        dspark_gumbel_warmup,\n"
+        "    )\n"
+        "\n"
+        "    deepseek_v4_mhc_broadcast_warmup(\n"
+        "        worker.get_model(),\n"
+        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        "    )\n"
+        "    dspark_gumbel_warmup(\n"
+        "        worker.get_model(),\n"
+        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        "    )\n",
+        "kernel_warmup dsv4 warmup ext",
+    )
+
+
 def patch_dsv4_b12x_sparse_backend(vllm: Path) -> None:
     """Register B12X_MLA_SPARSE and select the DSV4 b12x attention class."""
     copy_dsv4_b12x_sparse(vllm)
@@ -2912,6 +2960,8 @@ def apply(vllm: Path) -> None:
     patch_nvfp4_ds_mla(vllm)
     patch_dsv4_nvfp4_attn(vllm)
     patch_dsv4_sm12x_block_size(vllm)
+    copy_dsv4_warmup_ext(vllm)
+    patch_kernel_warmup_ext(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
@@ -4157,6 +4207,8 @@ def apply_main(vllm: Path) -> None:
     patch_nvfp4_ds_mla(vllm)
     patch_dsv4_nvfp4_attn(vllm)
     patch_dsv4_sm12x_block_size(vllm)
+    copy_dsv4_warmup_ext(vllm)
+    patch_kernel_warmup_ext(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
     # v0.28.0: einsum fallback/recipe/upcast overlays removed (kernel verified
@@ -4244,6 +4296,7 @@ def main() -> int:
             "dspark-fullstep-revert",
             "ar-static-ws",
             "ar-piecewise-ws",
+            "dsv4-warmup-ext",
         ],
         default=None,
         help="Apply a single overlay (for patching an already-built image).",
@@ -4355,6 +4408,10 @@ def main() -> int:
         return 0
     if args.only == "ar-piecewise-ws":
         patch_tp_allreduce_piecewise_workspace(vllm)
+        return 0
+    if args.only == "dsv4-warmup-ext":
+        copy_dsv4_warmup_ext(vllm)
+        patch_kernel_warmup_ext(vllm)
         return 0
     if args.stack == "main":
         apply_main(vllm)
