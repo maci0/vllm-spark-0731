@@ -132,6 +132,21 @@ per-M + triton compiles, the c16-collapse suspect. New
 + `finished in X.XX seconds` before health 200, then re-run the c8/c16/c24
 concurrency sweep.
 
+**BENCHMARKED 2026-08-28 (deploy 4, image = overlay with o_proj packed-UE8M0
+dequant + mHC/gumbel warmup):**
+| concurrency | agg tok/s | note |
+|------|------|------|
+| c1 | **33-38** | vs 29.8 pre-fix (o_proj bmm was garbage-first, then correct) |
+| c8 | **117.2** | |
+| c16 | **183.0** | was **44.5 (collapse)** → FIXED by warmup |
+| c24 | **260.7** | |
+| c32 | **306.8** | **300+ target HIT**; SM util **95%** (was ~47%) |
+
+Correctness: France greedy `' Paris. The capital of Spain is Madrid…'`
+logprob **-0.254** — identical to the einsum/golden reference; `b12x wo_proj
+bmm ok` logged once, `fallback` count **0**. The remaining c1 gap (target
+40-50) is per-step latency (Phase 3 profile is the next lever).
+
 **Fallback:** `vllm-spark-0731:v0.28.0rc2-b12x` (v0.28.0rc2 Python on
 v0.27.1 arm64 base). Same greedy string. Attention is FlashInfer DSV4,
 not b12x. Pin: `scripts/05-serve.sh nvfp4`. Rest of this file is overlay
