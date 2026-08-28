@@ -124,21 +124,24 @@ def copy_dsv4_warmup_ext(vllm: Path) -> None:
 def patch_kernel_warmup_ext(vllm: Path) -> None:
     """Call the mHC layer + gumbel warmups right after the upstream
     deepseek_v4_mhc_warmup (which is a no-op for the v0.28.0 nvidia layer).
-    Idempotent across the old broadcast-warmup name (the image tag
-    accumulates overlay state across rebuilds)."""
+
+    The image tag accumulates overlay state across rebuilds (old and new
+    warmup-ext blocks can coexist in kernel_warmup.py), so this strips any
+    previously-applied block between the upstream call and the next warmup
+    marker, then applies the fresh patch deterministically."""
     path = vllm / "model_executor/warmup/kernel_warmup.py"
     text = path.read_text()
-    if "deepseek_v4_mhc_layer_warmup" in text:
-        print("skip kernel_warmup dsv4 warmup ext (new patch already present)")
-        return
-    if "deepseek_v4_mhc_broadcast_warmup" in text:
-        # Migrate the pre-rename patch state (same block, new function name).
-        text = text.replace(
-            "deepseek_v4_mhc_broadcast_warmup", "deepseek_v4_mhc_layer_warmup"
-        )
+    start_marker = "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n    )\n"
+    end_marker = "    # Run next so input-prep kernels JIT against pristine runner state."
+    if "dsv4_warmup_ext" in text:
+        i = text.find(start_marker)
+        j = text.find(end_marker)
+        if i == -1 or j == -1 or j < i:
+            raise SystemExit(f"{path}: cannot strip accumulated warmup-ext blocks")
+        text = text[: i + len(start_marker)] + "\n" + text[j:]
         path.write_text(text)
-        print("migrated kernel_warmup dsv4 warmup ext (old name -> layer)")
-        return
+        assert "dsv4_warmup_ext" not in text
+        print("stripped accumulated warmup-ext blocks")
     replace_once(
         path,
         "    deepseek_v4_mhc_warmup(\n"
