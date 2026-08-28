@@ -122,34 +122,42 @@ def copy_dsv4_warmup_ext(vllm: Path) -> None:
 
 
 def patch_decode_profiler(vllm: Path) -> None:
-    """One-shot torch.profiler on the first decode execute_model call.
+    """One-shot torch.profiler on the first DSpark decode step.
 
     v0.28.0's --profiler-config parses on the API frontend but the engine
     workers never receive ProfilerConfig ("Profiling is not enabled"), so
-    the on-demand /start_profile API cannot reach the GPU kernels. This
-    wraps GPUModelRunner.execute_model with b12x_profile_decode_once
-    (env VLLM_PROFILE_DECODE=1 -> /tmp/decode_profile.json).
+    the on-demand /start_profile API cannot reach the GPU kernels. The
+    DSpark decode runs DFlashSpeculator._run_model -> self.model(...)
+    directly (not GPUModelRunner.execute_model), so hook _run_model with
+    b12x_profile_decode_once (env VLLM_PROFILE_DECODE=1 ->
+    /tmp/decode_profile.json).
     """
-    path = vllm / "v1/worker/gpu_model_runner.py"
+    path = vllm / "v1/worker/gpu/spec_decode/dflash/speculator.py"
     replace_once(
         path,
-        "    def execute_model(\n"
+        "    def _run_model(\n"
         "        self,\n"
-        "        scheduler_output: \"SchedulerOutput\",\n"
-        "        intermediate_tensors: IntermediateTensors | None = None,\n"
-        "    ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors | None:\n",
+        "        num_tokens: int,\n"
+        "        attn_metadata: dict[str, Any] | None,\n"
+        "        slot_mappings: dict[str, torch.Tensor] | None,\n"
+        "        num_tokens_across_dp: torch.Tensor | None,\n"
+        "        cudagraph_runtime_mode: CUDAGraphMode = CUDAGraphMode.NONE,\n"
+        "    ) -> torch.Tensor:\n",
         "    @b12x_profile_decode_once\n"
-        "    def execute_model(\n"
+        "    def _run_model(\n"
         "        self,\n"
-        "        scheduler_output: \"SchedulerOutput\",\n"
-        "        intermediate_tensors: IntermediateTensors | None = None,\n"
-        "    ) -> ModelRunnerOutput | AsyncModelRunnerOutput | IntermediateTensors | None:\n",
+        "        num_tokens: int,\n"
+        "        attn_metadata: dict[str, Any] | None,\n"
+        "        slot_mappings: dict[str, torch.Tensor] | None,\n"
+        "        num_tokens_across_dp: torch.Tensor | None,\n"
+        "        cudagraph_runtime_mode: CUDAGraphMode = CUDAGraphMode.NONE,\n"
+        "    ) -> torch.Tensor:\n",
         "decode profiler decorator",
     )
     replace_once(
         path,
-        "from vllm.utils import length_from_prompt_token_ids_or_embeds\n",
-        "from vllm.utils import length_from_prompt_token_ids_or_embeds\n"
+        "from vllm.v1.attention.backends.utils import PAD_SLOT_ID\n",
+        "from vllm.v1.attention.backends.utils import PAD_SLOT_ID\n"
         "from vllm.utils.sm12x_b12x_kernels import b12x_profile_decode_once\n",
         "decode profiler import",
     )
