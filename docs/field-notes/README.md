@@ -5,6 +5,11 @@ Raw, verbatim write-ups from the two GitHub repositories that this repo
 (which was already fully contained here as an earlier snapshot — nothing was
 left behind).
 
+`oh-my-dgx-spark/` is different: it is a **third-party corpus vendored
+verbatim** (a Korean-language DGX Spark lab book + research logs). It is kept
+unlinked — its raw files are not referenced from the knowledge chapters; the
+distilled knowledge itself lives in chapters 01, 05, 06, 07, 10 and 11.
+
 These are the **original source documents**, kept unedited for provenance. The
 consolidated, cross-linked version of this knowledge lives in
 [`docs/knowledge/`](../knowledge/00-index.md); the two are linked below.

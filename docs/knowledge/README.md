@@ -10,8 +10,9 @@ two NVIDIA DGX Spark (GB10, SM12x/sm_121a) nodes over RoCE.
 
 | Part | Location | Role |
 |------|----------|------|
-| **Consolidated chapters** | `00-index.md` … `09-golden-deepgemm.md` | Cross-linked, distilled knowledge (start here) |
+| **Consolidated chapters** | `00-index.md` … `13-qwenseek.md` | Cross-linked, distilled knowledge (start here) |
 | **Glossary** | [`glossary.md`](glossary.md) | Shared vocabulary across all chapters |
+| **Knowledge Graph** | [`graph.md`](graph.md) | Document graph (generated), concept graph, entity index |
 | **Raw field notes** | [`../field-notes/README.md`](../field-notes/README.md) | Unedited source documents from the predecessor repos, mapped per chapter |
 | **Architecture audit** | [`../../outputs/vllm-spark-0731-docs-audit.md`](../../outputs/vllm-spark-0731-docs-audit.md) | Canonical codebase audit |
 

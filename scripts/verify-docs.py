@@ -61,12 +61,21 @@ MD_GLOBS = [
     "patches/**/*.md",
 ]
 
+# Vendored third-party corpus (docs/field-notes/oh-my-dgx-spark/, see its PROVENANCE.md)
+# is preserved verbatim and excluded from the automated checks by design —
+# its internal links were verified once at merge time (169 md files, one
+# {{ISSUE_URL}} template placeholder).
+VENDORED_PREFIX = os.path.join("docs", "field-notes", "oh-my-dgx-spark")
+
 
 def md_files() -> list[str]:
     out = []
     for g in MD_GLOBS:
         out.extend(glob.glob(os.path.join(ROOT, g), recursive=True))
-    return sorted(set(out))
+    return sorted(
+        p for p in set(out)
+        if not os.path.relpath(p, ROOT).startswith(VENDORED_PREFIX)
+    )
 
 
 def check_links() -> list[str]:

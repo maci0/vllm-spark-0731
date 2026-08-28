@@ -9,9 +9,10 @@ overlays in `apply_overlays.py` run.
 | Patch | PR | Fix | Equivalent overlay (`--only`) |
 |---|---|---|---|
 | `pr-53055.diff` | #53055 (OPEN) | guard DeepGEMM in mHC pre-broadcast + exclude CUTLASS FP8 on SM12x | `patch_mhc`, `patch_cutlass_sm12x_guard` (applied in `--stack main`) |
-| `pr-53425.diff` | #53425 (OPEN) | DSV4 sparse MLA kernel block size 64 on SM12x | `dsv4-block64` |
-| `pr-53521.diff` | #53521 (OPEN) | Hopper `fp8_einsum` recipe (1,128,128) on SM12x instead of SM100 packed INT32 | `einsum-sm12x` |
+| `pr-53425.diff` | #53425 (OPEN) | DSV4 sparse MLA kernel block size 64 on SM12x; refreshed 2026-08-26 (ed71de5): lazy `sparse_mla` import in indexer (kills the `vllm._aiter_ops` cold-start import cycle) | `dsv4-block64` |
+| `pr-53521.diff` | #53521 **CLOSED** 2026-08-27 | Hopper `fp8_einsum` recipe on SM12x — NOT NEEDED: stock `(1,1,128)` + packed E8M0 scales verified correct on GB10 (mean_rel 0.000000; E2E France coherent on `main-b12x-mn2`). **Drop this backport.** | `einsum-sm12x` |
 | `pr-53522.diff` | #53522 (OPEN) | gate indexer paged MQA metadata on `is_deep_gemm_supported()` | `indexer-mqa` |
+| `pr-53898.diff` | #53898 **CLOSED** 2026-08-27 | SM12x fp8_einsum dequant fallback + unpack — NOT NEEDED: the einsum kernel is correct with packed scales; the fallback itself was the E2E-garbage source (packed-int32-as-fp32). Real upstream fix: deepseek-ai/DeepGEMM #337 (packer mantissa mask). **Drop this backport; mn2 uses the stock path.** | `einsum-sm12x` family |
 | `pr-52499.diff` | #52499 (OPEN) | DSV4 sparse-MLA spec-decode query shapes | comment-only (we didn't need it after TOPK=192) |
 | `pr-53574.diff` | #53574 (OPEN) | C128A eidx contiguity at the builder (`_build_c128a_metadata`); root cause of the "eidx must be contiguous" DSV4+spec-decode boot crash | `flashinfer-eidx-contig` (consumer-side) |
 | `pr-47988.diff` | #47988 (OPEN) | unconditional E8M0→fp32 upcast in `w8a8_triton_block_scaled_mm` + CUTLASS SM12x `can_implement`/weight-scale handling (source hunks only) | `triton-e8m0-sm12x` (family-120 gate variant) |
@@ -24,7 +25,7 @@ GitHub limit and the PR needs-rebase — comment only, per `docs/UPSTREAM.md`.
 | Patch | PR | Fix | Status |
 |---|---|---|---|
 | `deepgemm-pr-403.diff` | [deepseek-ai/DeepGEMM#403](https://github.com/deepseek-ai/DeepGEMM/pull/403) | SM120/SM121 SF layout transformation in `csrc/apis/layout.hpp` | Merged in `nv_dev 8b1392b978f5`; applied idempotently in `docker/Dockerfile.main` before vLLM compilation |
-| `deepgemm-fp8-1d1d-port.diff` | anemll 2.5.0 port | Port of golden anemll 2.5.0 `sm100_fp8_gemm_1d1d` kernel and dispatch to `nv_dev` | Staged local port for SM120 pure-FP8 GEMM; applied in `docker/Dockerfile.main` before compilation |
+| `deepgemm-fp8-1d1d-port.diff` | anemll 2.5.0 port | Port of golden anemll 2.5.0 `sm100_fp8_gemm_1d1d` kernel and dispatch to `nv_dev` | Staged local port for SM120 pure-FP8 GEMM; applied in `docker/Dockerfile.main` before compilation. **Upstreamed 2026-08-26 as [deepseek-ai/DeepGEMM#419](https://github.com/deepseek-ai/DeepGEMM/pull/419)** — refreshed to the reviewed state (44d9d2e: pure-fp8 excluded from AB-swap, `allow_swap_ab` layout filtering, arch-10 mixed-dtype routing, epilogue/math.cuh fixes) |
 
 ## Merged-fix patches (already in the build)
 

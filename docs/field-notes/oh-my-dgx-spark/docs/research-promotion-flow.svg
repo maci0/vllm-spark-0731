@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920" role="img" aria-labelledby="title desc">
+  <title id="title">DGX Spark 리서치에서 본문 승격까지의 흐름</title>
+<desc id="desc">새 출처 후보 찾기, 출처 수집, Research Issue, Copilot 분석, docs 원문, export로 생성되는 날짜별 공개 서브챕터, draft PR, 검증, 본문 승격 PR, WikiDocs 배포의 흐름</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#355070"/>
+    </marker>
+    <marker id="arrow-muted" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#8a94a6"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .title { fill: #172033; font: 700 34px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+      .subtitle { fill: #667085; font: 400 17px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+      .box { fill: #ffffff; stroke: #ccd5e1; stroke-width: 2; }
+      .box-blue { fill: #edf5ff; stroke: #79a9df; stroke-width: 2; }
+      .box-green { fill: #edf9f1; stroke: #76b58a; stroke-width: 2; }
+      .box-orange { fill: #fff7e8; stroke: #e5b866; stroke-width: 2; }
+      .step { fill: #355070; font: 700 14px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; letter-spacing: .06em; }
+      .heading { fill: #172033; font: 700 22px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+      .body { fill: #475467; font: 400 16px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+      .small { fill: #667085; font: 400 14px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+      .arrow { fill: none; stroke: #355070; stroke-width: 3; marker-end: url(#arrow); }
+      .arrow-muted { fill: none; stroke: #8a94a6; stroke-width: 2.5; stroke-dasharray: 8 8; marker-end: url(#arrow-muted); }
+      .label { fill: #667085; font: 600 14px 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="920"/>
+  <text class="title" x="80" y="70">DGX Spark 리서치 → 본문 승격 흐름</text>
+  <text class="subtitle" x="80" y="105">운영자용 자동화 경로. 자동화는 기록까지만 담당하고, 안정된 책 본문은 별도 검토를 거친다.</text>
+
+  <!-- first row -->
+  <rect class="box" x="70" y="160" rx="16" width="300" height="180"/>
+  <text class="step" x="98" y="198">01 · DISCOVER / COLLECT</text>
+  <text class="heading" x="98" y="238">자료 수집</text>
+  <text class="body" x="98" y="274">GitHub · RSS · Brave · SearXNG</text>
+<text class="body" x="98" y="300">새 출처 후보도 별도로 찾음</text>
+  <text class="small" x="98" y="325">주간 후보 / 평일 자료 / 수동 URL</text>
+
+  <path class="arrow" d="M370 250 H430"/>
+
+  <rect class="box-blue" x="440" y="160" rx="16" width="300" height="180"/>
+  <text class="step" x="468" y="198">02 · INTAKE</text>
+  <text class="heading" x="468" y="238">Research Issue</text>
+  <text class="body" x="468" y="274">URL과 짧은 메타데이터</text>
+  <text class="body" x="468" y="300">research-candidate</text>
+  <text class="small" x="468" y="325">maintainer가 research-ready 승인</text>
+
+  <path class="arrow" d="M740 250 H800"/>
+
+  <rect class="box-blue" x="810" y="160" rx="16" width="300" height="180"/>
+  <text class="step" x="838" y="198">03 · ANALYZE</text>
+  <text class="heading" x="838" y="238">Copilot 분석</text>
+  <text class="body" x="838" y="274">Free: auto 모델</text>
+  <text class="body" x="838" y="300">Pro 이상: 선택 모델</text>
+  <text class="small" x="838" y="325">출처·조건·충돌 분리</text>
+
+  <path class="arrow" d="M1110 250 H1170"/>
+
+  <rect class="box-green" x="1180" y="160" rx="16" width="350" height="180"/>
+  <text class="step" x="1208" y="198">04 · RECORD</text>
+  <text class="heading" x="1208" y="238">리서치 기록</text>
+  <text class="body" x="1208" y="274">docs 날짜별 원문</text>
+  <text class="body" x="1208" y="300">공개 서브챕터는 export 생성</text>
+  <text class="small" x="1208" y="325">후보 · 분석 · 재현 대기 · 승격 후보</text>
+
+  <!-- second row -->
+  <path class="arrow" d="M1355 340 V430 H220 V485"/>
+
+  <rect class="box" x="70" y="495" rx="16" width="300" height="180"/>
+  <text class="step" x="98" y="533">05 · PROPOSE</text>
+  <text class="heading" x="98" y="573">Draft PR</text>
+  <text class="body" x="98" y="609">docs 날짜별 원문</text>
+  <text class="body" x="98" y="635">Actions가 자동 생성</text>
+  <text class="small" x="98" y="660">안정된 본문은 자동 수정하지 않음</text>
+
+  <path class="arrow" d="M370 585 H430"/>
+
+  <rect class="box-orange" x="440" y="495" rx="16" width="300" height="180"/>
+  <text class="step" x="468" y="533">06 · VERIFY</text>
+  <text class="heading" x="468" y="573">사람 검증</text>
+  <text class="body" x="468" y="609">출처 교차 확인</text>
+  <text class="body" x="468" y="635">조건 고정 · 직접 재현</text>
+  <text class="small" x="468" y="660">수치와 원인 설명 분리</text>
+
+  <path class="arrow" d="M740 585 H800"/>
+
+  <rect class="box-orange" x="810" y="495" rx="16" width="300" height="180"/>
+  <text class="step" x="838" y="533">07 · PROMOTE</text>
+  <text class="heading" x="838" y="573">본문 승격 PR</text>
+  <text class="body" x="838" y="609">DeepSeek · Qwen · 장애 대응</text>
+  <text class="body" x="838" y="635">주제별 작은 PR</text>
+  <text class="small" x="838" y="660">reproduced → promoted</text>
+
+  <path class="arrow" d="M1110 585 H1170"/>
+
+  <rect class="box-green" x="1180" y="495" rx="16" width="350" height="180"/>
+  <text class="step" x="1208" y="533">08 · PUBLISH</text>
+  <text class="heading" x="1208" y="573">main 병합 → WikiDocs</text>
+  <text class="body" x="1208" y="609">Publish WikiDocs Action</text>
+  <text class="body" x="1208" y="635">TOC · pages · assets 동기화</text>
+  <text class="small" x="1208" y="660">검증된 내용만 독자에게 노출</text>
+
+  <!-- hold loop -->
+  <path class="arrow-muted" d="M590 675 V775 H1340 V685"/>
+  <text class="label" x="735" y="805">근거 부족 / 재현 대기 → docs 원문에 보류하고 다음 리서치에서 재검토</text>
+</svg>

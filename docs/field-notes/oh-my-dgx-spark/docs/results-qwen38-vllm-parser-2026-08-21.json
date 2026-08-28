@@ -1,0 +1,95 @@
+{
+  "date": "2026-08-21",
+  "timezone": "Asia/Seoul",
+  "hardware": {
+    "machine": "single NVIDIA DGX Spark",
+    "gpu": "NVIDIA GB10",
+    "unified_memory_gib": 128,
+    "driver": "580.142",
+    "cuda_runtime_reported_by_nvidia_smi": "13.0"
+  },
+  "software": {
+    "python": "3.12.3",
+    "venv": "/home/grid/vllm-venv",
+    "vllm": "0.26.0",
+    "torch": "2.11.0+cu130",
+    "transformers": "5.15.0",
+    "triton": "3.6.0",
+    "flashinfer": "0.6.14"
+  },
+  "model": {
+    "repo": "OBLITERATUS/Qwen3.8-27B-OBLITERATED",
+    "revision": "46c3c40faf9d89c692d8e82514cb5fe3d0f7fa83",
+    "format": "BF16 safetensors",
+    "checkpoint_size_gib": 51.75,
+    "config_architecture": "Qwen3_5ForConditionalGeneration",
+    "config_model_type": "qwen3_5"
+  },
+  "server": {
+    "base_url": "http://127.0.0.1:8083/v1",
+    "served_model_name": "qwen3.8-27b-obliterated",
+    "max_model_len": 32768,
+    "gpu_memory_utilization": 0.5,
+    "tool_call_parser": "qwen3_xml",
+    "reasoning_parser": "qwen3",
+    "auto_tool_choice": true,
+    "health_http": 200,
+    "kv_cache_tokens": 72089,
+    "max_concurrency_at_32k": 2.2
+  },
+  "tool_call": {
+    "status": "PASS",
+    "tool": "get_weather",
+    "tool_call_count": 1,
+    "arguments_valid": true,
+    "location": "Seoul, South Korea",
+    "content_present": false,
+    "finish_reason": "stop",
+    "elapsed_s": 7.1
+  },
+  "functional_smoke": {
+    "status": "PASS",
+    "model_discovery": true,
+    "korean_math": true,
+    "python_code": true,
+    "json_parsing": true,
+    "conversation_recall": true,
+    "thinking_on": true,
+    "long_context_8227_prompt_tokens": true,
+    "concurrency_4": true
+  },
+  "benchmarks": [
+    {
+      "id": "c1",
+      "warmups": 2,
+      "trials": 5,
+      "max_tokens": 128,
+      "prompt_tokens": 33,
+      "completion_tokens": 27,
+      "ttft_p50_ms": 463.736,
+      "ttft_p95_ms": 465.11,
+      "completion_tok_s_e2e_p50": 4.567,
+      "completion_tok_s_e2e_p95": 4.57,
+      "errors": 0
+    },
+    {
+      "id": "c4",
+      "warmups": 1,
+      "trials": 3,
+      "max_tokens": 64,
+      "prompt_tokens": 33,
+      "completion_tokens": 27,
+      "ttft_p50_ms": 508.904,
+      "ttft_p95_ms": 510.999,
+      "completion_tok_s_e2e_p50": 4.426,
+      "completion_tok_s_e2e_p95": 4.427,
+      "aggregate_completion_tok_s_e2e": 17.697,
+      "errors": 0
+    }
+  ],
+  "interpretation": [
+    "completion_tok_s_e2e includes prefill and decode; it is not pure decode throughput.",
+    "The tool-call result proves one explicit function call with valid JSON arguments, not a long-running multi-tool agent success rate.",
+    "The model is named Qwen3.8 but intentionally reports the Qwen3.5 architecture because Qwen3.8 is built on that architecture."
+  ]
+}

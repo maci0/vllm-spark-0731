@@ -26,7 +26,7 @@ For the full backport patch registry, including active upstream PR backports (`p
 |------|-----|------|
 | vLLM matched-main (live image) | `e25c586b9` (`v0.1.dev1+ge25c586b9.d20260823`) | 2026-08-23 |
 | vLLM v0.28.0rc2 (overlay fallback) | `74a6576b9b58` | 2026-08-21 06:47 UTC |
-| vLLM main (PR check) | default branch | 2026-08-24 afternoon; #53425 #53521 #53522 #53055 #52499 #41834 #52708 #53574 #47988 still OPEN |
+| vLLM main (PR check) | default branch | 2026-08-24 afternoon; #53425 #53522 #53055 #52499 #41834 #52708 #53574 #47988 still OPEN; #53521 #53898 CLOSED 2026-08-27 (einsum misread resolved as misdiagnosis — kernel correct, see table) |
 | DeepGEMM in v0.27.1 / overlay `.so` | `e21c821f39a2` (DeepGEMM **main**, ~SM90/SM100) | 2026-08-04 |
 | DeepGEMM in v0.28.0rc2, vLLM main cmake, and matched-main | `8b1392b978f5` (**nv_dev** HEAD) | 2026-08-11 |
 | DeepGEMM in eugr Dockerfile | `a6b593d28267` (nv_dev, frozen) | 2026-06-29 |
@@ -101,14 +101,15 @@ Same bug in the tag **and** on main today. Comment or small PR. Do not duplicate
 |-------|-----|-----------------|--------|
 | `mhc_pre_broadcast_tilelang` unguarded `tf32_hc_prenorm_gemm` | unguarded | still unguarded | [#53055](https://github.com/vllm-project/vllm/pull/53055) (also CUTLASS + sm121 carve-out). Older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase. Backport: `pr-53055.diff`; Overlay: `patch_mhc`. Comment only; do not duplicate. |
 | CUTLASS FP8 `is_supported()` ignores SM12x | `CutlassFp8BlockScaledMMKernel` returns True if `CUTLASS_BLOCK_FP8_SUPPORTED` | #53055 still open | Backport: `pr-53055.diff`; Overlay: `patch_cutlass_sm12x_guard`. Same PR as mHC. |
-| `compute_fp8_einsum_recipe`: `major >= 10` → SM100 packed INT32 | yes | **still yes** | [#52357](https://github.com/vllm-project/vllm/pull/52357) **closed** 2026-08-23 (Triton slice abandoned). Recipe-only follow-up: [#53521](https://github.com/vllm-project/vllm/pull/53521). Backport: `pr-53521.diff`; Overlay: `patch_einsum_sm12x_recipe`. |
-| DSV4 kernel block `[256]` on SM12x | `[256]` on sparse MLA, FlashInfer DSV4, V4 indexer | **still `[256]`** | [#53425](https://github.com/vllm-project/vllm/pull/53425) OPEN (rebased; DCO passes). Backport: `pr-53425.diff`; Overlay: `patch_dsv4_sm12x_block_size`. |
-| Indexer paged MQA metadata uses `has_deep_gemm()` not `is_deep_gemm_supported()` | yes | still that pattern | Not in #41834 / #53055. Opened [#53522](https://github.com/vllm-project/vllm/pull/53522) (`is_deep_gemm_supported()` + `num_states in (32, 64)`). Backport: `pr-53522.diff`; Overlay: `patch_indexer_deepgemm_guard`. |
+| `compute_fp8_einsum_recipe`: `major >= 10` → SM100 packed INT32 | yes | stock config is correct | [#53521](https://github.com/vllm-project/vllm/pull/53521) **CLOSED 2026-08-27** (not needed). Stock SM12x `(1,1,128)` + `tma_aligned_scales=True` verified numerically correct on GB10 (einsum mean_rel 0.000000 vs bf16 ref; E2E France coherent). The "~2³²" observation behind the override was the dequant-fallback's packed-int32-as-fp32 bug (see below), not a kernel misread. |
+| `fp8_einsum` on SM12x | yes | **stock kernel path is CORRECT** with packed E8M0 scales + `(1,1,128)` (mean_rel 0.000000 on GB10) | [#53898](https://github.com/vllm-project/vllm/pull/53898) **CLOSED 2026-08-27** (fallback not needed). The "290% kernel error" was the packer mantissa-leak hit by synthetic FP32 scales — real fix upstream: deepseek-ai/DeepGEMM **#337**. The "~2³²" was our own overlay fallback reading packed int32 as fp32 — it was the true E2E-garbage source. Final image `main-b12x-mn2` = stock einsum path + packed scales, verified E2E (France coherent, 65536 ctx, KV 9.38 GiB). |
+| DSV4 kernel block `[256]` on SM12x | `[256]` on sparse MLA, FlashInfer DSV4, V4 indexer | **still `[256]`** | [#53425](https://github.com/vllm-project/vllm/pull/53425) OPEN — fixed 2026-08-26 (ed71de5): `indexer → vllm.models.deepseek_v4.sparse_mla` module-level import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import inside `get_supported_kernel_block_sizes()`. Repro + 2 tests pass. Backport: `pr-53425.diff`; Overlay: `patch_dsv4_sm12x_block_size`. |
+| Indexer paged MQA metadata uses `has_deep_gemm()` not `is_deep_gemm_supported()` | yes | still that pattern | Not in #41834 / #53055. Opened [#53522](https://github.com/vllm-project/vllm/pull/53522) (`is_deep_gemm_supported()` + `num_states in (32, 64)`). **ivanusto reviewed 2026-08-24: test passed, gate scoped correctly (non-blocking note on test not pinning `build()` call site)**. Backport: `pr-53522.diff`; Overlay: `patch_indexer_deepgemm_guard`. |
 | DSpark SM120 spec-decode query rank / `num_tokens > 64` | #51538 is in rc2 (backend + top-k selection). Flat 3-D spec query may remain. | [#52499](https://github.com/vllm-project/vllm/pull/52499) open | Backport: `pr-52499.diff`; Comment only. We did not need this after TOPK=192. |
 | FlashInfer eidx contiguity (C128A builder) | `_build_c128a_metadata` view of a width-sliced `global_decode_buffer`; DSpark batches >64 tokens crash at boot | **still unpatched** 2026-08-24; [#53574](https://github.com/vllm-project/vllm/pull/53574) OPEN | Backport: `pr-53574.diff`; Overlay: `flashinfer-eidx-contig`. C4A branch verified contiguous — no C4A bug. |
 | Triton E8M0 upcast gated on rocm/xpu | `KeyError: 'float8_e8m0fnu'` on SM12x | **still gated** 2026-08-24; [#47988](https://github.com/vllm-project/vllm/pull/47988) OPEN (unconditional upcast) | Backport: `pr-47988.diff`; Overlay: `triton-e8m0-sm12x` skips when #47988 form present. |
 | SM12x DSv4 umbrella | partial (backend exists) | [#41834](https://github.com/vllm-project/vllm/pull/41834) needs-rebase | Comment only. `sm12x_mqa.py` lives there. Pointed at the focused PRs. |
-| `fp8_einsum` SM12x Python dequant | rc2 is DeepGEMM-or-missing | #52357 Triton path closed | Overlay: `patch_fp8_einsum_fallback`. Not upstreamed; `float8_e8m0fnu` dies on this image. Recipe is #53521. |
+| `fp8_einsum` SM12x Python dequant | rc2 is DeepGEMM-or-missing | #52357 Triton path closed | Overlay: `patch_fp8_einsum_fallback` — **REMOVED in main-b12x-mn2** (fallback was the E2E-garbage source; stock kernel path verified correct). |
 
 ## FlashInfer (not vLLM rc2)
 
@@ -147,14 +148,31 @@ Three different trees:
 | eugr Dockerfile | `a6b593d28267` | **nv_dev**, frozen | Yes (`arch_major == 12`). |
 | v0.28.0rc2 and vLLM main cmake | `8b1392b978f5` | **nv_dev** HEAD | Yes. Comment: "Pinned to the tip of the nv_dev branch (SM120 support)." |
 
-**2026-08-25: `8b1392b` is a REGRESSION for SM12x fp8 linear** (see
-[docs/knowledge/09](knowledge/09-golden-deepgemm.md)): it dropped the
-pure-fp8 1d1d kernels and aliased `fp8_gemm_nt = fp8_fp4_gemm_nt`
-(`gemm.hpp:851`), so fp8 weights feed the fp4 kernel = silent corruption on
-GB10. Matched-main is now pinned back to `a6b593d` (the eugr/golden freeze);
-a vLLM PR to move the cmake tag back to `a6b593d` is prepared
-(branch `fix-deepgemm-sm12x-fp8-regression` on maci0/vllm, PR opened after
-cluster validation).
+**2026-08-25 (corrected 2026-08-26): `8b1392b` is a REGRESSION for SM12x fp8 linear**
+(see [docs/knowledge/09](knowledge/09-golden-deepgemm.md)). Verified diff
+`a6b593d...8b1392b` (nv_dev):
+
+- `fp8_gemm_nt = fp8_fp4_gemm_nt` is **not** new — the alias exists in
+  `a6b593d` already (`gemm.hpp:792`). The regression is the **removal of the
+  pure-fp8 1d1d kernels**: `csrc/jit_kernels/impls/sm100_fp8_gemm_1d1d.hpp`
+  (−416) and `deep_gemm/include/deep_gemm/impls/sm100_fp8_gemm_1d1d.cuh`
+  (−567), plus an `fp8_fp4_mqa_logits` dispatch rewrite
+  (`smxx_fp8_mqa_logits` → per-arch `sm90/sm100/sm120_mqa_logits`).
+- On SM12x, pure fp8xfp8 inputs route to the combined `sm120_fp8_fp4_gemm_1d1d`
+  kernel, which misreads fp8 weights as fp4 — silent corruption (France
+  `' Septy Septy…'`, ~25.8 → 4.4 tok/s). Our local port
+  (`deepgemm-fp8-1d1d-port.diff`) re-adds the 1d1d kernel + the fp8xfp8 branch.
+  A/B of the a6 wheel vs 8b wheel is in progress to pin the exact surface.
+
+Matched-main is now pinned back to `a6b593d` (the eugr/golden freeze);
+vLLM PR [#53680](https://github.com/vllm-project/vllm/pull/53680) moves the
+cmake tag back to `a6b593d`; DeepGEMM issue
+[#417](https://github.com/deepseek-ai/DeepGEMM/issues/417) tracks the upstream
+restore — **landed 2026-08-26 as [DeepGEMM#419](https://github.com/deepseek-ai/DeepGEMM/pull/419)**
+(restore + TU header fixes; driver-JIT PTX route tested and blocked, see
+[docs/knowledge/09](knowledge/09-golden-deepgemm.md)). Updated 2026-08-26:
+with the a6 wheel, `fp8_einsum` o_proj runs on SM121a (T=10/96/8192);
+remaining gap is the 1d1d tcgen05 JIT toolchain.
 
 SM12x kernels live on DeepGEMM `nv_dev` ([PR #324](https://github.com/deepseek-ai/DeepGEMM/pull/324) / issue #324). They are **not** on DeepGEMM `main`.
 
@@ -171,7 +189,7 @@ Source: [eugr/spark-vllm-docker `Dockerfile`](https://github.com/eugr/spark-vllm
 | Freeze at `a6b593d` instead of nv_dev tip | "SM121 DeepSeek-V4 MXFP4 grouped scale-factor regression first observed at nv_dev `f8e8fb5` (PR #384); last known good" | **No.** rc2/main FetchContent tag is `8b1392b` (PR #396 SiTU, 2026-08-11). | `8b1392b` is only 3 SiTU commits after `f8e8fb5`. It does **not** claim to fix grouped MXFP4 scales. eugr still frozen. Do not bump blindly. |
 | `DG_JIT_USE_NVRTC=0` | build + runner. "disable for conflicts with DeepGEMM" / "compatibility with DeepGEMM changes" | Not a vLLM source pin. nv_dev JIT vs NVRTC. | Irrelevant here while DeepGEMM is forced off. Keep if anyone rebuilds nv_dev. |
 | `transform_sf_into_required_layout` missing `arch_major=12` for `(gran_mn=1, gran_k=32)` | nv_dev pin already has `arch_major == 12` | DeepGEMM **main** still SM100-only | [deepseek-ai/DeepGEMM#372](https://github.com/deepseek-ai/DeepGEMM/issues/372) / [#403](https://github.com/deepseek-ai/DeepGEMM/pull/403). Merged in `nv_dev 8b1392b`. Backported as `deepgemm-pr-403.diff` for clean builds. |
-| DeepGEMM SM120 pure-FP8 GEMM port (`sm100_fp8_gemm_1d1d` kernel to `nv_dev`) | anemll 2.5.0 port | staged local port | Tracked as `deepgemm-fp8-1d1d-port.diff` (applied in `docker/Dockerfile.main` before compilation). |
+| DeepGEMM SM12x pure-FP8 route (`sm100_fp8_gemm_1d1d` kernel + fp8xfp8 branch) | present in `a6b593d`; **deleted in `8b1392b`** | staged local port | Tracked as `deepgemm-fp8-1d1d-port.diff` (applied in `docker/Dockerfile.main` before compilation): re-adds the 1d1d kernel and routes fp8xfp8 away from the combined `sm120_fp8_fp4_gemm_1d1d` kernel. |
 | CUDA 13 `CUDA_SUPPORTED_ARCHS` drops 12.1 | opt-in `patch_vllm_preserve_sm12x_target.py` | rc2 CUDA 13 DeepGEMM list uses family `12.0f`, not `12.1a` | Already in [#52708](https://github.com/vllm-project/vllm/pull/52708) (and older [#38484](https://github.com/vllm-project/vllm/pull/38484)). Comment only; do not duplicate. Not this overlay image. |
 
 **Do not** open another DeepGEMM SM12x-enable PR. #372 covers main. nv_dev already has the kernels. vLLM #41062 (extend DeepGEMM MoE gates to SM12x) is closed, not merged; cmake moved to nv_dev instead.
@@ -229,11 +247,11 @@ Assume a **matched** image (Python + `.so` from the same main commit), plus
 | Overlay / gap | On main / nightly 2026-08-22 | Keep? |
 |---------------|------------------------------|-------|
 | MoE `--moe-backend b12x` (#52018) | **in tree** | drop cherry-pick |
-| DeepGEMM pin | cmake `8b1392b` **nv_dev**, compiled with the image | drop `patch_deep_gemm_sm12x_guard` **only after** MQA/mHC actually run. eugr still frozen at `a6b593d` for MXFP4 grouped scales |
+| DeepGEMM pin | cmake `8b1392b` **nv_dev**, compiled with the image | drop `patch_deep_gemm_sm12x_guard` **only after** MQA/mHC actually run. eugr still frozen at `a6b593d` for MXFP4 grouped scales. **2026-08-26:** [#53680](https://github.com/vllm-project/vllm/pull/53680) re-pins cmake to `a6b593d` (8b removed the pure-fp8 1d1d kernel); port `deepgemm-fp8-1d1d-port.diff` covers 8b-era builds |
 | KVBlockZeroer unaligned assert | rewritten on main | likely drop |
 | FlashInfer TOPK 192 | **no.** docker pin `FLASHINFER_VERSION=0.6.17`. Tag v0.6.17 dispatch is still `{128,512,1024}`. 192/256 are on flashinfer **main** (#4380), not in 0.6.17 | **keep** overlay or bump FlashInfer to main / 0.6.18 nightly |
-| DSV4 kernel block 64 | #53425 still OPEN (DCO fixed 2026-08-24) | **keep** |
-| einsum SM12x recipe | #52357 closed; #53521 OPEN | **keep** (wrong recipe + live DeepGEMM is worse than the PyTorch fallback) |
+| DSV4 kernel block 64 | #53425 OPEN; import-cycle fix ed71de5 (2026-08-26) | **keep** |
+| einsum SM12x recipe |  **keep** until merged; backport refresh pending| **keep** until merged; backport refresh pending |
 | Indexer paged MQA DeepGEMM gate | #53522 OPEN | **keep** until merged |
 | mHC broadcast / CUTLASS SM12x | #53055 still OPEN | keep CUTLASS guard. mHC might use nv_dev `sm120_tf32_hc_prenorm_gemm` if the `.so` is real; unproven |
 | MQA ReLU / graph-safe / b12x MQA | #41834 still OPEN | **keep** unless DeepGEMM SM12x MQA is measured equal to `fp8_mqa_logits_torch` |

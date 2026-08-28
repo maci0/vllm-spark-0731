@@ -211,6 +211,17 @@ RUN git clone --recursive "${DEEPGEMM_REPO}" /opt/DeepGEMM \
 COPY patches/upstream/*deepgemm*.diff /opt/spark-0731/patches/upstream/
 RUN cd /opt/DeepGEMM \
     && for p in /opt/spark-0731/patches/upstream/*deepgemm*.diff; do \
+         case "$(basename "$p")" in \
+           deepgemm-fp8-1d1d-port.diff) \
+             # The pure-fp8 1d1d kernel already exists on a6b593d; the port
+             # (built against 8b1392b, which removed it) must only be applied
+             # to 8b-era pins. Applying it to a6 redefines the combined
+             # runtime and breaks the build. \
+             if [ -f deep_gemm/include/deep_gemm/impls/sm100_fp8_gemm_1d1d.cuh ]; then \
+               echo "skip  deepgemm-fp8-1d1d-port.diff (kernel present on $(git rev-parse --short HEAD))"; \
+               continue; \
+             fi ;; \
+         esac; \
          patch -p1 --forward -N < "$p" >/dev/null 2>&1 \
            && echo "applied $(basename "$p")" \
            || echo "skip  $(basename "$p") (already applied)"; \

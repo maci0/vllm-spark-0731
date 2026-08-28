@@ -365,7 +365,7 @@ def try_paged_mqa_logits(
     if B == 0 or m_rows == 0:
         return None
     try:
-        from b12x.attention.nsa_indexer import (
+        from b12x.attention.dsa_indexer import (
             PagedDecodeMetadata,
             logits_paged,
             prepare_paged_metadata,

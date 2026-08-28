@@ -2,6 +2,8 @@
 
 # Upstream Gaps & PRs
 
+> **Scope:** Decision layer for upstream work — pins, gap status, triage. Canonical tracker: [docs/UPSTREAM.md](../UPSTREAM.md).
+
 The distilled decision layer for upstream work. **Canonical tracker:
 [docs/UPSTREAM.md](../UPSTREAM.md)** — pins, backports, eugr/nightly analysis,
 and the posted-comments log live there and are authoritative. This chapter

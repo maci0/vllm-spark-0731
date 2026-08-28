@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "같은 GB10, 다른 시스템 경험",
+    "output": "gb10-vendor.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "common", "label": "공통 기반", "focus": ["gb10", "vendorA", "vendorB", "vendorC"], "note": "GB10은 공통 기반이고 시스템 구성은 벤더마다 다르다." }
+    ]
+  },
+  "components": [
+    { "id": "gb10", "type": "backend", "label": "GB10", "sublabel": "128 GiB / CUDA", "pos": [560, 120], "size": [220, 90], "tag": "common" },
+    { "id": "vendorA", "type": "backend", "label": "시스템 A", "sublabel": "냉각·fan curve", "pos": [150, 390], "size": [220, 92] },
+    { "id": "vendorB", "type": "backend", "label": "시스템 B", "sublabel": "firmware·power", "pos": [560, 390], "size": [220, 92] },
+    { "id": "vendorC", "type": "backend", "label": "시스템 C", "sublabel": "support·tooling", "pos": [970, 390], "size": [220, 92] },
+    { "id": "result", "type": "external", "label": "운영 결과", "sublabel": "sustained speed / recovery", "pos": [560, 650], "size": [230, 86] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "공통 칩·메모리 기반", "wraps": ["gb10"], "pad": 30 },
+    { "kind": "region", "label": "제품별 시스템 구성", "wraps": ["vendorA", "vendorB", "vendorC"], "pad": 34 }
+  ],
+  "connections": [
+    { "id": "gb10-a", "from": "gb10", "to": "vendorA", "fromSide": "bottom", "toSide": "top" },
+    { "id": "gb10-b", "from": "gb10", "to": "vendorB", "fromSide": "bottom", "toSide": "top" },
+    { "id": "gb10-c", "from": "gb10", "to": "vendorC", "fromSide": "bottom", "toSide": "top" },
+    { "id": "a-result", "from": "vendorA", "to": "result", "label": "measure", "fromSide": "bottom", "toSide": "left" },
+    { "id": "b-result", "from": "vendorB", "to": "result", "label": "measure", "fromSide": "bottom", "toSide": "top" },
+    { "id": "c-result", "from": "vendorC", "to": "result", "label": "measure", "fromSide": "bottom", "toSide": "right" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "고정할 조건", "items": ["model revision·runtime·workload", "같은 clock·context·concurrency"] },
+    { "dot": "amber", "title": "다시 측정할 것", "items": ["지속 성능·온도·전력", "지원·복구 경험"] }
+  ]
+}

@@ -155,3 +155,15 @@ Full test in
 **Rollback:** `bash ~/spark-launch.sh eugr-prod.yaml ~/PROD.log` gives 1,768,024
 tokens on vLLM 0.27.x, five weeks newer, at the cost of 13% capacity and 45% of
 c6 throughput.
+
+**Re-boot via `05-serve.sh golden` does NOT reproduce this deployment
+(2026-08-26).** The serve-script path (pin.golden.env) feeds the **vanilla**
+`deepseek-ai/DeepSeek-V4-Flash-0731` checkpoint and the node's
+`/models/ds4-flash-0731` dir; this recipe is the **abliterated** model
+deployed through `spark-launch.sh anemll-nvfp4.yaml`. Attempts fail:
+(a) vLLM 0.25.2 dies on empty `VLLM_USE_B12X_MOE` (`int('')`) — the serve
+script passes it empty unless pinned (pin.golden.env now pins the B12X_*
+vars to 0); (b) with the vanilla checkpoint, `profile_run` hits the
+fp8_einsum `layout.hpp:97` scale assert (the same ue8m0 recipe family fixed
+for vLLM main in vllm-project/vllm#53521). To reproduce the golden numbers,
+use the abliterated model + `spark-launch.sh` as originally done.

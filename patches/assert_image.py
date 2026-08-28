@@ -100,9 +100,13 @@ def main(argv: list[str] | None = None) -> int:
         DeepseekV4FlashInferMLASparseBackend.supports_combination
     )
     assert "nvfp4_ds_mla" in dsv4_comb, "DSV4 SM12x still rejects nvfp4_ds_mla"
-    dsv4_bs_src = inspect.getsource(
-        DeepseekV4FlashInferMLASparseBackend.get_supported_kernel_block_sizes
+    from vllm.models.deepseek_v4.sparse_mla import (
+        dsv4_supported_kernel_block_sizes,
     )
+    # pr-53425 on v0.28.0: the FlashInfer subclass override was removed and the
+    # SM12x 64-token page logic lives in the sparse_mla helper the base class
+    # method delegates to. Assert on the helper source.
+    dsv4_bs_src = inspect.getsource(dsv4_supported_kernel_block_sizes)
     assert "is_device_capability_family(120)" in dsv4_bs_src
     from vllm.platforms import current_platform
     if current_platform.is_device_capability_family(120):
@@ -144,18 +148,27 @@ def main(argv: list[str] | None = None) -> int:
             "main stack must not blanket-kill DeepGEMM on family 120"
         )
 
-    einsum_src = inspect.getsource(fp8_einsum)
-    assert "is_device_capability_family(120)" in einsum_src, "fp8_einsum missing SM12x fallback"
-
     from vllm.utils import deep_gemm as dg
-    assert hasattr(dg, "_sm12x_fp8_scale_fp32"), "fp8_einsum missing UE8M0 scale upcast"
+    # 2026-08-27: the einsum "fallback" was a misdiagnosis - DeepGEMM's einsum
+    # kernel is correct on SM12x with packed E8M0 scales + recipe (1,1,128)
+    # (measured 0.000000 mean_rel; E2E coherent). The stock passthrough is
+    # required; the fallback/upcast helper must NOT be present.
+    einsum_src = inspect.getsource(fp8_einsum)
+    assert "is_device_capability_family(120)" not in einsum_src, (
+        "fp8_einsum still carries the obsolete SM12x dequant fallback"
+    )
+    assert not hasattr(dg, "_sm12x_fp8_scale_fp32"), (
+        "fp8_einsum still carries the obsolete UE8M0 scale upcast"
+    )
 
     from vllm.models.deepseek_v4.nvidia.ops.o_proj import (
         compute_fp8_einsum_recipe,
         deep_gemm_fp8_o_proj,
     )
     recipe_src = inspect.getsource(compute_fp8_einsum_recipe)
-    assert "cap.major == 12" in recipe_src, "o_proj recipe still uses SM100 packed scales on SM12x"
+    assert "cap.major == 12" not in recipe_src, (
+        "o_proj recipe still carries the obsolete SM12x (1,128,128) override"
+    )
     o_src = inspect.getsource(deep_gemm_fp8_o_proj)
     assert "try_b12x_wo_proj" in o_src, "o_proj missing b12x WO projection try"
 
@@ -249,18 +262,24 @@ def main(argv: list[str] | None = None) -> int:
         assert "_instanttensor_draft_load_config" in gm_src, (
             "main stack missing InstantTensor hybrid draft loader"
         )
-        from vllm.model_executor.kernels.linear.scaled_mm.b12x import (
+        from vllm.model_executor.kernels.linear.scaled_mm.b12x_block import (
             _run_b12x_fp8_block_scaled_mm,
         )
         b12x_mm_src = inspect.getsource(_run_b12x_fp8_block_scaled_mm)
         assert "block_fp8=True" in b12x_mm_src, (
             "main stack missing git-b12x mm_block_fp8 compatibility"
         )
-        from vllm.v1.worker.utils import allocate_kv_cache
-        alloc_src = inspect.getsource(allocate_kv_cache)
-        assert "tokens_per_state" in alloc_src, (
-            "main stack missing DSV4 compressed-page kernel-split skip"
-        )
+        try:
+            from vllm.v1.worker.utils import allocate_kv_cache
+            alloc_src = inspect.getsource(allocate_kv_cache)
+            assert "tokens_per_state" in alloc_src, (
+                "main stack missing DSV4 compressed-page kernel-split skip"
+            )
+        except ImportError:
+            # v0.28.0 KV-cache refactor (#51612/#51704) removed the BLHNC
+            # kernel-split code this assert guarded - the overlay is a no-op.
+            print("skip allocate_kv_cache assert: function absent in v0.28.0")
+
 
     print(
         f"image OK ({args.stack}): b12x importable, moe/linear b12x, "

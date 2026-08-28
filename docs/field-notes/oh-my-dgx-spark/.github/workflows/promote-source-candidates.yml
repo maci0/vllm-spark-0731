@@ -1,0 +1,203 @@
+name: Promote Approved Research Sources
+
+on:
+  issues:
+    types:
+      - labeled
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "source-candidate Issue 번호"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: source-promotion-${{ github.event.issue.number || inputs.issue_number }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' &&
+      github.event.label.name == 'source-approved' &&
+      contains(github.event.issue.labels.*.name, 'source-candidate'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Resolve Issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_ISSUE_NUMBER: ${{ inputs.issue_number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${INPUT_ISSUE_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Issue 번호가 없습니다."
+            exit 1
+          fi
+          issue_json="${RUNNER_TEMP}/source-candidate-issue.json"
+          gh issue view "${INPUT_ISSUE_NUMBER}" \
+            --repo "${GH_REPO}" \
+            --json number,title,body,labels,url \
+            > "${issue_json}"
+          if ! jq -e '.labels | any(.[]; .name == "source-candidate") and any(.[]; .name == "source-approved")' "${issue_json}" >/dev/null; then
+            echo "::error::source-candidate와 source-approved 라벨이 모두 필요한 Issue입니다."
+            exit 1
+          fi
+          echo "number=${INPUT_ISSUE_NUMBER}" >> "${GITHUB_OUTPUT}"
+          echo "issue_json=${issue_json}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check editor permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          permission="$(gh api \
+            "repos/${GH_REPO}/collaborators/${GH_ACTOR}/permission" \
+            --jq '.permission' 2>/dev/null || true)"
+          case "${permission}" in
+            admin|maintain|push)
+              echo "승인 PR 생성 권한 확인: ${permission}"
+              ;;
+            *)
+              echo "::error::저장소 쓰기 권한이 있는 사용자만 출처 승격을 실행할 수 있습니다."
+              exit 1
+              ;;
+          esac
+
+      - name: Promote checked candidates
+        id: promote
+        env:
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          ISSUE_JSON: ${{ steps.issue.outputs.issue_json }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          branch="automation/source-approval-issue-${ISSUE_NUMBER}"
+          git checkout -B "${branch}" origin/main
+          promotion_json="${RUNNER_TEMP}/source-promotion.json"
+          python3 tools/promote_source_candidates.py \
+            --issue-json "${ISSUE_JSON}" \
+            --sources research/sources.json \
+            --output "${promotion_json}"
+          changed="$(jq -r '.changed' "${promotion_json}")"
+          checked_count="$(jq -r '.checked_count' "${promotion_json}")"
+          promoted_count="$(jq -r '.promoted_count' "${promotion_json}")"
+          already_count="$(jq -r '.already_registered_count' "${promotion_json}")"
+          echo "checked_count=${checked_count}" >> "${GITHUB_OUTPUT}"
+          echo "promoted_count=${promoted_count}" >> "${GITHUB_OUTPUT}"
+          echo "already_count=${already_count}" >> "${GITHUB_OUTPUT}"
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
+          if [[ "${changed}" != "true" ]]; then
+            echo "새로 반영할 체크 후보가 없습니다."
+            exit 0
+          fi
+          git diff --check
+          git add research/sources.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: approve research sources from issue #${ISSUE_NUMBER}"
+          remote_sha="$(git ls-remote --heads origin "refs/heads/${branch}" | awk '{print $1}')"
+          if [[ -n "${remote_sha}" ]]; then
+            git push \
+              --force-with-lease="refs/heads/${branch}:${remote_sha}" \
+              origin "HEAD:${branch}"
+          else
+            git push origin "HEAD:${branch}"
+          fi
+
+      - name: Create or update approval PR
+        if: steps.promote.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_OWNER: ${{ github.repository_owner }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          BRANCH: ${{ steps.promote.outputs.branch }}
+          CHECKED_COUNT: ${{ steps.promote.outputs.checked_count }}
+          PROMOTED_COUNT: ${{ steps.promote.outputs.promoted_count }}
+          ALREADY_COUNT: ${{ steps.promote.outputs.already_count }}
+        run: |
+          set -euo pipefail
+          gh label create source-approval \
+            --repo "${GH_REPO}" \
+            --color "0e8a16" \
+            --description "승인된 리서치 출처를 sources.json에 반영" \
+            --force >/dev/null 2>&1 || true
+          gh label create source-promoted \
+            --repo "${GH_REPO}" \
+            --color "5319e7" \
+            --description "승인 출처가 sources.json에 반영된 후보 Issue" \
+            --force >/dev/null 2>&1 || true
+          pr_number="$(gh pr list \
+            --repo "${GH_REPO}" \
+            --state open \
+            --head "${GH_OWNER}:${BRANCH}" \
+            --json number \
+            --jq '.[0].number // empty')"
+          pr_body="## 자동 출처 승인 PR
+
+          원본 후보 Issue: [#${ISSUE_NUMBER}](https://github.com/${GH_REPO}/issues/${ISSUE_NUMBER})
+
+          체크된 후보 ${CHECKED_COUNT}건 중 신규 출처 ${PROMOTED_COUNT}건을
+          \`research/sources.json\`에 반영합니다. 이미 등록된 후보는 ${ALREADY_COUNT}건입니다.
+
+          이 PR은 \`main\`에 직접 쓰지 않으며, 출처·주소·등록 유형을 확인한 뒤 머지해야 합니다.
+          머지 후 다음 일반 리서치 실행부터 승인된 출처를 사용합니다.
+          모든 후보를 체크한 뒤 원본 Issue에 \`source-approved\` 라벨을 추가하면 이 PR이 생성됩니다. 관련 PR을 머지하면 완료 Workflow가 원본 Issue의 \`source-candidate\`와 \`source-approved\` 라벨을 \`source-promoted\`로 자동 변경합니다. 일부만 체크했다면 라벨을 추가하지 마세요."
+          if [[ -n "${pr_number}" ]]; then
+            gh pr edit "${pr_number}" \
+              --repo "${GH_REPO}" \
+              --title "[Sources] Issue #${ISSUE_NUMBER} 승인 출처 반영" \
+              --body "${pr_body}"
+            pr_url="$(gh pr view "${pr_number}" --repo "${GH_REPO}" --json url --jq .url)"
+          else
+            pr_url="$(gh pr create \
+              --repo "${GH_REPO}" \
+              --draft \
+              --base main \
+              --head "${BRANCH}" \
+              --title "[Sources] Issue #${ISSUE_NUMBER} 승인 출처 반영" \
+              --body "${pr_body}")"
+          fi
+          gh api --method POST "repos/${GH_REPO}/issues/${pr_number:-${pr_url##*/}}/labels" \
+            -f 'labels[]=source-approval' >/dev/null
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GH_REPO}" \
+            --body "체크된 후보를 \`research/sources.json\`에 반영하는 자동 PR을 만들거나 갱신했습니다: ${pr_url}"
+
+      - name: Report no-op
+        if: steps.promote.outputs.changed != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          CHECKED_COUNT: ${{ steps.promote.outputs.checked_count }}
+          ALREADY_COUNT: ${{ steps.promote.outputs.already_count }}
+        run: |
+          set -euo pipefail
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${GH_REPO}" \
+            --body "체크된 후보 ${CHECKED_COUNT}건은 이미 \`research/sources.json\`에 등록되어 새 PR을 만들지 않았습니다. (기존 등록 ${ALREADY_COUNT}건)"

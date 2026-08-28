@@ -18,7 +18,8 @@ case "${STACK}" in
   eugr) PIN="${ROOT}/configs/pin.eugr-b12x.env" ;;
   golden) PIN="${ROOT}/configs/pin.golden.env" ;;
   main) PIN="${ROOT}/configs/pin.main.env" ;;
-  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main]" >&2; exit 2 ;;
+  main-dg) PIN="${ROOT}/configs/pin.main-dg.env" ;;
+  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main|main-dg]" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC1090

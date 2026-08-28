@@ -1,0 +1,121 @@
+{
+  "date_unix_ns": 1787324808254083383,
+  "base_url": "http://127.0.0.1:8888",
+  "model": "deepseek-v4-flash-0731",
+  "thinking": false,
+  "semantic": {
+    "status": "pass",
+    "text": "17 \u00d7 19 = 323",
+    "prompt_tokens": 21,
+    "cached_tokens": 0,
+    "completion_tokens": 8,
+    "ttft_s": 0.21322628699999768,
+    "prefill_tok_s": 98.48691873530692,
+    "decode_tok_s": 39.3366474566427,
+    "elapsed_s": 0.4880014599984861,
+    "finish_reason": "stop"
+  },
+  "structured_json_schema": {
+    "status": "pass",
+    "parsed": {
+      "language": "Python",
+      "answer": 323,
+      "valid": true
+    },
+    "prompt_tokens": 22,
+    "cached_tokens": 0,
+    "completion_tokens": 23,
+    "ttft_s": 0.2762520519972895,
+    "prefill_tok_s": 79.63741749949374,
+    "decode_tok_s": 36.29375522765429,
+    "elapsed_s": 0.8825608900006046,
+    "finish_reason": "stop"
+  },
+  "code_c1_decode": {
+    "trials": [
+      {
+        "language": "python",
+        "content_sha256": "a53377ed0ea681d16aac44a18d12c4c48d79306f942fb112336b785163e29500",
+        "content_prefix": "I'll implement a production-quality LRU cache with comprehensive features, tests, and documentation. Let me build this s",
+        "prompt_tokens": 40,
+        "cached_tokens": 0,
+        "completion_tokens": 512,
+        "ttft_s": 0.3212648319968139,
+        "prefill_tok_s": 124.5078701935128,
+        "decode_tok_s": 41.64656474870965,
+        "elapsed_s": 12.591250853998645,
+        "finish_reason": "length"
+      },
+      {
+        "language": "rust",
+        "content_sha256": "511256d76c38e0cb654c8eafd2e62ffd8a48f46d490b42dc7e720f92bed55917",
+        "content_prefix": "# Production-Quality Bounded Work-Stealing Queue in Rust\n\nI'll implement a bounded work-stealing queue (like Chase-Lev d",
+        "prompt_tokens": 38,
+        "cached_tokens": 0,
+        "completion_tokens": 512,
+        "ttft_s": 0.27112237599794753,
+        "prefill_tok_s": 140.15811074290554,
+        "decode_tok_s": 37.5526048242223,
+        "elapsed_s": 13.878890476000379,
+        "finish_reason": "length"
+      },
+      {
+        "language": "typescript",
+        "content_sha256": "1f5a29fe31190a5f9294c44443ebc5721a028b4c6cc0dd09e864fdde3cc02681",
+        "content_prefix": "I'll implement a production-quality TypeScript JSON-RPC client with comprehensive features. Let me build this systematic",
+        "prompt_tokens": 39,
+        "cached_tokens": 0,
+        "completion_tokens": 512,
+        "ttft_s": 0.348813759002951,
+        "prefill_tok_s": 111.80751616988267,
+        "decode_tok_s": 44.932057504265714,
+        "elapsed_s": 11.721724410999741,
+        "finish_reason": "length"
+      },
+      {
+        "language": "cuda_cpp",
+        "content_sha256": "7dc15a70d81f47d50bc356c95049da5ef95ebc733cad520997a8825d9aa42918",
+        "content_prefix": "I'll implement a comprehensive CUDA C++ tiled reduction kernel with host harness, validation, and benchmarking. This wil",
+        "prompt_tokens": 39,
+        "cached_tokens": 0,
+        "completion_tokens": 512,
+        "ttft_s": 0.35364396899967687,
+        "prefill_tok_s": 110.28040464062215,
+        "decode_tok_s": 39.0839926644867,
+        "elapsed_s": 13.428221423004288,
+        "finish_reason": "length"
+      },
+      {
+        "language": "go",
+        "content_sha256": "ec93186bb4c352fb2a1fbe9cdf48de5e427257b933ad1ee93543d50f341a88d0",
+        "content_prefix": "I'll implement a production-quality bounded concurrent worker pool in Go with comprehensive features and tests. Let me b",
+        "prompt_tokens": 37,
+        "cached_tokens": 0,
+        "completion_tokens": 512,
+        "ttft_s": 0.35264935300074285,
+        "prefill_tok_s": 104.9200847390242,
+        "decode_tok_s": 41.35821685603966,
+        "elapsed_s": 12.708266588997503,
+        "finish_reason": "length"
+      }
+    ],
+    "minimum_tok_s": 37.5526048242223,
+    "median_tok_s": 41.35821685603966,
+    "mean_tok_s": 40.914687319544804,
+    "gate_tok_s": 35.0,
+    "gate": "pass"
+  },
+  "cold_c1_prefill": {
+    "response": "PREFILL OK.",
+    "prompt_tokens": 251968,
+    "cached_tokens": 0,
+    "completion_tokens": 6,
+    "ttft_s": 255.70715300900338,
+    "prefill_tok_s": 985.3772060538654,
+    "decode_tok_s": 47.016658105273066,
+    "elapsed_s": 255.81366205600352,
+    "finish_reason": "stop",
+    "gate_tok_s": 1000.0,
+    "gate": "fail"
+  }
+}

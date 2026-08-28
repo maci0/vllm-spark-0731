@@ -1,0 +1,117 @@
+name: Complete Source Promotion
+
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: source-promotion-completion-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'source-approval')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Resolve source Issue and completion state
+        id: state
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          pr_json="${RUNNER_TEMP}/source-approval-pr.json"
+          issue_json="${RUNNER_TEMP}/source-candidate-issue.json"
+          gh pr view "${PR_NUMBER}" \
+            --repo "${GH_REPO}" \
+            --json body,labels \
+            > "${pr_json}"
+          issue_number="$(python3 - "${pr_json}" <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          body = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("body", "")
+          match = re.search(r"원본 후보 Issue:\s*\[#([0-9]+)\]", body)
+          if not match:
+              raise SystemExit("source-approval PR has no source Issue reference")
+          print(match.group(1))
+          PY
+          )"
+          gh issue view "${issue_number}" \
+            --repo "${GH_REPO}" \
+            --json number,title,body,labels,url \
+            > "${issue_json}"
+          completion="$(python3 - "${issue_json}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          sys.path.insert(0, "tools")
+          from promote_source_candidates import candidate_progress
+
+          issue = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          total, checked = candidate_progress(issue)
+          print(f"{total} {checked}")
+          PY
+          )"
+          total="${completion%% *}"
+          checked="${completion##* }"
+          echo "issue_number=${issue_number}" >> "${GITHUB_OUTPUT}"
+          echo "total=${total}" >> "${GITHUB_OUTPUT}"
+          echo "checked=${checked}" >> "${GITHUB_OUTPUT}"
+          if [[ "${total}" -gt 0 && "${total}" == "${checked}" ]]; then
+            echo "complete=true" >> "${GITHUB_OUTPUT}"
+            echo "모든 후보가 체크되었습니다: ${checked}/${total}"
+          else
+            echo "complete=false" >> "${GITHUB_OUTPUT}"
+            echo "아직 일부 후보가 남아 있습니다: ${checked}/${total}"
+          fi
+
+      - name: Mark source Issue as promoted
+        if: steps.state.outputs.complete == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ steps.state.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+          gh label create source-promoted \
+            --repo "${GH_REPO}" \
+            --color "5319e7" \
+            --description "승인 출처가 sources.json에 반영된 후보 Issue" \
+            --force >/dev/null 2>&1 || true
+          gh issue edit "${ISSUE_NUMBER}" \
+            --repo "${GH_REPO}" \
+            --add-label source-promoted \
+            --remove-label source-candidate \
+            --remove-label source-approved
+          echo "source-promoted 라벨을 Issue #${ISSUE_NUMBER}에 적용했습니다."
+
+      - name: Keep source Issue open for remaining candidates
+        if: steps.state.outputs.complete != 'true'
+        run: |
+          echo "모든 후보가 체크될 때까지 source-candidate 라벨을 유지합니다."

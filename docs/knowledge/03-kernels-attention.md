@@ -2,6 +2,8 @@
 
 # Kernel Stack & Attention Backends
 
+> **Scope:** The SM12x kernel stack — b12x vs FlashInfer vs DeepGEMM/CUTLASS, attention backends, the packed-at-store indexer.
+
 ## The Kernel Stack on SM12x
 
 SM12x (sm_121a, family 120) runs DeepGEMM nv_dev (`is_deep_gemm_supported()` is True), but stock DeepGEMM shapes (such as 2-state MQA pages or mHC broadcast) and **CUTLASS block-FP8** (SM90/SM100) cannot execute natively. Every unsupported op must use **b12x** or a **PyTorch/TileLang fallback**.
@@ -22,6 +24,26 @@ SM12x (sm_121a, family 120) runs DeepGEMM nv_dev (`is_deep_gemm_supported()` is 
 - **DeepGEMM nv_dev** is compiled for SM12x on `main-b12x` (`is_deep_gemm_supported()` returns True), but stock DeepGEMM kernels assert Hopper/Blackwell page layouts (32 or 64 states, whereas DSV4 compress-128 pages have 2 states) or unsupported broadcast shapes. These paths require guards (e.g. `_should_build_paged_mqa_logits_metadata`) and PyTorch/b12x fallbacks.
 - **Pure-FP8 Linear GEMM Aliasing Bug**: In `nv_dev 8b1392b`, `csrc/apis/gemm.hpp:851` aliases pure-FP8 `fp8_gemm_nt` to `fp8_fp4_gemm_nt`. On SM12x (`arch_major == 12`), that dispatcher unconditionally executes `sm120_fp8_fp4_gemm_1d1d`, treating FP8 weights as FP4 and producing silent output corruption. Never use `LINEAR_BACKEND=deep_gemm` on SM12x until upstream separates the 1d1d pure-FP8 dispatch; keep `--linear-backend b12x` pinned (see [09-golden-deepgemm.md](09-golden-deepgemm.md)).
 - **CUTLASS block-FP8** requires SM90/SM100 TMA architectures and does not run on SM12x, falling back to PyTorch/Triton/TileLang.
+
+### SM12x programming model & NVFP4 blockscaled GEMM (Colfax tutorial)
+
+Source: [NVFP4 Blockscaled GEMM on SM12x — Colfax Research](https://research.colfax-intl.com/cutlass-tutorial-nvfp4-blockscaled-gemm-on-nvidia-rtx-pro-blackwell-gpus-sm12x/) (CUDA 13.2, RTX Pro 6000 / DGX Spark).
+
+**Architecture**: SM12x does **not** use `tcgen05.mma`/TMEM (that is SM10x B200/B300). It uses warp-level **`mma.sync`** (SM8x-inherited, register fragments) — so SM10x GEMM kernels are *incompatible* with SM12x, SM8x kernels run fine, and SM12x kernels run poorly on SM10x. SM12x adds: sub-byte/block-scaled MMA, TMA, warpgroup register reallocation (sm120a/sm120f only), Cluster Launch Control, and Programmatic Dependent Launch. This is why our stack needs b12x/DeepGEMM-fallback kernels rather than SM100 `tcgen05` paths.
+
+**NVFP4 format**: operand E2M1 (4-bit, values {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}; all-ones exponent not NaN/∞), micro-block size **16** (one scale per 16 K-elements), scale dtype **UE4M3** (8-bit non-negative). SFA is `[M, K/16]`, SFB is `[K/16, N]`.
+
+**The only NVFP4 blockscaled MMA on SM12x** (fixed shape):
+```
+mma.sync.aligned.kind::mxf4nvf4.block_scale.scale_vec::4X.m16n8k64.row.col.f32.e2m1.e2m1.f32.ue4m3
+```
+Consumes A 16×64 + B 64×8 (E2M1), SFA 16×4 + SFB 4×8 (UE4M3), accumulates F32 16×8. `.scale_vec::4X` = 4 scale factors per K=64 atom (64/16).
+
+**Scale-factor ownership**: rows of A / columns of B are owned by quads; the quad's scale factors go to specific lanes — in CUTLASS, SFA comes from lanes `thread_id % 4 ∈ {0,1}`, SFB from lane `thread_id % 4 == 0` (hard-coded `{byte-id, thread-id} = 0`). TV layouts: SFA `((2,2,8),(16,4)):((32,0,4),(0,1))`, SFB `((4,8),(16,4)):((0,4),(0,1))` — with 2× (SFA) / 4× (SFB) data replication across lanes. GMEM/SMEM layouts are free choices (TMA optional); only the per-thread register layout is hardware-forced.
+
+**Benchmark** (RTX Pro 6000, CUDA 13.2): tutorial CuTe-DSL NVFP4 GEMM ≈ **3×** dense FP16 cuBLAS (vs 4× theoretical FP4/FP16 ratio), topping ~60% of FP4 peak; 2k-shape dips come from CTA-wave quantization (256 CTAs / 188 SMs = 1.36 waves).
+
+Relevance to this stack: the `nvfp4_ds_mla` KV envelope and b12x/DeepGEMM NVFP4 MoE kernels operate in this exact scale-layout space — the same UE8M0/UE4M3 block-scale semantics that drove the deep_gemm einsum/linear scale saga (see [09-golden-deepgemm.md](09-golden-deepgemm.md) and [04-quantization-kv.md](04-quantization-kv.md)).
 
 SM12x kernels live in:
 - **DeepGEMM nv_dev** (not main) — SM12x MQA only in nv_dev branch

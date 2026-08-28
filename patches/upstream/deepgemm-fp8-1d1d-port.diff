@@ -1,5 +1,5 @@
 diff --git a/csrc/apis/gemm.hpp b/csrc/apis/gemm.hpp
-index 902ae69..529528e 100644
+index 902ae69..019069e 100644
 --- a/csrc/apis/gemm.hpp
 +++ b/csrc/apis/gemm.hpp
 @@ -7,6 +7,7 @@
@@ -10,21 +10,34 @@ index 902ae69..529528e 100644
  #include "../jit_kernels/impls/sm100_bf16_gemm.hpp"
  #include "../jit_kernels/impls/sm120_fp8_fp4_gemm_1d1d.hpp"
  #include "../jit_kernels/impls/sm120_bf16_gemm.hpp"
-@@ -143,6 +144,19 @@ static void fp8_fp4_gemm_nt_sm120(const std::pair<torch::Tensor, torch::Tensor>&
+@@ -104,11 +105,18 @@ static void fp8_fp4_gemm_nt_sm120(const std::pair<torch::Tensor, torch::Tensor>&
+                               (a_data.scalar_type() == kPackedFP4 or b_data.scalar_type() == kPackedFP4);
+     DG_HOST_ASSERT(!is_mixed_fp4 or k % 128 == 0);
+ 
++    // Pure fp8xfp8 must not run the fp8xfp4 kernel (fp8 weights are misread
++    // as fp4: silent corruption), and the restored sm100_fp8_gemm_1d1d has no
++    // AB-swap/transposed-store support - force the non-swapped path (the
++    // SM100 heuristics already cover small M with block_m<=32 candidates).
++    const bool pure_fp8 = (a_data.scalar_type() != kPackedFP4) and
++                          (b_data.scalar_type() != kPackedFP4);
++
+     // AB-swap for small-M decode: swap A↔B so small M becomes N (BN=16).
+     // K-major B has N as TMA outer dim — no minimum size restriction.
+     constexpr int kSwapAbMMax = 16;
+     const bool swap_ab = (m >= 1 and m <= kSwapAbMMax
+-        and d.stride(-1) == 1 and !is_mixed_fp4 and !c.has_value());
++        and d.stride(-1) == 1 and !is_mixed_fp4 and !pure_fp8 and !c.has_value());
+ 
+     // Resolve actual granularities, swap if needed
+     int ga, gb, gk;
+@@ -143,6 +151,12 @@ static void fp8_fp4_gemm_nt_sm120(const std::pair<torch::Tensor, torch::Tensor>&
          sf_a_raw, sf_b_raw, eff_m, eff_n, k, eff_recipe,
          eff_recipe_a, eff_recipe_b, std::nullopt, std::nullopt, disable_ue8m0_cast);
  
-+    // Pure fp8xfp8 must not run the fp8xfp4 kernel (fp8 weights are
-+    // misread as fp4: silent corruption). Route to the fp8 1d1d kernel.
-+    if (a_data.scalar_type() != kPackedFP4 and b_data.scalar_type() != kPackedFP4) {
-+        if (swap_ab) {
-+            sm100_fp8_gemm_1d1d(b_data, sfa, a_data, sfb, std::nullopt, d,
-+                                eff_m, eff_n, k, gran_k_a, gran_k_b,
-+                                k_major, k_major, compiled_dims);
-+        } else {
-+            sm100_fp8_gemm_1d1d(a_data, sfa, b_data, sfb, c, d, m, n, k,
-+                                gran_k_a, gran_k_b, k_major, k_major, compiled_dims);
-+        }
++    // Route pure fp8xfp8 to the fp8 1d1d kernel (swap_ab is false for it).
++    if (pure_fp8) {
++        sm100_fp8_gemm_1d1d(a_data, sfa, b_data, sfb, c, d, m, n, k,
++                            gran_k_a, gran_k_b, k_major, k_major, compiled_dims);
 +        return;
 +    }
      if (swap_ab) {
@@ -36,7 +49,7 @@ index 902ae69..529528e 100644
          } else if (arch_major == 10 and sfa.scalar_type() == torch::kInt) {
 -            sm100_fp8_fp4_gemm_1d1d(a.first, sfa, b.first, sfb, c, d, m, n, k, gran_k_a, gran_k_b,
 -                                    major_a, major_b, compiled_dims);
-+            if (b.first.scalar_type() != kPackedFP4) {
++            if (b.first.scalar_type() != kPackedFP4 and a.first.scalar_type() != kPackedFP4) {
 +                sm100_fp8_gemm_1d1d(a.first, sfa, b.first, sfb, c, d, m, n, k,
 +                                    gran_k_a, gran_k_b, major_a, major_b, compiled_dims);
 +            } else {
@@ -46,12 +59,44 @@ index 902ae69..529528e 100644
          } else {
              DG_HOST_UNREACHABLE("Unsupported architecture or scaling factor types");
          }
+diff --git a/csrc/jit_kernels/heuristics/config.hpp b/csrc/jit_kernels/heuristics/config.hpp
+index 8e24575..44a5941 100644
+--- a/csrc/jit_kernels/heuristics/config.hpp
++++ b/csrc/jit_kernels/heuristics/config.hpp
+@@ -29,6 +29,10 @@ struct GemmDesc {
+     // cannot express it, so the kernel falls back to the strided-store epilogue.
+     bool cd_n_contiguous = true;
+ 
++    // False for kernels without AB-swap support: skips the swap_ab==1 layout
++    // candidates in get_layout_candidates (default true preserves all callers).
++    bool allow_swap_ab = true;
++
+     // SM100 m-grouped psum layout padding contract
+     bool ensure_zero_padding = true;
+ 
+diff --git a/csrc/jit_kernels/heuristics/sm100.hpp b/csrc/jit_kernels/heuristics/sm100.hpp
+index c8e9e2e..af84776 100644
+--- a/csrc/jit_kernels/heuristics/sm100.hpp
++++ b/csrc/jit_kernels/heuristics/sm100.hpp
+@@ -45,6 +45,12 @@ struct SM100ArchSpec {
+         // Enumerate all candidates
+         std::vector<Layout> candidates;
+         for (int swap_ab = 0; swap_ab < 2; ++ swap_ab) {
++            // Kernels without AB-swap support (e.g. the restored pure-fp8
++            // sm100_fp8_gemm_1d1d) must not see swapped layouts: the swap
++            // store/smem configs would silently miscompute or trip the
++            // multicast static assert at JIT time.
++            if (swap_ab == 1 and not desc.allow_swap_ab)
++                continue;
+             // Block M/N candidates
+             std::vector<int> block_m_candidates;
+             std::vector<int> block_n_candidates;            
 diff --git a/csrc/jit_kernels/impls/sm100_fp8_gemm_1d1d.hpp b/csrc/jit_kernels/impls/sm100_fp8_gemm_1d1d.hpp
 new file mode 100644
-index 0000000..0dbc891
+index 0000000..ccefa06
 --- /dev/null
 +++ b/csrc/jit_kernels/impls/sm100_fp8_gemm_1d1d.hpp
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,171 @@
 +#pragma once
 +
 +#include <torch/python.h>
@@ -137,7 +182,7 @@ index 0000000..0dbc891
 +        args.gemm_config.launch_config.num_sms,
 +        to_string(args.gemm_desc.gemm_type), args.gemm_desc.with_accumulation,
 +        to_string(args.gemm_desc.a_dtype), to_string(args.gemm_desc.b_dtype), to_string(args.gemm_desc.cd_dtype),
-+        "EpilogueIdentity");
++        get_default_epilogue_type(args.epilogue_type));
 +    }
 +
 +    static void launch_impl(const KernelHandle& kernel, const LaunchConfigHandle& config, Args args) {
@@ -167,10 +212,14 @@ index 0000000..0dbc891
 +        .cd_dtype = d.scalar_type(),
 +        .major_a = major_a, .major_b = major_b,
 +        .with_accumulation = c.has_value(),
++        // The restored kernel has no AB-swap/transposed-store support.
++        .allow_swap_ab = false,
 +        .num_sms = device_runtime->get_num_sms(),
 +        .tc_util = device_runtime->get_tc_util(),
 +        .compiled_dims = compiled_dims
 +    };
++    // SM100ArchSpec smem_capacity is reused for sm_12x; GB10 per-SM dynamic
++    // smem matches SM100 (227 KB), so stage sizing is safe there.
 +    const auto config = get_best_config<SM100ArchSpec>(desc);
 +
 +    const auto cd = c.value_or(d);
@@ -301,7 +350,7 @@ index 0000000..a3a8b62
 +    } while (0)
 diff --git a/deep_gemm/include/deep_gemm/dg25_fp8/common/epilogue_utils.cuh b/deep_gemm/include/deep_gemm/dg25_fp8/common/epilogue_utils.cuh
 new file mode 100644
-index 0000000..1d6130a
+index 0000000..aa78f5b
 --- /dev/null
 +++ b/deep_gemm/include/deep_gemm/dg25_fp8/common/epilogue_utils.cuh
 @@ -0,0 +1,27 @@
@@ -323,7 +372,7 @@ index 0000000..1d6130a
 +struct EpilogueHeadSplits: EpilogueIdentity {
 +    template <uint32_t STORE_BLOCK_N>
 +    __device__ __forceinline__ static uint32_t apply_index_n(const uint32_t &n_idx) {
-+        DG_STATIC_ASSERT(kLeft % STORE_BLOCK_N == 0 and kMid % STORE_BLOCK_N == 0 
++        DG_STATIC_ASSERT(kLeft % STORE_BLOCK_N == 0 and kMid % STORE_BLOCK_N == 0
 +                         and kRight % STORE_BLOCK_N == 0, "Invalid head splits config");
 +        return n_idx + (n_idx + kRight) / (kLeft + kRight) * kMid;
 +    }
@@ -383,13 +432,14 @@ index 0000000..2c7856c
 +#endif
 diff --git a/deep_gemm/include/deep_gemm/dg25_fp8/common/math.cuh b/deep_gemm/include/deep_gemm/dg25_fp8/common/math.cuh
 new file mode 100644
-index 0000000..c2d1aa6
+index 0000000..e26bb4e
 --- /dev/null
 +++ b/deep_gemm/include/deep_gemm/dg25_fp8/common/math.cuh
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,150 @@
 +#pragma once
 +
 +#include <cuda/std/cstdint>
++#include <cuda_bf16.h>
 +#include <deep_gemm/dg25_fp8/common/compile.cuh>
 +#include <deep_gemm/dg25_fp8/common/exception.cuh>
 +
@@ -588,7 +638,7 @@ index 0000000..d29643a
 +}
 diff --git a/deep_gemm/include/deep_gemm/dg25_fp8/common/scheduler.cuh b/deep_gemm/include/deep_gemm/dg25_fp8/common/scheduler.cuh
 new file mode 100644
-index 0000000..70e8a11
+index 0000000..bd3355c
 --- /dev/null
 +++ b/deep_gemm/include/deep_gemm/dg25_fp8/common/scheduler.cuh
 @@ -0,0 +1,288 @@
@@ -772,7 +822,7 @@ index 0000000..70e8a11
 +            }
 +
 +            get_swizzled_block_idx(next_block_idx - current_m_cumsum * num_n_blocks, m_block_idx, n_block_idx);
-+        } else if constexpr (kGemmType == GemmType::MGroupedContiguousWithPsumLayout) { 
++        } else if constexpr (kGemmType == GemmType::MGroupedContiguousWithPsumLayout) {
 +            while (true) {
 +                // Within current group
 +                if (next_block_idx < (current_m_block_cumsum + num_m_blocks) * num_n_blocks)
@@ -871,7 +921,7 @@ index 0000000..70e8a11
 +        } else if constexpr (kGemmType == GemmType::MGroupedMasked) {
 +            return m_offset + m_block_idx * BLOCK_M < __ldg(grouped_layout + current_group_idx);
 +        } else {
-+            // Unreachable 
++            // Unreachable
 +            DG_TRAP_ONLY_DEVICE_ASSERT(false);
 +        }
 +    }
@@ -882,7 +932,7 @@ index 0000000..70e8a11
 +} // namespace deep_gemm
 diff --git a/deep_gemm/include/deep_gemm/dg25_fp8/common/sm100_utils.cuh b/deep_gemm/include/deep_gemm/dg25_fp8/common/sm100_utils.cuh
 new file mode 100644
-index 0000000..3e7245a
+index 0000000..8dffe8d
 --- /dev/null
 +++ b/deep_gemm/include/deep_gemm/dg25_fp8/common/sm100_utils.cuh
 @@ -0,0 +1,266 @@
@@ -1050,8 +1100,8 @@ index 0000000..3e7245a
 +    asm volatile(
 +        "cp.async.bulk.tensor.2d.shared::cta.global.tile::gather4.mbarrier::complete_tx::bytes.cta_group::1.L2::cache_hint [%0], [%1, {%2, %3, %4, %5, %6}], [%7], %8;\n"
 +        :
-+        : "r"(smem_addr), "l"(desc_ptr), "r"(col_idx), 
-+          "r"(row_idxs.x), "r"(row_idxs.y), "r"(row_idxs.z), "r"(row_idxs.w), 
++        : "r"(smem_addr), "l"(desc_ptr), "r"(col_idx),
++          "r"(row_idxs.x), "r"(row_idxs.y), "r"(row_idxs.z), "r"(row_idxs.w),
 +          "r"(mbarrier_addr), "l"(cache_hint)
 +        : "memory"
 +    );
@@ -2145,7 +2195,7 @@ index 0000000..f03544b
 +} // namespace deep_gemm::utils
 diff --git a/deep_gemm/include/deep_gemm/dg25_fp8/impls/sm100_fp8_gemm_1d1d.cuh b/deep_gemm/include/deep_gemm/dg25_fp8/impls/sm100_fp8_gemm_1d1d.cuh
 new file mode 100644
-index 0000000..9d644dc
+index 0000000..c3ca34a
 --- /dev/null
 +++ b/deep_gemm/include/deep_gemm/dg25_fp8/impls/sm100_fp8_gemm_1d1d.cuh
 @@ -0,0 +1,567 @@
@@ -2242,7 +2292,7 @@ index 0000000..9d644dc
 +    constexpr uint32_t SF_BLOCK_N = constexpr_align(BLOCK_N, kNumUTCCPAlignedElems);
 +    constexpr uint32_t SMEM_SFA_SIZE_PER_STAGE = SF_BLOCK_M * sizeof(uint32_t);
 +    constexpr uint32_t SMEM_SFB_SIZE_PER_STAGE = SF_BLOCK_N * sizeof(uint32_t);
-+    DG_STATIC_ASSERT(SMEM_CD_SIZE % 1024 == 0 and SMEM_A_SIZE_PER_STAGE % 1024 == 0 and SMEM_B_SIZE_PER_STAGE % 1024 == 0, 
++    DG_STATIC_ASSERT(SMEM_CD_SIZE % 1024 == 0 and SMEM_A_SIZE_PER_STAGE % 1024 == 0 and SMEM_B_SIZE_PER_STAGE % 1024 == 0,
 +                     "Shared memory of A/B must be aligned to 1024 bytes");
 +    DG_STATIC_ASSERT(kNumTMAStoreStages >= 1, "Invalid number of TMA stages");
 +
@@ -2273,7 +2323,7 @@ index 0000000..9d644dc
 +
 +    // D/A/B shared memory
 +    auto smem_cd = PatternVisitor([&](const uint32_t& i) {
-+        return reinterpret_cast<cd_dtype_t*>(smem_buffer + i * SMEM_CD_SIZE_PER_STAGE); 
++        return reinterpret_cast<cd_dtype_t*>(smem_buffer + i * SMEM_CD_SIZE_PER_STAGE);
 +    });
 +    auto smem_a  = PatternVisitor([&](const uint32_t& i) {
 +        return reinterpret_cast<a_dtype_t*>(smem_buffer + SMEM_CD_SIZE + i * SMEM_A_SIZE_PER_STAGE);
@@ -2397,8 +2447,8 @@ index 0000000..9d644dc
 +                if constexpr (kMajorB == cute::UMMA::Major::MN)
 +                    tma_copy<LOAD_BLOCK_N, BLOCK_K, kSwizzleBMode, b_dtype_t, kIsBatchedMM>(
 +                        &tensor_map_b, full_barriers[stage_idx], smem_b[stage_idx], n_idx, k_b_idx, 1, batch_idx);
-+                auto num_arrival_bytes = SMEM_A_SIZE_PER_STAGE / (std::is_same_v<a_dtype_t, cutlass::float_e4m3_t> ? 1 : 2) +
-+                                         SMEM_B_SIZE_PER_STAGE / (std::is_same_v<b_dtype_t, cutlass::float_e4m3_t> ? 1 : 2);
++                auto num_arrival_bytes = SMEM_A_SIZE_PER_STAGE / (cute::is_same_v<a_dtype_t, cutlass::float_e4m3_t> ? 1 : 2) +
++                                         SMEM_B_SIZE_PER_STAGE / (cute::is_same_v<b_dtype_t, cutlass::float_e4m3_t> ? 1 : 2);
 +
 +                // Issue SFA and SFB TMAs at certain stages
 +                // No swizzling, so one TMA for one SF is enough

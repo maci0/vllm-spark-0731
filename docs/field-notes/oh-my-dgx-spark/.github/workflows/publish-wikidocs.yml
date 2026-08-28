@@ -1,0 +1,73 @@
+name: Publish WikiDocs
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the source repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Build and validate the WikiDocs bundle
+        run: |
+          python3 tools/build_wikidocs_export.py
+          python3 tests/check_wikidocs_export.py
+          git diff --check
+
+      - name: Push the bundle to the WikiDocs repository
+        env:
+          WIKIDOCS_DEPLOY_TOKEN: ${{ secrets.WIKIDOCS_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${WIKIDOCS_DEPLOY_TOKEN:-}" ]]; then
+            echo "::error::Set the WIKIDOCS_DEPLOY_TOKEN repository secret before publishing."
+            exit 1
+          fi
+
+          deploy_dir="${RUNNER_TEMP}/oh-my-dgx-spark-wikidocs"
+          git clone --quiet \
+            "https://x-access-token:${WIKIDOCS_DEPLOY_TOKEN}@github.com/recrack/oh-my-dgx-spark-wikidocs.git" \
+            "${deploy_dir}"
+
+          source_subject="$(git log -1 --format=%s "${GITHUB_SHA}")"
+          source_subject="${source_subject//$'\n'/ }"
+          if ((${#source_subject} > 96)); then
+            source_subject="${source_subject:0:93}..."
+          fi
+
+          rsync -a --delete --exclude=.git wikidocs/ "${deploy_dir}/"
+          cd "${deploy_dir}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet; then
+            echo "WikiDocs bundle is already up to date."
+            exit 0
+          fi
+
+          git add -A
+          commit_subject="docs: sync WikiDocs — ${source_subject}"
+          commit_body="Source commit: ${GITHUB_SHA}"
+          commit_body+=$'\nSource subject: '
+          commit_body+="${source_subject}"
+          commit_body+=$'\n\nBundle changes:\n'
+          commit_body+="$(git diff --cached --stat)"
+          commit_body+=$'\n\nChanged files:\n'
+          commit_body+="$(git diff --cached --name-status)"
+          git commit -m "${commit_subject}" -m "${commit_body}"
+          git push origin HEAD:main

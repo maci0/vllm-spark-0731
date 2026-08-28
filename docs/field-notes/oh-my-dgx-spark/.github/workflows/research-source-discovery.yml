@@ -1,0 +1,265 @@
+name: DGX Spark Source Discovery
+
+on:
+  schedule:
+    # 11:31 KST every Monday. Keep this apart from the weekday research run so
+    # the shared Copilot concurrency gate does not queue two paid sessions.
+    - cron: "31 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: copilot-research-automation
+  cancel-in-progress: false
+
+env:
+  COPILOT_CLI_VERSION: "1.0.80"
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out the source repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Refresh search endpoints for this run
+        id: endpoints
+        env:
+          SEARCH_URL: ${{ secrets.SEARCH_URL || '' }}
+          SEARCH_URLS: ${{ secrets.SEARCH_URLS || '' }}
+          SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY || '' }}
+        run: |
+          set -euo pipefail
+          cache_file="${RUNNER_TEMP}/search-endpoints.json"
+          python3 tools/refresh_search_endpoints.py \
+            --config research/source-discovery.json \
+            --cache research/search-endpoints.json \
+            --output "${cache_file}"
+          echo "cache_file=${cache_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Collect unregistered source candidates
+        id: collect
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          SEARCH_URL: ${{ secrets.SEARCH_URL || '' }}
+          SEARCH_URLS: ${{ secrets.SEARCH_URLS || '' }}
+          SEARCH_API_KEY: ${{ secrets.SEARCH_API_KEY || '' }}
+          SEARCH_ENDPOINTS_CACHE: ${{ steps.endpoints.outputs.cache_file }}
+        run: |
+          set -euo pipefail
+          candidates_file="${RUNNER_TEMP}/source-candidates.json"
+          python3 tools/discover_source_candidates.py \
+            --config research/source-discovery.json \
+            --sources research/sources.json \
+            --output "${candidates_file}"
+          candidate_count="$(python3 - "${candidates_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              print(json.load(handle).get("candidate_count", 0))
+          PY
+          )"
+          python3 - "${candidates_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              data = json.load(handle)
+          stats = data.get("collection_stats", {})
+          backend = stats.get("search_backend", {})
+          counts = stats.get("configured_query_counts", {})
+          print(
+              "수집 결과: "
+              f"원시 링크 {data.get('raw_candidate_count', 0)}건, "
+              f"그룹 후보 {data.get('candidate_count', 0)}건"
+          )
+          print(
+              "검색 설정: "
+              f"백엔드 {backend.get('source', 'unknown')}, "
+              f"검색 쿼리 {counts.get('search_backend', 0)}개, "
+              f"GitHub 저장소 쿼리 {counts.get('github_repository', 0)}개"
+          )
+          print(
+              "검색 요청: "
+              f"{backend.get('requests_succeeded', 0)}/"
+              f"{backend.get('requests_attempted', 0)} 성공, "
+              f"결과 {backend.get('result_count', 0)}건, "
+              f"인스턴스 {backend.get('instances_succeeded', 0)}/"
+              f"{backend.get('instances_attempted', 0)} 성공"
+          )
+          for attempt in backend.get("query_attempts", []):
+              print(
+                  f"검색 쿼리 {attempt.get('query_index', '?')}: "
+                  f"{attempt.get('query', '')} — "
+                  f"{attempt.get('status', 'unknown')}, "
+                  f"결과 {attempt.get('result_count', 0)}건"
+              )
+          PY
+          echo "candidate_count=${candidate_count}" >> "${GITHUB_OUTPUT}"
+          echo "수집 후보: ${candidate_count}건"
+          if [[ "${candidate_count}" == "0" ]]; then
+            echo "has_candidates=false" >> "${GITHUB_OUTPUT}"
+            echo "새로운 출처 후보가 없습니다."
+            exit 0
+          fi
+          echo "has_candidates=true" >> "${GITHUB_OUTPUT}"
+          echo "candidates_file=${candidates_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare the LLM triage prompt
+        if: steps.collect.outputs.has_candidates == 'true'
+        run: |
+          set -euo pipefail
+          python3 tools/render_source_discovery_prompt.py \
+            "${{ steps.collect.outputs.candidates_file }}" \
+            "${RUNNER_TEMP}/source-discovery-prompt.md"
+
+      - name: Check Copilot credential
+        id: copilot_auth
+        if: steps.collect.outputs.has_candidates == 'true'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${COPILOT_GITHUB_TOKEN:-}" ]]; then
+            echo "has_token=false" >> "${GITHUB_OUTPUT}"
+            echo "Copilot credential가 없어 LLM 판정을 보류합니다. 원시 후보 Issue는 계속 만듭니다."
+            exit 0
+          fi
+          echo "has_token=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Node.js
+        if: steps.copilot_auth.outputs.has_token == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install GitHub Copilot CLI
+        if: steps.copilot_auth.outputs.has_token == 'true'
+        run: |
+          npm install --global "@github/copilot@${COPILOT_CLI_VERSION}"
+          copilot --version
+
+      - name: Run LLM source triage
+        id: triage
+        if: steps.copilot_auth.outputs.has_token == 'true'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          DISCOVERY_MODEL: ${{ vars.SOURCE_DISCOVERY_MODEL || 'gpt-5.6-luna' }}
+          DISCOVERY_EFFORT: ${{ vars.SOURCE_DISCOVERY_EFFORT || 'low' }}
+          DISCOVERY_MAX_AI_CREDITS: ${{ vars.SOURCE_DISCOVERY_MAX_AI_CREDITS || '30' }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${DISCOVERY_MAX_AI_CREDITS}" =~ ^[0-9]+$ ]] || \
+            ((DISCOVERY_MAX_AI_CREDITS < 30 || DISCOVERY_MAX_AI_CREDITS > 60)); then
+            echo "::error::SOURCE_DISCOVERY_MAX_AI_CREDITS는 30 이상 60 이하의 정수여야 합니다."
+            exit 1
+          fi
+          echo "Copilot 실행 정책: role=source-triage, model=${DISCOVERY_MODEL}, effort=${DISCOVERY_EFFORT}, max_ai_credits=${DISCOVERY_MAX_AI_CREDITS}"
+          output_file="${RUNNER_TEMP}/source-discovery-assessment.json"
+          prompt_file="${RUNNER_TEMP}/source-discovery-prompt.md"
+          copilot_args=(
+            -s
+            -p "Use the view tool to read the complete source-triage task from ${prompt_file}. Follow every instruction in that file, then return only the required JSON object."
+            --add-dir "${RUNNER_TEMP}"
+            --model "${DISCOVERY_MODEL}"
+            --max-ai-credits "${DISCOVERY_MAX_AI_CREDITS}"
+            --no-ask-user
+            --no-auto-update
+            --no-color
+            --no-custom-instructions
+            --no-remote
+            --no-remote-export
+            --log-level error
+            --secret-env-vars "COPILOT_GITHUB_TOKEN"
+            "--available-tools=view"
+            "--allow-tool=read"
+            "--deny-tool=shell"
+            "--deny-tool=url"
+            "--deny-tool=write"
+          )
+          if [[ "${DISCOVERY_MODEL}" != "auto" && -n "${DISCOVERY_EFFORT}" ]]; then
+            copilot_args+=(--effort "${DISCOVERY_EFFORT}")
+          fi
+          if copilot "${copilot_args[@]}" > "${output_file}" 2>&1; then
+            python3 tools/redact_sensitive_output.py "${output_file}" --in-place
+            echo "assessment_file=${output_file}" >> "${GITHUB_OUTPUT}"
+            echo "assessment_status=LLM 평가를 완료했습니다." >> "${GITHUB_OUTPUT}"
+          else
+            echo "assessment_status=LLM 실행에 실패해 원시 후보로 검토합니다." >> "${GITHUB_OUTPUT}"
+            python3 tools/redact_sensitive_output.py "${output_file}" --max-chars 6000
+          fi
+          output_bytes="$(wc -c < "${output_file}")"
+          {
+            echo "### Copilot 출처 판정"
+            echo
+            echo "- 모델: \`${DISCOVERY_MODEL}\`"
+            echo "- effort: \`${DISCOVERY_EFFORT}\`"
+            echo "- 세션 AIC soft cap: \`${DISCOVERY_MAX_AI_CREDITS}\`"
+            echo "- 최종 응답 크기: \`${output_bytes}\` bytes"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Render the source-candidate Issue
+        if: steps.collect.outputs.has_candidates == 'true'
+        env:
+          CANDIDATES_FILE: ${{ steps.collect.outputs.candidates_file }}
+          ASSESSMENT_FILE: ${{ steps.triage.outputs.assessment_file || '' }}
+          ASSESSMENT_STATUS: ${{ steps.triage.outputs.assessment_status || 'Copilot 미설정 · LLM 평가 보류' }}
+        run: |
+          set -euo pipefail
+          issue_body="${RUNNER_TEMP}/source-discovery-issue.md"
+          if [[ -n "${ASSESSMENT_FILE:-}" && -f "${ASSESSMENT_FILE}" ]]; then
+            python3 tools/render_source_discovery_issue.py \
+              "${CANDIDATES_FILE}" \
+              "${issue_body}" \
+              --assessment "${ASSESSMENT_FILE}" \
+              --assessment-status "${ASSESSMENT_STATUS}"
+          else
+            python3 tools/render_source_discovery_issue.py \
+              "${CANDIDATES_FILE}" \
+              "${issue_body}" \
+              --assessment-status "${ASSESSMENT_STATUS}"
+          fi
+
+      - name: Create the source-candidate Issue
+        if: steps.collect.outputs.has_candidates == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CANDIDATE_COUNT: ${{ steps.collect.outputs.candidate_count }}
+        run: |
+          set -euo pipefail
+          gh label create source-candidate \
+            --repo "${GH_REPO}" \
+            --color "1d76db" \
+            --description "새로운 리서치 출처 후보" \
+            --force >/dev/null 2>&1 || true
+          gh label create source-approved \
+            --repo "${GH_REPO}" \
+            --color "fbca04" \
+            --description "검토가 끝나 sources.json 반영을 승인한 후보 Issue" \
+            --force >/dev/null 2>&1 || true
+          research_date="$(TZ=Asia/Seoul date +%F)"
+          issue_url="$(gh issue create \
+            --repo "${GH_REPO}" \
+            --title "[Source Discovery] DGX Spark 새 출처 후보 ${research_date} (${CANDIDATE_COUNT}건)" \
+            --body-file "${RUNNER_TEMP}/source-discovery-issue.md" \
+            --label source-candidate)"
+          gh issue comment "${issue_url##*/}" \
+            --repo "${GH_REPO}" \
+            --body "반영할 후보의 '반영 승인' 체크박스를 선택해 Issue 본문을 저장하면 sources.json 자동 PR이 생성됩니다. 승인 전에는 일반 리서치 수집에 사용되지 않습니다."

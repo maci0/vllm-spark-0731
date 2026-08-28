@@ -1,0 +1,28 @@
+{
+  "date": "2026-08-22",
+  "base_url": "http://127.0.0.1:8888",
+  "model": "deepseek-v4-flash-0731",
+  "thinking": false,
+  "request": {
+    "tool": "lookup_weather",
+    "arguments_schema": {
+      "city": "string"
+    },
+    "tool_choice": "lookup_weather",
+    "city": "서울"
+  },
+  "result": {
+    "http_status": 200,
+    "tool_name": "lookup_weather",
+    "arguments": {
+      "city": "서울"
+    },
+    "content": "",
+    "finish_reason": "length",
+    "prompt_tokens": 338,
+    "completion_tokens": 128,
+    "cached_tokens": 0,
+    "elapsed_s": 3.2
+  },
+  "interpretation": "Parser와 JSON arguments 생성은 확인했지만 실제 도구 실행이나 multi-turn recovery는 확인하지 않음."
+}

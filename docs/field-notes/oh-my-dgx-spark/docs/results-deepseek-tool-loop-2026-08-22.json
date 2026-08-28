@@ -1,0 +1,63 @@
+{
+  "date": "2026-08-22",
+  "test": "deepseek_multi_turn_tool_loop_mock",
+  "base_url": "http://127.0.0.1:8888",
+  "model": "deepseek-v4-flash-0731",
+  "settings": {
+    "thinking": false,
+    "temperature": 0,
+    "max_tokens": 256
+  },
+  "first_call": {
+    "elapsed_s": 2.524,
+    "finish_reason": "stop",
+    "tool_calls": [
+      {
+        "id": "chatcmpl-tool-91d951d491612486",
+        "name": "lookup_weather",
+        "arguments": {
+          "city": "Seoul"
+        }
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 416,
+      "total_tokens": 492,
+      "completion_tokens": 76,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "multimodal_tokens": null
+      }
+    }
+  },
+  "mock_tool": [
+    {
+      "city": "Seoul",
+      "condition": "맑음",
+      "temperature_c": 24
+    }
+  ],
+  "second_call": {
+    "executed": true,
+    "elapsed_s": 1.513,
+    "finish_reason": "stop",
+    "content": "서울의 현재 날씨는 맑음, 섭씨 24도입니다。",
+    "tool_calls": false,
+    "usage": {
+      "prompt_tokens": 524,
+      "total_tokens": 545,
+      "completion_tokens": 21,
+      "prompt_tokens_details": {
+        "cached_tokens": 256
+      }
+    }
+  },
+  "checks": {
+    "first_tool_name_ok": true,
+    "first_arguments_json_ok": true,
+    "mock_tool_executed": true,
+    "second_final_content_ok": true,
+    "second_loop_finished_without_tool": true
+  },
+  "total_elapsed_s": 4.038
+}

@@ -1,6 +1,6 @@
 diff -ruN a/config/cache.py b/config/cache.py
---- a/config/cache.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/config/cache.py	2026-08-21 20:21:06.219378924 +0800
+--- a/vllm/config/cache.py	2026-08-11 17:20:02.000000000 +0800
++++ b/vllm/config/cache.py	2026-08-21 20:21:06.219378924 +0800
 @@ -25,6 +25,7 @@
      "fp8_e5m2",
      "fp8_inc",
@@ -10,8 +10,8 @@ diff -ruN a/config/cache.py b/config/cache.py
      "turboquant_4bit_nc",
      "turboquant_k3v4_nc",
 diff -ruN a/models/deepseek_v4/attention.py b/models/deepseek_v4/attention.py
---- a/models/deepseek_v4/attention.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/models/deepseek_v4/attention.py	2026-08-21 20:21:06.219816479 +0800
+--- a/vllm/models/deepseek_v4/attention.py	2026-08-11 17:20:02.000000000 +0800
++++ b/vllm/models/deepseek_v4/attention.py	2026-08-21 20:21:06.219816479 +0800
 @@ -87,6 +87,19 @@
      )
  
@@ -80,8 +80,8 @@ diff -ruN a/models/deepseek_v4/attention.py b/models/deepseek_v4/attention.py
  
      def forward(self): ...
 diff -ruN a/models/deepseek_v4/sparse_mla.py b/models/deepseek_v4/sparse_mla.py
---- a/models/deepseek_v4/sparse_mla.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/models/deepseek_v4/sparse_mla.py	2026-08-21 20:21:06.219989648 +0800
+--- a/vllm/models/deepseek_v4/sparse_mla.py	2026-08-11 17:20:02.000000000 +0800
++++ b/vllm/models/deepseek_v4/sparse_mla.py	2026-08-21 20:21:06.219989648 +0800
 @@ -100,7 +100,7 @@
          head_size: int,
          cache_dtype_str: str = "auto",
@@ -92,8 +92,8 @@ diff -ruN a/models/deepseek_v4/sparse_mla.py b/models/deepseek_v4/sparse_mla.py
              # head_size passed in is the semantic head_dim (512).
              return (num_blocks, block_size, 584)
 diff -ruN a/utils/torch_utils.py b/utils/torch_utils.py
---- a/utils/torch_utils.py	2026-08-11 17:20:03.000000000 +0800
-+++ b/utils/torch_utils.py	2026-08-21 20:21:06.219623278 +0800
+--- a/vllm/utils/torch_utils.py	2026-08-11 17:20:03.000000000 +0800
++++ b/vllm/utils/torch_utils.py	2026-08-21 20:21:06.219623278 +0800
 @@ -44,6 +44,7 @@
      "fp8_per_token_head": torch.uint8,
      "fp8_inc": torch.float8_e4m3fn,
@@ -103,8 +103,8 @@ diff -ruN a/utils/torch_utils.py b/utils/torch_utils.py
      "turboquant_4bit_nc": torch.uint8,
      "turboquant_k3v4_nc": torch.uint8,
 diff -ruN a/v1/attention/backends/mla/flashmla_sparse.py b/v1/attention/backends/mla/flashmla_sparse.py
---- a/v1/attention/backends/mla/flashmla_sparse.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/v1/attention/backends/mla/flashmla_sparse.py	2026-08-21 20:21:06.220103681 +0800
+--- a/vllm/v1/attention/backends/mla/flashmla_sparse.py	2026-08-11 17:20:02.000000000 +0800
++++ b/vllm/v1/attention/backends/mla/flashmla_sparse.py	2026-08-21 20:21:06.220103681 +0800
 @@ -135,7 +135,7 @@
          head_size: int,
          cache_dtype_str: str = "auto",
@@ -148,8 +148,8 @@ diff -ruN a/v1/attention/backends/mla/flashmla_sparse.py b/v1/attention/backends
          if not use_fp8_cache:
              attn_out = self._forward_bf16_kv(
 diff -ruN a/v1/attention/backends/mla/sparse_swa.py b/v1/attention/backends/mla/sparse_swa.py
---- a/v1/attention/backends/mla/sparse_swa.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/v1/attention/backends/mla/sparse_swa.py	2026-08-21 20:21:06.220252482 +0800
+--- a/vllm/v1/attention/backends/mla/sparse_swa.py	2026-08-11 17:20:02.000000000 +0800
++++ b/vllm/v1/attention/backends/mla/sparse_swa.py	2026-08-21 20:21:06.220252482 +0800
 @@ -87,7 +87,7 @@
      def get_kv_cache_spec(self, vllm_config: VllmConfig) -> KVCacheSpec:
          # fp8_ds_mla's UE8M0 paged layout needs 576B alignment; contiguous
@@ -168,24 +168,3 @@ diff -ruN a/v1/attention/backends/mla/sparse_swa.py b/v1/attention/backends/mla/
              # DeepseekV4 SWA: 584B per token (448 NoPE + 128 RoPE + 8 fp8 scale).
              # head_size passed in is the semantic head_dim (512).
              return (num_blocks, block_size, 584)
-diff -ruN a/v1/kv_cache_interface.py b/v1/kv_cache_interface.py
---- a/v1/kv_cache_interface.py	2026-08-11 17:20:02.000000000 +0800
-+++ b/v1/kv_cache_interface.py	2026-08-21 20:21:06.220392082 +0800
-@@ -406,7 +406,7 @@
- 
-     @property
-     def real_page_size_bytes(self) -> int:
--        if self.cache_dtype_str == "fp8_ds_mla":
-+        if self.cache_dtype_str in ("fp8_ds_mla", "nvfp4_ds_mla"):
-             if self.model_version == "deepseek_v4":
-                 # DeepseekV4: 448B NoPE + 128B RoPE + 8B fp8 scale = 584B per token.
-                 # head_size stays semantic (512); bytes are determined here.
-@@ -646,7 +646,7 @@
- 
-     @property
-     def real_page_size_bytes(self) -> int:
--        if self.model_version == "deepseek_v4" and self.cache_dtype_str == "fp8_ds_mla":
-+        if self.model_version == "deepseek_v4" and self.cache_dtype_str in ("fp8_ds_mla", "nvfp4_ds_mla"):
-             # DeepseekV4 FlashMLA: 448B NoPE + 128B RoPE + 8B fp8 scale = 584B
-             # per token. FlashInfer's contiguous bf16/fp8 cache falls through to
-             # the element-size formula below.

@@ -9,6 +9,7 @@ already present (idempotent).
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 import sys
 import textwrap
@@ -200,6 +201,51 @@ def patch_dsv4_b12x_sparse_backend(vllm: Path) -> None:
         "        return DeepseekV4FlashInferMLAAttention\n",
         "select B12X_MLA_SPARSE attention class",
     )
+
+
+def patch_b12x_moe_weight_prep_v028(vllm: Path) -> None:
+    """v0.28.0 modular MoE: run the b12x experts' weight prep on GPU too.
+
+    UnquantizedFusedMoEMethod only calls ``fused_experts.process_weights_after_loading``
+    for the CPU backend; the b12x path needs it on GPU as well (the donor
+    B12xExperts raises "must be prepared by process_weights_after_loading"
+    otherwise).
+    """
+    path = vllm / "model_executor/layers/fused_moe/unquantized_fused_moe_method.py"
+    text = path.read_text()
+    if "isinstance(self.moe_kernel.fused_experts, B12xExperts)" in text:
+        print("skip b12x MoE weight prep (v0.28.0): already present")
+        return
+    old = (
+        "            if self.unquantized_backend == UnquantizedMoeBackend.CPU:\n"
+        "                # The CPU experts need the layer itself for the setup that\n"
+        "                # convert_to_unquantized_kernel_format cannot express, since\n"
+        "                # it only sees the two weight tensors: padding and prepacking\n"
+        "                # into the grouped-gemm layout (bias included), and capturing\n"
+        "                # the router config that monolithic apply() cannot carry.\n"
+        "                self.moe_kernel.fused_experts.process_weights_after_loading(layer)"
+    )
+    new = (
+        "            if (\n"
+        "                self.unquantized_backend == UnquantizedMoeBackend.CPU\n"
+        "                or isinstance(self.moe_kernel.fused_experts, B12xExperts)\n"
+        "            ):\n"
+        "                # The CPU experts need the layer itself for the setup that\n"
+        "                # convert_to_unquantized_kernel_format cannot express, since\n"
+        "                # it only sees the two weight tensors: padding and prepacking\n"
+        "                # into the grouped-gemm layout (bias included), and capturing\n"
+        "                # the router config that monolithic apply() cannot carry.\n"
+        "                # v0.28.0: the b12x experts need the same layer-level prep on GPU.\n"
+        "                self.moe_kernel.fused_experts.process_weights_after_loading(layer)"
+    )
+    assert old in text, "unquantized method needle missing"
+    text = text.replace(old, new)
+    imp_old = "from vllm.model_executor.utils import replace_parameter, set_weight_attrs"
+    imp_new = "from vllm.model_executor.layers.fused_moe.b12x import B12xExperts\nfrom vllm.model_executor.utils import replace_parameter, set_weight_attrs"
+    assert imp_old in text, "import needle missing"
+    text = text.replace(imp_old, imp_new, 1)
+    path.write_text(text)
+    print("ok b12x MoE weight prep (v0.28.0)")
 
 
 def patch_moe_backend(vllm: Path) -> None:
@@ -1041,6 +1087,27 @@ def patch_mxfp4_process_weights(vllm: Path) -> None:
         "    kernel = mk.FusedMoEKernel(\n",
         "make_mxfp4_moe_kernel process_weights_after_loading",
     )
+    # v0.28.0: the if/else above now branches on activation_format; the
+    # prep call must be unconditional, right before the kernel is built.
+    replace_once(
+        path,
+        "        experts = experts_cls(\n"
+        "            moe_config=moe_config,\n"
+        "            quant_config=moe_quant_config,\n"
+        "        )\n"
+        "\n"
+        "    kernel = mk.FusedMoEKernel(\n",
+        "        experts = experts_cls(\n"
+        "            moe_config=moe_config,\n"
+        "            quant_config=moe_quant_config,\n"
+        "        )\n"
+        "\n"
+        "    if layer is not None and hasattr(experts, \"process_weights_after_loading\"):\n"
+        "        experts.process_weights_after_loading(layer)\n"
+        "\n"
+        "    kernel = mk.FusedMoEKernel(\n",
+        "make_mxfp4_moe_kernel process_weights_after_loading (v0.28.0 unconditional)",
+    )
     caller = vllm / "model_executor/layers/quantization/mxfp4.py"
     replace_once(
         caller,
@@ -1067,19 +1134,24 @@ def patch_cutlass_sm12x_guard(vllm: Path) -> None:
     """
     path = vllm / "model_executor/kernels/linear/scaled_mm/cutlass.py"
     text = path.read_text()
-    if "cutlass_scaled_mm_supports_fp8" in text or "CUTLASS FP8 not supported on SM12x" in text:
+    # v0.28.0: `cutlass_scaled_mm_supports_fp8` exists upstream but does NOT
+    # guard CutlassFp8BlockScaledMMKernel.is_supported - only skip when the
+    # actual injected exclusion is present.
+    if "CUTLASS FP8 not supported on SM12x" in text:
         print("skip cutlass SM12x guard (already present)")
         return
     replace_once(
         path,
         "    @classmethod\n"
-        "    def is_supported(cls, compute_capability=None):\n"
+        "    def is_supported(\n"
+        "        cls, compute_capability: int | None = None\n"
+        "    ) -> tuple[bool, str | None]:\n"
         "        if not CUTLASS_BLOCK_FP8_SUPPORTED:\n"
         "            return (\n"
         "                False,\n"
-        '                "The device compute capability of"\n'
-        '                f"{compute_capability} is not supported.",\n'
+        '                "CUTLASS block FP8 is not supported.",\n'
         "            )\n"
+        "\n"
         "        return True, None\n",
         "    @classmethod\n"
         "    def is_supported(cls, compute_capability=None):\n"
@@ -1857,6 +1929,9 @@ def patch_sm12x_kv_insert(vllm: Path) -> None:
     and runs on CUDA.
     """
     attn = vllm / "models/deepseek_v4/attention.py"
+    if "xpu_qnorm_rope_kv_fp8_insert" in attn.read_text():
+        print("skip SM12x Triton SWA KV insert: already present upstream")
+        return
     sm12x_insert = (
         "        # kv is unchanged; attention reads kv solely via swa_kv_cache.\n"
         "        if cache_dtype == torch.uint8:\n"
@@ -2053,15 +2128,18 @@ def patch_sm12x_kv_insert(vllm: Path) -> None:
         "SM12x Triton DSpark SWA KV insert",
     )
     attn_text = attn.read_text()
-    scratch_old = "self.eager_scratch_pool"
-    scratch_new = 'getattr(self, "eager_scratch_pool", None)'
-    if scratch_new in attn_text:
+    # Replace READ sites of eager_scratch_pool with the getattr form, but
+    # never the assignment site (``self.eager_scratch_pool = ...``) - turning
+    # that into getattr(...) = ... is a SyntaxError.
+    if 'getattr(self, "eager_scratch_pool", None)' in attn_text:
         print("skip SM12x eager_scratch getattr: already applied")
-    elif scratch_old not in attn_text:
-        raise SystemExit("SM12x eager_scratch getattr: missing needle")
     else:
-        n = attn_text.count(scratch_old)
-        attn.write_text(attn_text.replace(scratch_old, scratch_new))
+        n = len(re.findall(r"self\.eager_scratch_pool(?!\s*=)", attn_text))
+        fixed = re.sub(r"self\.eager_scratch_pool(?!\s*=)",
+                       'getattr(self, "eager_scratch_pool", None)', attn_text)
+        if fixed == attn_text:
+            raise SystemExit("SM12x eager_scratch getattr: missing needle")
+        attn.write_text(fixed)
         print(f"ok SM12x eager_scratch getattr ({n})")
 
 
@@ -2438,6 +2516,8 @@ def patch_kv_zeroer_skip(vllm: Path) -> None:
                 "KVBlockZeroer overlay mixed-page strides",
             ),
         ],
+    ) if "idx := seen_ptrs.get(addr)" in path.read_text() else print(
+        "skip KVBlockZeroer mixed-page strides: absent upstream"
     )
 
 
@@ -2703,6 +2783,12 @@ def patch_kv_kernel_split_padded_blhnc(vllm: Path) -> None:
     storage_block_size != block_size. Keep manager 256. France is the gate.
     """
     interface = vllm / "v1/kv_cache_interface.py"
+    text = interface.read_text()
+    if "dense_page_size" not in text and "padded kernel-split" not in text:
+        # v0.28.0 KV-cache refactor (#51612/#51704) removed the BLHNC
+        # block_stride split this overlay reverts - nothing to do.
+        print("skip BLHNC block_stride split revert: code path absent upstream")
+        return
     replace_one_of(
         interface,
         [
@@ -2771,7 +2857,12 @@ def patch_b12x_mm_block_fp8_compat(vllm: Path) -> None:
     New oneshot is gemm.blockscaled.mm(..., block_fp8=True) with 3D values
     (M/N, K, 1) and FP32 128x128 scales. Keep the old name when present.
     """
-    path = vllm / "model_executor/kernels/linear/scaled_mm/b12x.py"
+    # v0.28.0 renamed the combined b12x.py into b12x_block.py / b12x_tensor.py
+    # (#52016). Try both, in order of appearance.
+    for name in ("b12x.py", "b12x_block.py"):
+        path = vllm / "model_executor/kernels/linear/scaled_mm" / name
+        if path.is_file():
+            break
     replace_once(
         path,
         "    return blockscaled.mm_block_fp8(\n"
@@ -2816,6 +2907,7 @@ def apply(vllm: Path) -> None:
     patch_envs(vllm)
     patch_utils_b12x(vllm)
     patch_mxfp4_oracle(vllm)
+    patch_mxfp4_process_weights(vllm)
     patch_mhc(vllm)
     patch_nvfp4_ds_mla(vllm)
     patch_dsv4_nvfp4_attn(vllm)
@@ -2823,9 +2915,13 @@ def apply(vllm: Path) -> None:
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
-    patch_fp8_einsum_fallback(vllm)
-    patch_einsum_sm12x_recipe(vllm)
-    patch_einsum_sm12x_scale_upcast(vllm)
+    # v0.28.0 rebase (2026-08-27): the einsum "fallback" overlays are removed —
+    # verified that DeepGEMM's einsum kernel is correct on SM12x with packed
+    # E8M0 scales + recipe (1,1,128) (mean_rel 0.000000 vs bf16 ref; E2E
+    # coherent on main-b12x-mn2). The fallback itself was the E2E-garbage
+    # source (packed int32 read as fp32). See docs/UPSTREAM.md.
+    # patch_fp8_einsum_fallback / patch_einsum_sm12x_recipe /
+    # patch_einsum_sm12x_scale_upcast intentionally not applied.
     patch_mqa_logits_sm12x_fallback(vllm)
     patch_mqa_paged_cudagraph_safe(vllm)
     patch_mqa_relu_formula(vllm)
@@ -3029,17 +3125,12 @@ def patch_triton_e8m0_sm12x(vllm: Path) -> None:
 
 
 _INDEXER_B12X_SCHEDULE_OLD = (
+    "            # DeepGEMM paged MQA metadata helper asserts 32 or 64 states\n"
     "            schedule_metadata = self.scheduler_metadata_buffer\n"
-    "            from vllm.utils.deep_gemm import is_deep_gemm_supported\n"
-    "            if (\n"
-    "                current_platform.is_cuda()\n"
-    "                and is_deep_gemm_supported()\n"
-    "                and not current_platform.is_device_capability_family(120)\n"
-    "                and self.kv_cache_spec.num_states in (32, 64)\n"
-    "            ):\n"
+    "            if _should_build_paged_mqa_logits_metadata(self.kv_cache_spec.storage_block_size):\n"
     "                metadata = get_paged_mqa_logits_metadata(\n"
     "                    seq_lens,\n"
-    "                    self.kv_cache_spec.num_states,\n"
+    "                    self.kv_cache_spec.storage_block_size,\n"
     "                    self.num_sms,\n"
     "                    indices=decode_indices,\n"
     "                )\n"
@@ -3116,17 +3207,12 @@ _INDEXER_B12X_SCHEDULE_SM120_Q1 = (
 )
 
 _INDEXER_B12X_SCHEDULE_NEW = (
+    "            # DeepGEMM paged MQA metadata helper asserts 32 or 64 states\n"
     "            schedule_metadata = self.scheduler_metadata_buffer\n"
-    "            from vllm.utils.deep_gemm import is_deep_gemm_supported\n"
-    "            if (\n"
-    "                current_platform.is_cuda()\n"
-    "                and is_deep_gemm_supported()\n"
-    "                and not current_platform.is_device_capability_family(120)\n"
-    "                and self.kv_cache_spec.num_states in (32, 64)\n"
-    "            ):\n"
+    "            if _should_build_paged_mqa_logits_metadata(self.kv_cache_spec.storage_block_size):\n"
     "                metadata = get_paged_mqa_logits_metadata(\n"
     "                    seq_lens,\n"
-    "                    self.kv_cache_spec.num_states,\n"
+    "                    self.kv_cache_spec.storage_block_size,\n"
     "                    self.num_sms,\n"
     "                    indices=decode_indices,\n"
     "                )\n"
@@ -3272,6 +3358,9 @@ def patch_indexer_b12x_schedule(vllm: Path) -> None:
         print("skip fp8_fp4_paged_mqa_logits pass vLLM schedule: already applied")
         return
     if _PAGED_MQA_PAGED_TRY_OLD not in text:
+        if "schedule_metadata=schedule_metadata" in text:
+            print("skip fp8_fp4_paged_mqa_logits pass vLLM schedule: already passed")
+            return
         raise SystemExit(
             f"fp8_fp4_paged_mqa_logits pass vLLM schedule: missing needle in {path}"
         )
@@ -4049,21 +4138,29 @@ def apply_main(vllm: Path) -> None:
     Do not copy rc2 B12xExperts. Do not blanket-kill DeepGEMM on family 120.
     Skip FlashInfer TOPK 192 if git main already has it. Skip lm_head restore.
     """
+    # v0.28.0 phase-1 images do not carry the b12x MoE donor modules (the
+    # MoE integration is not upstream) - provide them before the overlay run.
+    copy_new_modules(vllm)
     moe = vllm / "model_executor/layers/fused_moe/b12x.py"
     if not moe.is_file():
         raise SystemExit(
             f"main tree missing {moe}; refusing to copy patches/files B12xExperts"
         )
     print(f"ok main already has {moe.relative_to(vllm)}")
+    patch_envs(vllm)
+    patch_moe_backend(vllm)
+    patch_b12x_moe_weight_prep_v028(vllm)
+    patch_utils_b12x(vllm)
+    patch_mxfp4_oracle(vllm)
+    patch_mxfp4_process_weights(vllm)
     patch_mhc(vllm)
     patch_nvfp4_ds_mla(vllm)
     patch_dsv4_nvfp4_attn(vllm)
     patch_dsv4_sm12x_block_size(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
-    patch_fp8_einsum_fallback(vllm)
-    patch_einsum_sm12x_recipe(vllm)
-    patch_einsum_sm12x_scale_upcast(vllm)
+    # v0.28.0: einsum fallback/recipe/upcast overlays removed (kernel verified
+    # correct on SM12x with packed E8M0 scales; see apply() note above).
     patch_mqa_logits_sm12x_fallback(vllm)
     patch_mqa_paged_cudagraph_safe(vllm)
     patch_mqa_relu_formula(vllm)

@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sol max와 local Spark를 고르는 기준",
+    "output": "sol-local.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "decision", "label": "작업 분기", "focus": ["task", "router", "sol", "spark"], "note": "같은 작업을 어디에 맡길지 분기한다." },
+      { "id": "factors", "label": "비교 기준", "focus": ["sol", "spark"], "note": "품질·지연·비용·데이터 경계를 함께 본다." }
+    ]
+  },
+  "components": [
+    { "id": "task", "type": "external", "label": "같은 작업", "sublabel": "code + tool call", "pos": [40, 330], "size": [180, 78] },
+    { "id": "router", "type": "backend", "label": "Router", "sublabel": "task / policy", "pos": [310, 330], "size": [180, 78] },
+    { "id": "sol", "type": "cloud", "label": "Sol max", "sublabel": "hosted API", "pos": [640, 180], "size": [210, 88] },
+    { "id": "spark", "type": "backend", "label": "DGX Spark", "sublabel": "local endpoint", "pos": [640, 500], "size": [210, 88] },
+    { "id": "result", "type": "external", "label": "결과", "sublabel": "quality / latency", "pos": [1040, 330], "size": [180, 78] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "hosted boundary", "wraps": ["sol"], "pad": 28 },
+    { "kind": "security-group", "label": "local data boundary", "wraps": ["spark"], "pad": 28 }
+  ],
+  "connections": [
+    { "id": "task-router", "from": "task", "to": "router", "label": "classify", "variant": "emphasis" },
+    { "id": "router-sol", "from": "router", "to": "sol", "label": "remote request", "variant": "dashed", "fromSide": "right", "toSide": "left" },
+    { "id": "router-spark", "from": "router", "to": "spark", "label": "local request", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "sol-result", "from": "sol", "to": "result", "label": "response", "variant": "dashed", "fromSide": "right", "toSide": "top" },
+    { "id": "spark-result", "from": "spark", "to": "result", "label": "response", "variant": "emphasis", "fromSide": "right", "toSide": "bottom" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "Sol max", "items": ["관리된 endpoint", "호출 비용·네트워크 정책"] },
+    { "dot": "cyan", "title": "Local Spark", "items": ["데이터·runtime 직접 제어", "장비·전력·복구 책임"] }
+  ]
+}

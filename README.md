@@ -44,6 +44,9 @@ live in [docs/field-notes/](docs/field-notes/README.md); their patches,
 Dockerfiles, prod recipes, and scripts moved into `patches/`, `docker/`,
 `configs/examples/`, and `scripts/` (see the field-notes index).
 
+All external references cited across the corpus are collected in
+[REFERENCES.md](REFERENCES.md) (368 links, categorized).
+
 The older overlay image (`vllm/vllm-openai:v0.27.1` + rc2 Python) is the
 fallback. Ops notes: [HANDOFF.md](HANDOFF.md). Do not overlay main Python
 onto v0.27.1.

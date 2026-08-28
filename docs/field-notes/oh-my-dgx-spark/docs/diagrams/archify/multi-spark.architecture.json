@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "여러 Spark가 일을 나누는 구조",
+    "output": "multi-spark.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "two-node", "label": "2대 direct", "focus": ["request", "sparkA", "sparkB", "response"], "note": "두 노드가 매 단계 통신하며 하나의 작업을 나눈다." },
+      { "id": "switch-topology", "label": "4대 switch", "focus": ["request", "switch", "spark1", "spark2", "spark3", "spark4", "response"], "note": "노드가 늘면 스위치와 경로 운영이 추가된다." }
+    ]
+  },
+  "components": [
+    { "id": "request", "type": "external", "label": "요청", "sublabel": "client / agent", "pos": [40, 330], "size": [150, 72] },
+    { "id": "sparkA", "type": "backend", "label": "Spark A", "sublabel": "rank / stage 0", "pos": [270, 260], "size": [180, 82] },
+    { "id": "sparkB", "type": "backend", "label": "Spark B", "sublabel": "rank / stage 1", "pos": [560, 260], "size": [180, 82] },
+    { "id": "response", "type": "external", "label": "결과", "sublabel": "response", "pos": [1040, 330], "size": [160, 72] },
+    { "id": "switch", "type": "messagebus", "label": "QSFP switch", "sublabel": "RDMA / RoCE", "pos": [560, 560], "size": [190, 82], "tag": "4+ nodes" },
+    { "id": "spark1", "type": "backend", "label": "Spark 1", "sublabel": "worker", "pos": [210, 730], "size": [160, 72] },
+    { "id": "spark2", "type": "backend", "label": "Spark 2", "sublabel": "worker", "pos": [430, 730], "size": [160, 72] },
+    { "id": "spark3", "type": "backend", "label": "Spark 3", "sublabel": "worker", "pos": [850, 730], "size": [160, 72] },
+    { "id": "spark4", "type": "backend", "label": "Spark 4", "sublabel": "worker", "pos": [1070, 730], "size": [160, 72] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "2-node direct path", "wraps": ["sparkA", "sparkB"], "pad": 28 },
+    { "kind": "region", "label": "4-node switch path", "wraps": ["switch", "spark1", "spark2", "spark3", "spark4"], "pad": 28 }
+  ],
+  "connections": [
+    { "id": "request-a", "from": "request", "to": "sparkA", "label": "dispatch", "variant": "emphasis" },
+    { "id": "a-b", "from": "sparkA", "to": "sparkB", "label": "sync / all-reduce", "variant": "emphasis" },
+    { "id": "b-response", "from": "sparkB", "to": "response", "label": "return", "variant": "emphasis" },
+    { "id": "spark1-switch", "from": "spark1", "to": "switch", "fromSide": "top", "toSide": "left" },
+    { "id": "spark2-switch", "from": "spark2", "to": "switch", "fromSide": "top", "toSide": "left" },
+    { "id": "switch-spark3", "from": "switch", "to": "spark3", "label": "fabric", "fromSide": "right", "toSide": "top" },
+    { "id": "switch-spark4", "from": "switch", "to": "spark4", "label": "fabric", "fromSide": "right", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "2대", "items": ["direct QSFP/RoCE 가능", "통신이 매 단계 병목이 될 수 있음"] },
+    { "dot": "violet", "title": "4대 이상", "items": ["switch·MTU·HCA mapping 필요", "TP/PP/DP 분담을 먼저 결정"] }
+  ]
+}

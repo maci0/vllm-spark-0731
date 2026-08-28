@@ -140,7 +140,7 @@ def _get_b12x_plan(
     cached = _b12x_plans.get(key)
     if cached is not None:
         return cached
-    from b12x.attention.compressed_mla import Caps, plan
+    from b12x.attention.compressed_sparse_mla import Caps, plan
 
     caps = Caps(
         device=device,
@@ -260,7 +260,7 @@ class DeepseekV4B12xSM120Attention(DeepseekV4FlashInferSM120Attention):
         extra_lens: torch.Tensor | None,
         prefill: bool,
     ) -> None:
-        from b12x.attention.compressed_mla import bind, run
+        from b12x.attention.compressed_sparse_mla import bind, run
 
         q = self._prepare_query(q, output)
         rows = int(q.shape[0])

@@ -1,0 +1,296 @@
+name: Draft a Reviewed Book Chapter
+
+on:
+  workflow_dispatch:
+    inputs:
+      research_report:
+        description: "검토·머지된 날짜별 보고서 경로"
+        required: true
+        type: string
+      book_file:
+        description: "보완할 기존 book/*.md 파일 경로"
+        required: true
+        type: string
+      force:
+        description: "같은 장의 열린 초안 PR이 있어도 다시 실행합니다."
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: copilot-research-automation
+  cancel-in-progress: false
+
+env:
+  COPILOT_CLI_VERSION: "1.0.80"
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out the reviewed main branch
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Check the operator and prepare the prompt
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ACTOR: ${{ github.actor }}
+          RESEARCH_REPORT: ${{ inputs.research_report }}
+          BOOK_FILE: ${{ inputs.book_file }}
+        run: |
+          set -euo pipefail
+          permission="$(gh api "repos/${GH_REPO}/collaborators/${RUN_ACTOR}/permission" --jq '.user.permission')"
+          case "${permission}" in
+            admin|maintain|write) ;;
+            *)
+              echo "::error::책 초안 Workflow는 저장소 쓰기 권한이 있는 사용자만 실행할 수 있습니다."
+              exit 1
+              ;;
+          esac
+
+          python3 tools/prepare_book_draft.py \
+            --report "${RESEARCH_REPORT}" \
+            --book-file "${BOOK_FILE}" \
+            --output "${RUNNER_TEMP}/book-draft-prompt.md"
+          head -n 1 -- "${BOOK_FILE}" > "${RUNNER_TEMP}/book-original-h1.txt"
+          book_stem="$(basename "${BOOK_FILE}" .md)"
+          echo "book_stem=${book_stem}" >> "${GITHUB_OUTPUT}"
+
+      - name: Skip an overlapping draft
+        id: duplicate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BOOK_STEM: ${{ steps.prepare.outputs.book_stem }}
+          FORCE_RUN: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [[ "${FORCE_RUN}" == "true" ]]; then
+            echo "강제 재실행을 요청했습니다."
+            echo "should_run=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          open_pr="$(gh pr list \
+            --repo "${GH_REPO}" \
+            --state open \
+            --limit 100 \
+            --json headRefName,url \
+            --jq "[.[] | select(.headRefName | startswith(\"book-draft/${BOOK_STEM}-\"))][0].url // empty")"
+          if [[ -n "${open_pr}" ]]; then
+            echo "이미 같은 장을 수정하는 열린 초안 PR이 있어 LLM 호출을 생략합니다: ${open_pr}"
+            echo "should_run=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          echo "should_run=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Check Copilot credential
+        if: steps.duplicate.outputs.should_run == 'true'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${COPILOT_GITHUB_TOKEN:-}" ]]; then
+            echo "::error::COPILOT_GITHUB_TOKEN Actions Secret이 필요합니다."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        if: steps.duplicate.outputs.should_run == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install GitHub Copilot CLI
+        if: steps.duplicate.outputs.should_run == 'true'
+        run: |
+          npm install --global "@github/copilot@${COPILOT_CLI_VERSION}"
+          copilot --version
+
+      - name: Prepare the draft branch
+        id: branch
+        if: steps.duplicate.outputs.should_run == 'true'
+        env:
+          BOOK_STEM: ${{ steps.prepare.outputs.book_stem }}
+        run: |
+          set -euo pipefail
+          branch="book-draft/${BOOK_STEM}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git checkout -b "${branch}"
+          echo "name=${branch}" >> "${GITHUB_OUTPUT}"
+
+      - name: Run the selected book editor
+        if: steps.duplicate.outputs.should_run == 'true'
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          BOOK_DRAFT_MODEL: ${{ vars.BOOK_DRAFT_MODEL || 'gpt-5.6-terra' }}
+          BOOK_DRAFT_EFFORT: ${{ vars.BOOK_DRAFT_EFFORT || 'medium' }}
+          BOOK_DRAFT_MAX_AI_CREDITS: ${{ vars.BOOK_DRAFT_MAX_AI_CREDITS || '60' }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${BOOK_DRAFT_MAX_AI_CREDITS}" =~ ^[0-9]+$ ]] || \
+            ((BOOK_DRAFT_MAX_AI_CREDITS < 30 || BOOK_DRAFT_MAX_AI_CREDITS > 120)); then
+            echo "::error::BOOK_DRAFT_MAX_AI_CREDITS는 30 이상 120 이하의 정수여야 합니다."
+            exit 1
+          fi
+          echo "Copilot 실행 정책: role=reviewed-book-draft, model=${BOOK_DRAFT_MODEL}, effort=${BOOK_DRAFT_EFFORT}, max_ai_credits=${BOOK_DRAFT_MAX_AI_CREDITS}"
+          output_file="${RUNNER_TEMP}/copilot-book-draft-output.md"
+          prompt_file="${RUNNER_TEMP}/book-draft-prompt.md"
+          copilot_args=(
+            -s
+            -p "Use the view tool to read the complete book-editing task from ${prompt_file}. Follow every instruction in that file and complete the required chapter edit before responding."
+            --add-dir "${RUNNER_TEMP}"
+            --model "${BOOK_DRAFT_MODEL}"
+            --max-ai-credits "${BOOK_DRAFT_MAX_AI_CREDITS}"
+            --no-ask-user
+            --no-auto-update
+            --no-color
+            --no-custom-instructions
+            --no-remote
+            --no-remote-export
+            --log-level error
+            --secret-env-vars "COPILOT_GITHUB_TOKEN"
+            "--available-tools=view,edit,create,apply_patch,glob,grep"
+            "--allow-tool=read,write"
+            "--deny-tool=shell"
+            "--deny-tool=url"
+          )
+          if [[ "${BOOK_DRAFT_MODEL}" != "auto" && -n "${BOOK_DRAFT_EFFORT}" ]]; then
+            copilot_args+=(--effort "${BOOK_DRAFT_EFFORT}")
+          fi
+          if ! copilot "${copilot_args[@]}" > "${output_file}" 2>&1; then
+            python3 tools/redact_sensitive_output.py "${output_file}" --max-chars 6000
+            exit 1
+          fi
+          python3 tools/redact_sensitive_output.py "${output_file}" --in-place
+          output_bytes="$(wc -c < "${output_file}")"
+          {
+            echo "### Copilot 책 초안 실행"
+            echo
+            echo "- 모델: \`${BOOK_DRAFT_MODEL}\`"
+            echo "- effort: \`${BOOK_DRAFT_EFFORT}\`"
+            echo "- 세션 AIC soft cap: \`${BOOK_DRAFT_MAX_AI_CREDITS}\`"
+            echo "- 최종 응답 크기: \`${output_bytes}\` bytes"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Enforce the one-file boundary
+        id: scope
+        if: steps.duplicate.outputs.should_run == 'true'
+        env:
+          BOOK_FILE: ${{ inputs.book_file }}
+        run: |
+          set -euo pipefail
+          mapfile -t changed_files < <(
+            {
+              git diff --name-only HEAD
+              git ls-files --others --exclude-standard
+            } | sed '/^$/d' | sort -u
+          )
+          if ((${#changed_files[@]} == 0)); then
+            echo "책에 옮길 만큼 검증된 변경이 없어 초안 PR을 만들지 않습니다."
+            echo "has_change=false" >> "${GITHUB_OUTPUT}"
+            echo "책 파일 변경 없음: 검토된 근거가 부족하거나 이미 반영된 내용입니다." >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          if ((${#changed_files[@]} != 1)) || [[ "${changed_files[0]:-}" != "${BOOK_FILE}" ]]; then
+            echo "::error::책 편집 모델은 지정된 파일 하나만 수정해야 합니다."
+            printf '변경 감지: %s\n' "${changed_files[@]:-없음}"
+            exit 1
+          fi
+          if [[ ! -f "${BOOK_FILE}" ]] || git diff --quiet -- "${BOOK_FILE}"; then
+            echo "::error::지정된 책 파일에 유효한 변경이 없습니다."
+            exit 1
+          fi
+          head -n 1 -- "${BOOK_FILE}" > "${RUNNER_TEMP}/book-current-h1.txt"
+          if ! cmp -s "${RUNNER_TEMP}/book-original-h1.txt" "${RUNNER_TEMP}/book-current-h1.txt"; then
+            echo "::error::책 파일의 H1 제목이 바뀌었습니다."
+            exit 1
+          fi
+          git diff --check -- "${BOOK_FILE}"
+          echo "has_change=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate the WikiDocs export
+        if: >-
+          steps.duplicate.outputs.should_run == 'true' &&
+          steps.scope.outputs.has_change == 'true'
+        run: |
+          set -euo pipefail
+          restore_bundle() {
+            git restore --source=HEAD --staged --worktree -- wikidocs
+          }
+          trap restore_bundle EXIT
+          python3 tools/build_wikidocs_export.py
+          python3 tests/check_wikidocs_export.py
+
+      - name: Create a draft book PR
+        if: >-
+          steps.duplicate.outputs.should_run == 'true' &&
+          steps.scope.outputs.has_change == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESEARCH_REPORT: ${{ inputs.research_report }}
+          BOOK_FILE: ${{ inputs.book_file }}
+          DRAFT_BRANCH: ${{ steps.branch.outputs.name }}
+          BOOK_DRAFT_MODEL: ${{ vars.BOOK_DRAFT_MODEL || 'gpt-5.6-terra' }}
+        run: |
+          set -euo pipefail
+          git add -- "${BOOK_FILE}"
+          if git diff --cached --quiet; then
+            echo "::error::검토할 책 변경이 없습니다."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "docs: draft ${BOOK_FILE#book/} from reviewed research"
+          git push --set-upstream origin "${DRAFT_BRANCH}"
+
+          pr_body="${RUNNER_TEMP}/book-draft-pr.md"
+          {
+            echo "## 검토된 리서치의 책 초안"
+            echo
+            echo "- 근거 보고서: \`${RESEARCH_REPORT}\`"
+            echo "- 수정한 장: \`${BOOK_FILE}\`"
+            echo "- 편집 모델: \`${BOOK_DRAFT_MODEL}\`"
+            echo "- 실행 로그: https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "### 검토할 내용"
+            echo
+            echo "- 보고서의 상태와 한계가 본문에서도 유지되는지"
+            echo "- 수치마다 모델·양자화·런타임·노드·컨텍스트·동시성 조건이 있는지"
+            echo "- 공식 자료, 직접 실험, 커뮤니티 보고가 구분되는지"
+            echo "- 중복 설명이나 과장된 비교가 생기지 않았는지"
+            echo
+            echo "자동 편집 초안이며 자동으로 병합되지 않습니다. 사람이 diff와 원문 링크를 확인해 주세요."
+          } > "${pr_body}"
+          pr_url="$(gh pr create \
+            --repo "${GH_REPO}" \
+            --draft \
+            --base main \
+            --head "${DRAFT_BRANCH}" \
+            --title "[Book Draft] ${BOOK_FILE#book/}" \
+            --body-file "${pr_body}")"
+          pr_number="${pr_url##*/}"
+          gh label create book-draft \
+            --repo "${GH_REPO}" \
+            --color "5319e7" \
+            --description "검토된 리서치에서 만든 책 본문 초안" \
+            --force >/dev/null 2>&1 || true
+          gh api --method POST "repos/${GH_REPO}/issues/${pr_number}/labels" \
+            -f 'labels[]=book-draft'
+          echo "초안 PR: ${pr_url}" >> "${GITHUB_STEP_SUMMARY}"

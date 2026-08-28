@@ -7,13 +7,67 @@ Deploy `deepseek-ai/DeepSeek-V4-Flash-0731` across 2x DGX Spark nodes.
 **Audit Artifact:** [outputs/vllm-spark-0731-docs-audit.md](outputs/vllm-spark-0731-docs-audit.md) — Comprehensive architecture & codebase audit ([Plan](outputs/.plans/vllm-spark-0731-docs.md)).  
 **Knowledge Base:** [docs/knowledge/00-index.md](docs/knowledge/00-index.md) — Definitive 10-chapter reference guide.
 
-**Live (2026-08-24):** `vllm-spark-0731:main-b12x` (matched vLLM
+**Live (2026-08-26, re-served):** `vllm-spark-0731:main-b12x` (matched vLLM
 `v0.1.dev1+ge25c586b9.d20260823`, CUDA 13.3.1, torch 2.14 `12.1a`). b12x
 linear + MoE + `B12X_MLA_SPARSE` (target and DSpark draft), `nvfp4_ds_mla`
 584 B DSV4 envelope, DSpark k=5, `FULL_AND_PIECEWISE`, DSpark backbone FULL
 (sample eager), util **0.8**, `MAX_NUM_SEQS=32` (was 8), capture 192,
 TP=2 over RoCE. Pin: `scripts/05-serve.sh main`.
 Build plan: [docs/PLAN-MAIN.md](docs/PLAN-MAIN.md).
+
+**DeepGEMM fp8 scale story — FINAL RESOLUTION (2026-08-27):**
+After full boot-free + E2E investigation, the einsum "misread" was a chain
+of misdiagnoses. The truth, all measured on GB10 with the real shared `w1`
+(F8_E4M3 + F8_E8M0) and a bf16 reference:
+1. **Linear path (`fp8_gemm_nt`) with packed-UE8M0 scales: CORRECT**
+   (mean_rel=0.000000). No fix needed.
+2. **Einsum kernel with packed E8M0 scales + recipe `(1,1,128)`
+   (stock upstream SM12x config): CORRECT** (mean_rel=0.000000). No fix
+   needed — the kernel never misread the real scales.
+3. The earlier "290% einsum error" was the **packer mantissa-leak** hit by
+   synthetic FP32 scales with mantissa (upstream deepseek-ai/DeepGEMM
+   **#337** fixes it; real checkpoint scales are E8M0 = zero mantissa).
+4. The "~2³² wrong" was **our own dequant-fallback overlay** reading
+   packed int32 as fp32 — the fallback was the actual E2E-garbage source.
+
+**Final stack: `main-b12x-mn2`** = stock upstream einsum kernel path
+(passthrough `fp8_einsum`, no fallback, no SM12x recipe override) + packed
+scales. Verified E2E: France coherent, 9×8="72", `max_model_len=65536`,
+KV 9.38 GiB. `pin.main-dg.env` points at mn2.
+**PR fallout:** vLLM #53898 (fallback) and #53521 (recipe override) both
+CLOSED as not-needed (analysis posted on each). The only genuine upstream
+fix in this area is DeepGEMM #337 (packer mantissa mask). The mn image
+(fallback variant) measured 46.3 tok/s vs mn2's 37.1 in one cold 4-parallel
+run — inconclusive, worth a clean re-benchmark if einsum decode perf matters.
+NOTE: the phase-1 `02-build-main.sh` rebuild does NOT apply the vLLM pr-*
+backports — use the layered `main-b12x-mn2` image (or the overlay build).
+
+**Debugging the deep_gemm path:** a6-wheelled image + `--linear-backend
+deep_gemm` boots (health 200) but France is garbage — the a6 kernels do not
+match vLLM main's scale producers (einsum proven: FP32 scales correct,
+packed UE8M0 ~2³² wrong; `fp8_gemm_nt` suspected). Validate per-op with the
+tiny 1:1 model `yujiepan/deepseek-v4-tiny-random` (downloaded on spark1,
+`/home/maci/models/deepseek-v4-tiny-random`) — see
+[docs/knowledge/09-golden-deepgemm.md](docs/knowledge/09-golden-deepgemm.md).
+
+**Cluster state 2026-08-27 (RESTORED):** both nodes were power-cycled
+(spark1 08-27 ~09:55, spark2 ~10:30); `/tmp` on both is cleared per-reboot
+(re-sync the repo from the local checkout before booting — `tar czf - . |
+ssh … tar xzf - -C /tmp/vllm-spark-0731`). Swap is now ACTIVE on both
+(`/swap.img` 16G, systemd `swap.img.swap`, fstab entry present — the
+earlier "no swap at boot" issue is fixed). **Boot hygiene learned this
+session:** (a) a fresh image with no AOT/inductor cache + `AOT=1` can wedge
+a host into a memory-thrash where sshd accepts TCP but never sends a banner
+— boot `VLLM_USE_AOT_COMPILE=0` until caches warm; (b) if one node
+reboots/dies mid-rendezvous, the peer can wedge the same way — cycle it;
+(c) `gb10-clockcap` does not always auto-restart on spark1 — `docker start
+gb10-clockcap` after a cycle. Verified stack (a6fix, TP=2, deep_gemm) is
+left RUNNING for interactive testing; stop with `07-stop.sh` on both.
+
+Re-served 2026-08-26 (spark2 worker then spark1 head): `/health` 200 in
+~200s, France greedy coherent (`" Paris. The capital of Italy is Rome…"`),
+c1 ~21.8 tok/s incl. TTFT (decode-only ~26, matches the 25.8 baseline).
+Swap verified active on both nodes (see the swap note below).
 
 France is green (`' Paris'` logprob -0.25..-0.26, n_tie=1, chat `Paris`).
 Measured 2026-08-24 (France, temp 0, 128 tok): 1-way ~25.8, c8 ~95, c16 ~116,
@@ -35,7 +89,12 @@ Rome. ..."`. Chat answers `"Paris."`. Do not raise spark2 to util 0.85.
 spark2 swap is now **enabled** (the `swap.img.swap` unit was masked
 `-> /dev/null`; unmasked 2026-08-24 — it auto-enables at boot; fstab already
 had the `sw` entry, the mask suppressed the generated unit, hence earlyoom
-logging `swap total: 0 MiB` at boot). **swappiness=10** (was 100): swappiness=100
+logging `swap total: 0 MiB` at boot). Verified 2026-08-26: both nodes have
+`/swap.img` 16 GiB active (unit `generated` + active, ~835 MiB used), fstab
+entry present, `vm.swappiness=10` live, zswap `Y/zstd/zsmalloc`. spark1
+activates swap automatically at boot (Aug-22 boot log: unit activated +
+`swap.target` reached); spark2's Aug-22 boot was the masked-unit case.
+**swappiness=10** (was 100): swappiness=100
 + disk swap caused decode stalls/hitches once swap was live; 10 keeps zswap
 reclaim without the disk-swap stalls. Persisted in
 `/etc/sysctl.d/99-dgx-spark-swap.conf` on both nodes (root-owned, written via
@@ -299,7 +358,39 @@ curl -s http://spark1:8000/v1/completions \
 
 ## Status
 
-### Golden (anemll, real NVFP4) — deployed 2026-08-24
+### v0.28.0 rebase — IN PROGRESS (2026-08-28)
+
+Upstream released **vLLM v0.28.0** (2026-08-26, tag `2cf0a6915ce5`),
+which includes DSV4 sparse-MLA E2E fixes (#51538), b12x linear backends
+(#52016), JIT-warmup infra, and pins DeepGEMM at `8b1392b` (the same tree
+our fp8-1d1d port was staged against). Rebase status:
+
+- **Patches rebased + verified applying to v0.28.0**: `pr-53522` (renamed
+  `num_states` -> `storage_block_size`), `pr-53425`, `pr-53574`,
+  `pr-47988`, `pr-53055` (test hunks dropped - refactored upstream),
+  `kv-offload-bounds-check` (headers fixed), `b12x-moe` (envs/warmup hunks
+  rebuilt), `0003-nvfp4-ds-mla` (paths fixed + kv_cache_interface section
+  dropped - superseded by the v0.28.0 `state_content_bytes` mechanism).
+- **Dropped**: `pr-53521`, `pr-53898` (closed - einsum misdiagnosis),
+  `pr-52499`, `b12x-linear-52016` (merged as #52016), `deepgemm-pr-403`
+  (already in the pinned 8b1392b), `mhc-guard-50645` (dup of 0002).
+- **apply_overlays.py adapted**: the 3 einsum overlays (fallback / recipe /
+  scale-upcast) removed from both apply flows; `patch_b12x_mm_block_fp8_compat`
+  retargeted to `b12x_block.py`; obsolete-guard skips for the upstream-present
+  SM12x KV insert, the removed BLHNC split, and the reworked KVBlockZeroer;
+  indexer b12x-schedule needles updated to the `_should_build_paged_mqa_logits_metadata`
+  gate; eager_scratch getattr now skips assignment sites (was a SyntaxError
+  on v0.28.0); schedule-pass overlay made tolerant.
+- **Verified**: full pipeline (5 pr-* patches + donors + ~26 overlays) exits 0
+  on a clean v0.28.0 tree; `compileall` over the whole overlaid `vllm/` passes.
+- **Pins**: `VLLM_REF=2cf0a6915ce5` (pin.main.env + pin.main-dg.env).
+  `DEEPGEMM_COMMIT` stays `a6b593d` (the verified wheel; do NOT switch to
+  the v0.28.0-pinned 8b1392b, which removed the SM12x fp8 1d1d path).
+- **In flight**: phase-1 rebuild `main-b12x-028` on spark1 (log
+  `/tmp/build-028.log`), then overlay image + boot-verify France.
+
+### Golden
+ (anemll, real NVFP4) — deployed 2026-08-24
 
 `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` (stock, zero patches) via sparkrun
 with `examples/anemll-nvfp4-golden.yaml` + the abliterated checkpoint
@@ -563,10 +654,13 @@ Matched-main uses `ar-piecewise-ws` (in-graph TP AR) and keeps France with
 - [x] Skip unused indexer `page64_block_table_buffer` when manager tables
       are already 1024-wide. KV 94,516 → 97,737.
 - [ ] 1-way decode at/above gather ~30.6 tok/s with paged indexer on,
-      France green, 8-way not collapsed. Last bench 26.90. The correctness
+      France green, 8-way not collapsed. Re-bench 2026-08-26 (restored
+      main-b12x): c1 26.3 tok/s, c8 agg 73.4, c16 115.3, **c32 agg 174.7**,
+      France green. The correctness
       half of item 18 is fixed (`packed_gather_mqa_logits`, 0.0-diff unit
       test); this bullet is now purely a perf gap on main-b12x. The speed
-      goal itself is served by the golden image (c1 65.2).
+      goal itself is served by the golden image (c1 65.2, c6 216.8 —
+      neither reaches 300 aggregated; see docs/knowledge/05-performance.md).
 - [x] Real NVFP4 KV: resolved by adopting the golden image. Porting the
       NVFP4 writer into matched-main is not needed for the speed goal; this
       image's `nvfp4_ds_mla` stays the 584-byte fp8 envelope alias.
@@ -599,11 +693,17 @@ guarded mHC siblings (not broadcast).
 Not in rc2, merged on main later: MoE `--moe-backend b12x` (#52018, 8h after
 the tag).
 
-Not in rc2 **or** main yet (still OPEN 2026-08-24): SM12x einsum recipe
-([#53521](https://github.com/vllm-project/vllm/pull/53521); #52357 closed),
+Not in rc2 **or** main yet (still OPEN 2026-08-26): SM12x einsum recipe
+([#53521](https://github.com/vllm-project/vllm/pull/53521); #52357 closed —
+**updated 8284955**: SM12x `(1,128,128)` + `tma_aligned_scales=True` (packed
+INT32 UE8M0) + 3D `wo_a` views; kitch2400 review applied, verified on SM121a
+T=10/96/8192),
 mHC broadcast + CUTLASS SM12x ([#53055](https://github.com/vllm-project/vllm/pull/53055)),
-DSV4 kernel block 64 ([#53425](https://github.com/vllm-project/vllm/pull/53425)),
-indexer DeepGEMM gate ([#53522](https://github.com/vllm-project/vllm/pull/53522)),
+DSV4 kernel block 64 ([#53425](https://github.com/vllm-project/vllm/pull/53425) —
+**import-cycle fix ed71de5**: `indexer → deepseek_v4.sparse_mla` module-level
+import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import),
+indexer DeepGEMM gate ([#53522](https://github.com/vllm-project/vllm/pull/53522) —
+**ivanusto reviewed**: test passed, gate scoped correctly),
 C128A eidx contiguity ([#53574](https://github.com/vllm-project/vllm/pull/53574)),
 Triton E8M0 upcast ([#47988](https://github.com/vllm-project/vllm/pull/47988)).
 The last two are backported as `patches/upstream/pr-53574.diff` /
@@ -615,11 +715,16 @@ FlashInfer TOPK 192 is on flashinfer-ai main (#4380) but not in the overlay
 image's `0.6.16.post3` wheel until the overlay. Matched-main FlashInfer is
 git main (192 present).
 
-DeepGEMM: rc2 cmake already pins **nv_dev** `8b1392b` (SM12x). This image
-still runs the v0.27.1 **main** `.so` (`e21c821`, `attention.hpp:122`).
-eugr rebuilds nv_dev but freezes at `a6b593d` because of an SM121 MXFP4
-grouped scale-factor regression at `f8e8fb5` (DeepGEMM PR #384). See
-[docs/UPSTREAM.md](docs/UPSTREAM.md).
+DeepGEMM: rc2 cmake pins **nv_dev** `8b1392b` (SM12x); **8b1392b regressed
+the pure-fp8 path** (removed `sm100_fp8_gemm_1d1d.{hpp,cuh}`; the
+`fp8_gemm_nt` alias predates it — corrected 2026-08-26 in
+[DeepGEMM#417](https://github.com/deepseek-ai/DeepGEMM/issues/417)). vLLM PR
+[#53680](https://github.com/vllm-project/vllm/pull/53680) re-pins cmake to
+`a6b593d`; local port `deepgemm-fp8-1d1d-port.diff` covers 8b-era builds.
+This image still runs the v0.27.1 **main** `.so` (`e21c821`,
+`attention.hpp:122`). eugr rebuilds nv_dev but freezes at `a6b593d` because
+of an SM121 MXFP4 grouped scale-factor regression at `f8e8fb5` (DeepGEMM PR
+#384). See [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
 ---
 

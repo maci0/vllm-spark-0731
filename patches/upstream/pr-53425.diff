@@ -1,6 +1,6 @@
 diff --git a/tests/v1/attention/test_dsv4_kernel_block_size.py b/tests/v1/attention/test_dsv4_kernel_block_size.py
 new file mode 100644
-index 000000000000..1cc0f0239a8d
+index 0000000..1cc0f02
 --- /dev/null
 +++ b/tests/v1/attention/test_dsv4_kernel_block_size.py
 @@ -0,0 +1,36 @@
@@ -41,10 +41,10 @@ index 000000000000..1cc0f0239a8d
 +    ]
 +    assert DeepseekV4IndexerBackend.get_supported_kernel_block_sizes() == [256]
 diff --git a/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py b/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
-index bca71abbadc3..517950db7578 100644
+index bca71ab..517950d 100644
 --- a/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
 +++ b/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
-@@ -24,7 +24,6 @@
+@@ -24,7 +24,6 @@ from vllm.models.deepseek_v4.sparse_mla import (
  )
  from vllm.platforms.interface import DeviceCapability
  from vllm.utils.flashinfer import flashinfer_trtllm_batch_decode_sparse_mla_dsv4
@@ -64,10 +64,10 @@ index bca71abbadc3..517950db7578 100644
      def get_name() -> str:
          return "FLASHINFER_MLA_SPARSE_DSV4"
 diff --git a/vllm/models/deepseek_v4/sparse_mla.py b/vllm/models/deepseek_v4/sparse_mla.py
-index ebff031cea70..4e9efe5a5e8d 100644
+index ebff031..4e9efe5 100644
 --- a/vllm/models/deepseek_v4/sparse_mla.py
 +++ b/vllm/models/deepseek_v4/sparse_mla.py
-@@ -9,6 +9,7 @@
+@@ -9,6 +9,7 @@ import torch
  
  from vllm.config import VllmConfig
  from vllm.config.cache import CacheDType
@@ -75,7 +75,7 @@ index ebff031cea70..4e9efe5a5e8d 100644
  from vllm.platforms.interface import DeviceCapability
  from vllm.triton_utils import tl, triton
  from vllm.utils.math_utils import cdiv
-@@ -32,6 +33,19 @@
+@@ -32,6 +33,19 @@ from vllm.v1.kv_cache_interface import AttentionSpec
  _C128A_TOPK_ALIGNMENT = 128
  
  
@@ -105,22 +105,22 @@ index ebff031cea70..4e9efe5a5e8d 100644
      @staticmethod
      def get_builder_cls() -> type["DeepseekV4SparseMLAMetadataBuilder"]:
 diff --git a/vllm/v1/attention/backends/mla/indexer.py b/vllm/v1/attention/backends/mla/indexer.py
-index 4700fbea0695..c58e0aa812c8 100644
+index 4700fbe..0752d7f 100644
 --- a/vllm/v1/attention/backends/mla/indexer.py
 +++ b/vllm/v1/attention/backends/mla/indexer.py
-@@ -16,6 +16,7 @@
-     TritonPointerInputVariant,
-     TritonWarmupTensor,
- )
-+from vllm.models.deepseek_v4.sparse_mla import dsv4_supported_kernel_block_sizes
- from vllm.platforms import current_platform
- from vllm.triton_utils import tl, triton
- from vllm.utils.deep_gemm import (
-@@ -193,7 +194,7 @@ def supported_kv_cache_layouts(cls) -> tuple[KVCacheLayout, ...]:
+@@ -193,7 +193,15 @@ class DeepseekV4IndexerBackend(DeepseekV32IndexerBackend):
  
      @staticmethod
      def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
 -        return [256]
++        # Imported lazily: vllm.models.deepseek_v4 transitively imports
++        # vllm._aiter_ops (via fused_moe), which would deadlock cold start
++        # with an import cycle when vllm._aiter_ops pulls in this module
++        # first (see vllm/v1/attention/ops/rocm_aiter_mla_sparse.py).
++        from vllm.models.deepseek_v4.sparse_mla import (
++            dsv4_supported_kernel_block_sizes,
++        )
++
 +        return dsv4_supported_kernel_block_sizes()
  
  

@@ -29,7 +29,10 @@ export CUDA_DEVICE_MAX_CONNECTIONS="${CUDA_DEVICE_MAX_CONNECTIONS:-1}"
 export VLLM_HOST_IP="${VLLM_HOST_IP:-}"
 export HEAD_IP="${HEAD_IP:-}"
 
-export VLLM_USE_DEEP_GEMM_E8M0="${VLLM_USE_DEEP_GEMM_E8M0:-1}"
+export VLLM_USE_DEEP_GEMM_E8M0="${VLLM_USE_DEEP_GEMM_E8M0:-0}"
+# GB10: the DeepGEMM ue8m0 path needs a working fp8 linear stack; the b12x
+# image ships no DeepGEMM and the 8b1392b pin regressed SM12x fp8 (see
+# docs/knowledge/09-golden-deepgemm.md). Default 0, matching pin.main.env.
 # GB10: ptxas cannot assemble tcgen05 for sm_121a on any CUDA 13.x tested.
 # NVRTC was tried as the workaround but its cubins are rejected by the driver
 # (CUDA_ERROR_INVALID_IMAGE), so DG_JIT_USE_NVRTC stays 0 (see

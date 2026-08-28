@@ -1,0 +1,146 @@
+{
+  "keywords": [
+    "DGX Spark",
+    "DGX 스파크",
+    "GB10",
+    "DeepSeek v4 Flash 0731",
+    "Qwen3.8 27B",
+    "MiniMax DGX Spark",
+    "NVFP4 KV cache",
+    "2x DGX Spark",
+    "DGX Spark 설치 초기 설정",
+    "DGX Spark 복구 부팅 오류",
+    "DGX Spark 트러블슈팅 Docker CUDA",
+    "DGX Spark 저성능 발열 전원",
+    "DGX Spark RDMA 네트워크"
+  ],
+  "github_repositories": [
+    "MiaAI-Lab/DeepSeek-v4-Flash-One-DGX-Spark",
+    "tonyd2wild/DeepSeek-v4-Flash-0731-Vision-DSpark-1M-NVFP4-KV-2x-DGX-Spark",
+    "agjs/gb10-clock-cap",
+    "recrack/oh-my-dgx-spark",
+    "0xSufi/h3.c",
+    "11harjo8842/dgx-spark-2-deepseek-flash-0731",
+    "AlexLJC/deepseek-v4-flash-gb10",
+    "CarstVaartjes/vonk-forge",
+    "CosmicRaisins/minimax-m3-awq-gb10",
+    "Fulton-Engineering-Services/dgx-spark-wheels",
+    "MarinhoLab/local_llm_agent",
+    "MiaAI-Lab/DeepSeek-v4-Flash-DSpark-2x-DGX-Spark",
+    "NTillmann/dgx-spark-deepseek-v4-flash-kernel-configs",
+    "SuperElectron/dgx-spark-tuner",
+    "anakronox/spark-dash",
+    "brookie32/quantum-wiki",
+    "bytebunkerlabs/dgx-spark-setup",
+    "chrisjhebert1973/F2K_CUDA",
+    "ciprianveg/gb10-vllm",
+    "coolchenK/DGX-Spark-web-manager",
+    "darkdatter/gb10-repo",
+    "hazyumps/deepseek-v4-flash-gb10",
+    "jethac/personaplex-gb10",
+    "jschmied/dgx-spark-setup-guide",
+    "jtchilders-ai-assistant/warpcore-benchmarks",
+    "kentslaney/dgx-spark-playbooks",
+    "kshetrajna12/sparkstation",
+    "lrozewicz/vLLM-Moet-GB10",
+    "luisefigueroa/pulsar-gb10-vllm-stack",
+    "marshbellflowerchipewyan180/Laguna-S-2.1-DGX-Spark-RTX-6000-PRO",
+    "misused-emergencyalertsystem552/GLM-5.2-NVFP4-AQLM-Triple-DGX-Sparks",
+    "natolambert/dgx-spark-setup",
+    "neko-legends/three-sparks-optimizations",
+    "pju-hoge/gb10-thermal-governor",
+    "r0b0tlab/hermes-concurrent-agents",
+    "shawnmarck/sparkbench",
+    "shunsuke-nashiki-agent/dgx-spark-vllm-nvfp4",
+    "slangevi/sparkyard",
+    "timothystewart6/ubuntu-gb10",
+    "vladimir-voinea/gb10-laguna-s-2.1-w4a16-moe",
+    "wshobson/minimax-dgx-spark"
+  ],
+  "github_queries": [
+    "\"DGX Spark\"",
+    "\"GB10\" \"DeepSeek\"",
+    "\"Qwen3.8\" \"DGX Spark\"",
+    "\"MiniMax\" \"DGX Spark\"",
+    "\"NVFP4\" \"DGX Spark\"",
+    "\"DGX Spark\" setup troubleshooting",
+    "\"DGX Spark\" recovery boot",
+    "\"DGX Spark\" Docker CUDA"
+  ],
+  "rss": [
+    {
+      "name": "NVIDIA Developer Forum DGX Spark / GB10",
+      "url": "https://forums.developer.nvidia.com/c/accelerated-computing/dgx-spark-gb10/719.rss"
+    },
+    {
+      "name": "Reddit LocalLLaMA: DGX Spark",
+      "url": "https://www.reddit.com/r/LocalLLaMA/search.rss?q=DGX%20Spark&restrict_sr=1&sort=new"
+    },
+    {
+      "name": "Reddit LocalLLaMA: GB10",
+      "url": "https://www.reddit.com/r/LocalLLaMA/search.rss?q=GB10&restrict_sr=1&sort=new"
+    },
+    {
+      "name": "Reddit LocalAIServers: DGX Spark",
+      "url": "https://www.reddit.com/r/LocalAIServers/search.rss?q=DGX%20Spark&restrict_sr=1&sort=new"
+    }
+  ],
+  "web_search": [
+    {
+      "query": "DGX Spark GB10 DeepSeek Qwen MiniMax",
+      "domains": [
+        "nvidia.com",
+        "docs.nvidia.com",
+        "developer.nvidia.com",
+        "forums.developer.nvidia.com",
+        "huggingface.co",
+        "arca.live",
+        "nacyot.github.io",
+        "svrforum.com"
+      ]
+    },
+    {
+      "query": "DGX Spark GB10 한국어",
+      "domains": [
+        "arca.live",
+        "nacyot.github.io",
+        "svrforum.com"
+      ]
+    },
+    {
+      "query": "DGX Spark 설치 초기 설정 복구 트러블슈팅",
+      "domains": [
+        "nvidia.com",
+        "docs.nvidia.com",
+        "developer.nvidia.com",
+        "forums.developer.nvidia.com",
+        "arca.live",
+        "nacyot.github.io",
+        "svrforum.com"
+      ]
+    },
+    {
+      "query": "DGX Spark Docker CUDA vLLM 오류",
+      "domains": [
+        "nvidia.com",
+        "docs.nvidia.com",
+        "developer.nvidia.com",
+        "forums.developer.nvidia.com",
+        "arca.live",
+        "svrforum.com"
+      ]
+    }
+  ],
+  "x_search": [
+    "\"DGX Spark\"",
+    "\"DGX 스파크\"",
+    "\"DeepSeek v4 Flash\" Spark",
+    "\"딥시크\" \"DGX Spark\"",
+    "GB10 NVFP4",
+    "\"DGX Spark\" 설치",
+    "\"DGX Spark\" 복구",
+    "\"DGX Spark\" troubleshooting",
+    "\"DGX Spark\" thermal throttling"
+  ],
+  "approved_sources": []
+}

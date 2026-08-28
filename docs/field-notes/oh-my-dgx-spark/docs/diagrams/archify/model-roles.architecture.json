@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "모델 선택은 역할 배치다",
+    "output": "model-roles.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "team", "label": "모델 팀", "focus": ["request", "router", "deepseek", "qwen", "h3"], "note": "작업 종류에 따라 supervisor·worker·media 역할을 나눈다." },
+      { "id": "tools", "label": "도구 경계", "focus": ["router", "deepseek", "qwen", "tools"], "note": "모델이 도구를 호출하는 것과 도구를 안전하게 운영하는 것은 다르다." }
+    ]
+  },
+  "components": [
+    { "id": "request", "type": "external", "label": "요청", "sublabel": "user / agent", "pos": [40, 340], "size": [160, 78] },
+    { "id": "router", "type": "backend", "label": "Router", "sublabel": "task + policy", "pos": [280, 340], "size": [180, 78] },
+    { "id": "deepseek", "type": "backend", "label": "DeepSeek", "sublabel": "supervisor", "pos": [590, 160], "size": [210, 90], "tag": "long context" },
+    { "id": "qwen", "type": "backend", "label": "Qwen3.8", "sublabel": "code / UI worker", "pos": [590, 340], "size": [210, 90], "tag": "low latency" },
+    { "id": "h3", "type": "backend", "label": "MiniMax-H3", "sublabel": "video / audio", "pos": [590, 520], "size": [210, 90], "tag": "media" },
+    { "id": "tools", "type": "external", "label": "Tools", "sublabel": "files / shell / APIs", "pos": [970, 340], "size": [210, 90] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "권한·도구 경계", "wraps": ["tools"], "pad": 30 }
+  ],
+  "connections": [
+    { "id": "request-router", "from": "request", "to": "router", "label": "classify", "variant": "emphasis" },
+    { "id": "router-deepseek", "from": "router", "to": "deepseek", "label": "plan / review", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "id": "router-qwen", "from": "router", "to": "qwen", "variant": "emphasis" },
+    { "id": "router-h3", "from": "router", "to": "h3", "label": "render media", "variant": "dashed", "fromSide": "right", "toSide": "left" },
+    { "id": "deepseek-tools", "from": "deepseek", "to": "tools", "label": "approved tool call", "variant": "security", "fromSide": "right", "toSide": "top" },
+    { "id": "qwen-tools", "from": "qwen", "to": "tools", "label": "approved tool call", "variant": "security" }
+  ],
+  "cards": [
+    { "dot": "violet", "title": "Supervisor", "items": ["긴 문맥·계획·검토", "DeepSeek 후보"] },
+    { "dot": "cyan", "title": "Worker", "items": ["코드·UI·JSON 반복", "Qwen3.8 후보"] },
+    { "dot": "emerald", "title": "Media", "items": ["영상·음성 생성", "MiniMax-H3 후보"] }
+  ]
+}
