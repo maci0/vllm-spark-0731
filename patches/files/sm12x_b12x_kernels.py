@@ -590,6 +590,7 @@ def b12x_profile_decode_once(fn):
         if torch.cuda.is_current_stream_capturing():
             return fn(self, *args, **kwargs)
         _PROFILING_STEP[0] = True
+        _LAYER_EVENTS[0] = []
         try:
             torch.cuda.synchronize()
             t0 = time.perf_counter()
@@ -603,11 +604,21 @@ def b12x_profile_decode_once(fn):
             wall_ms = 1000.0 * (t1 - t0)
             gpu_ms = e0.elapsed_time(e1)
             ntoks = int(args[0]) if args else "?"
+            layer_ms = [a.elapsed_time(b) for a, b in _LAYER_EVENTS[0]]
             print(
                 f"b12x decode step: toks={ntoks} wall={wall_ms:.1f}ms "
                 f"gpu={gpu_ms:.1f}ms overhead={wall_ms - gpu_ms:.1f}ms",
                 flush=True,
             )
+            if layer_ms:
+                n = len(layer_ms)
+                total = sum(layer_ms)
+                print(
+                    f"b12x layers: n={n} sum={total:.1f}ms avg={total / n:.2f}ms "
+                    f"max={max(layer_ms):.2f}ms@L{layer_ms.index(max(layer_ms))} "
+                    f"p95={sorted(layer_ms)[int(n * 0.95) - 1]:.2f}ms",
+                    flush=True,
+                )
         finally:
             _PROFILING_STEP[0] = False
         return out
@@ -621,7 +632,12 @@ _PROFILING_STEP = [False]
 
 
 def b12x_profile_layer(fn):
-    """Per-layer CUDA-event timing, active only inside the profiled step."""
+    """Per-layer CUDA-event timing, active only inside the profiled step.
+
+    Events are recorded per layer on the current stream WITHOUT per-layer
+    synchronize (that distorted timing via aux-stream waits); the step
+    decorator's final synchronize settles everything.
+    """
 
     import os
 
@@ -640,11 +656,14 @@ def b12x_profile_layer(fn):
         e0.record()
         out = fn(self, *args, **kwargs)
         e1.record()
-        torch.cuda.synchronize()
-        print(f"b12x layer: {e0.elapsed_time(e1):.2f}ms", flush=True)
+        _LAYER_EVENTS[0].append((e0, e1))
         return out
 
     return wrapper
+
+
+#: (e0, e1) pairs per layer, consumed by the step decorator after sync.
+_LAYER_EVENTS = [[]]
 
 
 def _cached_wo_a_bmm_weight(
