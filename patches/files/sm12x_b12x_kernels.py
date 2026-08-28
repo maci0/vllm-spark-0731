@@ -574,7 +574,12 @@ def _cached_wo_a_bmm_weight(
     o_lora_rank: int,
     group_width: int,
 ) -> torch.Tensor | None:
-    """Dequant WO-A to bf16 [G, R, D] once (same expand as SM12x fp8_einsum)."""
+    """Dequant WO-A to bf16 [G, D, R] once (same expand as SM12x fp8_einsum).
+
+    vLLM's deepgemm is_bmm post-processing (deepgemm_post_process_fp8_weight_block)
+    stores the local shard as 3D [G, R, D] with 3D scale [G, R/128, D/128];
+    the raw checkpoint is 2D [G*R, D] with 2D scale. Handle both.
+    """
     cached = getattr(wo_a, "_b12x_w_bmm", None)
     if cached is not None:
         return cached
@@ -582,23 +587,42 @@ def _cached_wo_a_bmm_weight(
         return None
     w = wo_a.weight
     scale = wo_a.weight_scale if hasattr(wo_a, "weight_scale") else wo_a.weight_scale_inv
-    rows, cols = int(w.shape[0]), int(w.shape[1])
-    s = _expand_block_scales(scale, rows, cols)
-    w_dq = w.to(torch.bfloat16) * s.to(dtype=torch.bfloat16, device=w.device)
-    if w_dq.shape[0] == n_groups * o_lora_rank and w_dq.shape[1] == group_width:
-        # [G*D, R] -> [G, D, R] -> [G, R, D] for bmm(a[G,T,R], w[G,R,D])
-        w_bmm = w_dq.view(n_groups, o_lora_rank, group_width).transpose(1, 2).contiguous()
+    if w.dim() == 3:
+        g, r, d = w.shape
+        if not (g == n_groups and r == o_lora_rank and d == group_width):
+            global _w_bmm_none_logged
+            if not _w_bmm_none_logged:
+                _w_bmm_none_logged = True
+                print(
+                    "DBG wo_proj w_bmm NONE (3D): "
+                    f"w={tuple(w.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)}) "
+                    f"want [g={n_groups}, r={o_lora_rank}, d={group_width}]",
+                    flush=True,
+                )
+            return None
+        # [G, R/128, D/128] -> [G, R, D]
+        s = _expand_block_scales(scale, o_lora_rank, group_width)
+        w_dq = w.to(torch.bfloat16) * s.to(dtype=torch.bfloat16, device=w.device)
+        # [G, R, D] -> [G, D, R] for bmm(a[G,T,D], w[G,D,R])
+        w_bmm = w_dq.transpose(1, 2).contiguous()
     else:
-        global _w_bmm_none_logged
-        if not _w_bmm_none_logged:
-            _w_bmm_none_logged = True
-            print(
-                "DBG wo_proj w_bmm NONE: "
-                f"w_dq={tuple(w_dq.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)}) "
-                f"want rows=G*R={n_groups * o_lora_rank} cols=gw={group_width}",
-                flush=True,
-            )
-        return None
+        rows, cols = int(w.shape[0]), int(w.shape[1])
+        s = _expand_block_scales(scale, rows, cols)
+        w_dq = w.to(torch.bfloat16) * s.to(dtype=torch.bfloat16, device=w.device)
+        if w_dq.shape[0] == n_groups * o_lora_rank and w_dq.shape[1] == group_width:
+            # [G*R, D] -> [G, R, D] -> [G, D, R] for bmm(a[G,T,R], w[G,R,D])
+            w_bmm = w_dq.view(n_groups, o_lora_rank, group_width).transpose(1, 2).contiguous()
+        else:
+            global _w_bmm_none_logged2
+            if not _w_bmm_none_logged2:
+                _w_bmm_none_logged2 = True
+                print(
+                    "DBG wo_proj w_bmm NONE (2D): "
+                    f"w_dq={tuple(w_dq.shape)} (wa={tuple(w.shape)} sa={tuple(scale.shape)}) "
+                    f"want rows=G*R={n_groups * o_lora_rank} cols=gw={group_width}",
+                    flush=True,
+                )
+            return None
     wo_a._b12x_w_bmm = w_bmm
     print(
         f"b12x wo_proj w_bmm ok {tuple(w_bmm.shape)} from wa={tuple(w.shape)} sa={tuple(scale.shape)}",
@@ -636,7 +660,7 @@ def _ensure_bmm_ws(
             and ws.device == device
             and ws.dtype == torch.bfloat16
             and ws.dim() == 3
-            and ws.shape[0] >= n0
+            and ws.shape[0] == n0  # groups must match exactly (shape[1] is a token cap)
             and ws.shape[1] >= n1
             and ws.shape[2] == n2
         )
