@@ -1,10 +1,14 @@
-# Golden deployment: anemll NVFP4, ~2.0M KV, 2x DGX Spark
+# Legacy reference: anemll NVFP4 deployment (surpassed by the v0.28.0 stack)
 
 > **Canonical reference:** [docs/knowledge/14-golden-setup.md](../../knowledge/14-golden-setup.md)
-> — the setup summary, "why faster" decomposition, reproduction paths, and
-> measured numbers live there. This field note keeps the operational detail
-> (ceiling experiments, workload sensitivity, failure modes, operating
-> notes) that the knowledge chapter deliberately omits.
+> — the reference-stack summary (our v0.28.0 image is now the throughput
+> reference), the legacy anemll setup, the "why faster / where we surpassed
+> it" decomposition, reproduction paths, and measured numbers live there.
+> This field note keeps the operational detail (ceiling experiments,
+> workload sensitivity, failure modes, operating notes) that the knowledge
+> chapter deliberately omits. The anemll image remains the reference for
+> **real NVFP4 KV capacity** (7,650 B/token, 2.0M tokens) and
+> **single-stream latency** (c1 51-65 vs our 40-43).
 
 The shipped configuration as of 2026-08-22. Every number below is measured on
 this cluster with one harness, not quoted from upstream.

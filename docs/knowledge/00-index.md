@@ -29,7 +29,7 @@
 | **Cost & vendor decision** | [11-cost-decision.md](11-cost-decision.md) — CAPEX/OPEX/TCO, GPT-5.6 Sol vs local, GB10 OEM choice |
 | **Debug stand-in & tiny V4** | [12-debug-standin.md](12-debug-standin.md) — Shallowseek, exact config ground truth, differential-test workflow |
 | **Architecture transplant** | [13-qwenseek.md](13-qwenseek.md) — Qwen MoE trunk → V4 attention, measured MTP-3 finding, transfer ledger |
-| **Golden setup (reference target)** | [14-golden-setup.md](14-golden-setup.md) — anemll image: exact config, why 2× faster, how to reproduce, measured numbers |
+| **Reference stack (current)** | [14-golden-setup.md](14-golden-setup.md) — our v0.28.0 stack (306.8 @ c32) is the throughput reference; legacy anemll image + its NVFP4-capacity/per-stream-latency gaps documented |
 | **Raw evidence & field notes** | [docs/field-notes/README.md](../field-notes/README.md) — per-chapter mapping to the unedited source documents |
 | **Knowledge Graph** | [graph.md](graph.md) — document graph (generated), concept graph, entity index |
 | **Glossary** | [glossary.md](glossary.md) — shared vocabulary (b12x, DSV4, mHC, eidx, nv_dev, …) |
