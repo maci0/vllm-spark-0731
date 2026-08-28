@@ -158,3 +158,33 @@ ue8m0-recipe family fixed on main by vllm-project/vllm#53521).
 - Remaining gaps vs the legacy, tracked in
   [05-performance.md](05-performance.md) and HANDOFF: c1 single-stream
   latency (40-43 vs 51-65) and KV capacity (real NVFP4 writer).
+
+## 8. Real NVFP4 into our v0.28.0 image — experiment verdict (2026-08-29)
+
+Asked "how can we get NVFP4 into the v0.28.0 image", tested end-to-end:
+
+- **v0.28.0 already ships an `nvfp4_ds_mla` path**: the
+  `fused_deepseek_v4_qnorm_rope_kv_rope_quant_insert` writer op (compiled in
+  `_C_stable_libtorch.abi3.so`, registered when vllm imports) + the FlashInfer
+  DSV4 sparse MLA reader (`flashinfer_sparse.py` accepts `nvfp4_ds_mla`).
+  Switching to `--attention-backend FLASHINFER_MLA_SPARSE_DSV4` +
+  `nvfp4_ds_mla` boots and serves coherently on SM12x — after removing the
+  SM12x Triton-fp8 KV-insert diversion for the nvfp4 case (the
+  `patch_sm12x_kv_insert` overlay bypasses the CUDA op on SM12x; the exclusion
+  lets `nvfp4_ds_mla` fall through, verified `kv_cache_dtype='nvfp4_ds_mla'` +
+  0 Triton diversions + no CUDA errors).
+- **BUT the density is unchanged**: KV cache 100-115k tokens at ~214 KB/token —
+  identical to the fp8 path. v0.28.0's `nvfp4_ds_mla` is the 584-aligned padded
+  uint8 layout (584 vs fp8's 576 = +1.4%), i.e. an **fp8-density alias**.
+- **The golden's 7,650 B/token (28.7× denser) is a different cache layout in
+  its vLLM 0.25.2 fork** — not the v0.28.0 `nvfp4_ds_mla` format. Porting it
+  means porting the golden's dense FP4-packed MLA cache (writer op + cache
+  layout) AND a reader (decode kernels that dequantize it) — the writer is a
+  compiled op (torch 2.11 ABI, not binary-liftable); the source may exist in
+  vLLM git history (the op name matches v0.28.0's). Multi-day kernel/porting
+  work, not a config change.
+- **Verdict/revert**: FlashInfer+`nvfp4_ds_mla` gives no capacity or speed
+  gain over `B12X_MLA_SPARSE` (which is the 306.8-tok/s @ c32 config), so the
+  stack stays on `B12X_MLA_SPARSE` + `nvfp4_ds_mla` (the fp8 alias). Real NVFP4
+  capacity only matters for 1M-context serving; our 64k `max_model_len` holds
+  1.5× concurrency at the current 99k-token pool.
