@@ -358,7 +358,7 @@ curl -s http://spark1:8000/v1/completions \
 
 ## Status
 
-### v0.28.0 rebase — IN PROGRESS (2026-08-28)
+### v0.28.0 rebase — DEPLOYED (2026-08-28)
 
 Upstream released **vLLM v0.28.0** (2026-08-26, tag `2cf0a6915ce5`),
 which includes DSV4 sparse-MLA E2E fixes (#51538), b12x linear backends
@@ -367,7 +367,8 @@ our fp8-1d1d port was staged against). Rebase status:
 
 - **Patches rebased + verified applying to v0.28.0**: `pr-53522` (renamed
   `num_states` -> `storage_block_size`), `pr-53425`, `pr-53574`,
-  `pr-47988`, `pr-53055` (test hunks dropped - refactored upstream),
+  `pr-47988`, `pr-53055` (test hunks dropped - refactored upstream;
+  **cuda.py sm121 exclusion dropped** - deep_gemm verified working on GB10),
   `kv-offload-bounds-check` (headers fixed), `b12x-moe` (envs/warmup hunks
   rebuilt), `0003-nvfp4-ds-mla` (paths fixed + kv_cache_interface section
   dropped - superseded by the v0.28.0 `state_content_bytes` mechanism).
@@ -380,14 +381,27 @@ our fp8-1d1d port was staged against). Rebase status:
   SM12x KV insert, the removed BLHNC split, and the reworked KVBlockZeroer;
   indexer b12x-schedule needles updated to the `_should_build_paged_mqa_logits_metadata`
   gate; eager_scratch getattr now skips assignment sites (was a SyntaxError
-  on v0.28.0); schedule-pass overlay made tolerant.
+  on v0.28.0); schedule-pass overlay made tolerant; **v0.28.0 integration
+  fixes**: `patch_envs` + MoE overlays added to apply_main (rc2-only before),
+  `patch_mxfp4_process_weights` wired (modular-MoE weight prep), b12x MoE
+  weight-prep call for GPU, donor `nsa_indexer` -> `dsa_indexer` (b12x
+  master drift), donor `compressed_mla` -> `compressed_sparse_mla`.
 - **Verified**: full pipeline (5 pr-* patches + donors + ~26 overlays) exits 0
-  on a clean v0.28.0 tree; `compileall` over the whole overlaid `vllm/` passes.
+  on a clean v0.28.0 tree; `compileall` passes; **E2E boot on both nodes**:
+  France coherent, health 200, CUDA graphs 27/27 + DSpark 21/21 captured.
 - **Pins**: `VLLM_REF=2cf0a6915ce5` (pin.main.env + pin.main-dg.env).
   `DEEPGEMM_COMMIT` stays `a6b593d` (the verified wheel; do NOT switch to
   the v0.28.0-pinned 8b1392b, which removed the SM12x fp8 1d1d path).
-- **In flight**: phase-1 rebuild `main-b12x-028` on spark1 (log
-  `/tmp/build-028.log`), then overlay image + boot-verify France.
+- **Images**: `main-b12x-028` (v0.28.0 + overlays, committed 97e4a6a);
+  `main-b12x-028-rdma` (added rdma-core v54 libmlx5 - see 05-performance.md
+  NCCL/RoCE finding; benchmark pending).
+- **Benchmarks (golden methodology, shared coding prompt, natural EOS)**:
+  c1 17.2, c3 32.4, c5 60.4, c6 49.6 tok/s (before the rdma fix).
+  NOTE: benchmark prompts matter ~1.7x (see GOLDEN.md); unique-prose +
+  forced-continuation (ignore_eos) is the WORST case.
+- **b12x hazard**: B12X_REF=master is rolling - the phase-1 build pulled a
+  version that renamed `nsa_indexer`->`dsa_indexer` and
+  `compressed_mla`->`compressed_sparse_mla`; consider pinning B12X_REF.
 
 ### Golden
  (anemll, real NVFP4) — deployed 2026-08-24

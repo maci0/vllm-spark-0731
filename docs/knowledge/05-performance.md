@@ -132,6 +132,51 @@ without real NVFP4 KV (which changes cache geometry and memory traffic).
 
 ---
 
+### 2b. NCCL was running on TCP, not RoCE — the 200G fabric was idle **(FIXED 2026-08-28)**
+
+The single biggest sub-gap found in the v0.28.0 stack, and it applies to
+every image lineage (any container with the same rdma-core).
+
+**Symptom**: 44% SM util at c5, ~67 ms/step at c1, aggregate degrading past
+~8 concurrent — classic sync-overhead signature, not compute-bound.
+
+**Diagnosis chain**:
+- `nvidia-smi dmon`: SM util ~44% during a c5 burst (not saturated).
+- NCCL all_reduce microbench: 40 KB = **0.371 ms**, 128 MB = **3.9 GB/s** —
+  only ~16% of the fabric's capability.
+- `NCCL_DEBUG=INFO`: `NET/IB: No device found` + `GPU Direct RDMA
+  Disabled for HCA ...` → **NCCL fell back to TCP sockets** over the CPU
+  NIC; the 200 Gbps RoCE link (active, `ethtool` 200000Mb/s) was idle.
+- Root cause: the container's `libmlx5.so.1` (rdma-core 50.0 /
+  libmlx5 1.24.50.0, Ubuntu 24.04) lacks the `mlx5dv_reg_dmabuf_mr` /
+  `mlx5dv_get_data_direct_sysfs_path` symbols (MLX5_1.25+, added in
+  rdma-core v54). **NCCL 2.30.7 requires those symbols for IB device
+  detection** → sees zero IB devices → TCP fallback. `ibv_devinfo` still
+  enumerates the devices (libibverbs itself works); only NCCL's probe fails.
+- Why the golden isn't affected: `ghcr.io/anemll/dspark-vllm-gx10:0.1.1`
+  ships Ubuntu 22.04 + **NCCL 2.28.9** + libmlx5 1.22 — an OLDER NCCL that
+  predates the mlx5dv-symbol requirement, so basic RoCE works for it.
+
+**Fix**: build rdma-core **v54.0** from source (`linux-rdma/rdma-core`
+tag v54.0, CMake, `cmake --install --prefix /usr`) and replace
+`/usr/lib/aarch64-linux-gnu/libmlx5.so.1` (symlink → 1.25.54.0, `ldconfig`).
+Deployed as overlay image `main-b12x-028-rdma`.
+
+**Measured (before → after, 2-node, same harness)**:
+| Size | TCP (old libmlx5) | RoCE (v54) | Δ |
+|------|------|------|------|
+| 40 KB all_reduce | 0.371 ms | **0.034 ms** | 10.9× |
+| 320 KB | 1.068 ms | **0.213 ms** | 5× |
+| 128 MB | 3.9 GB/s | **39.3 GB/s** | 10× |
+
+Decode does ~86 all_reduces/step (2/layer × 43); the sync cost dropped from
+~32 ms to ~3 ms per step. Re-benchmark pending.
+
+**Implication for all images**: any vLLM container on these nodes built on
+Ubuntu 24.04 with rdma-core 50.0 + NCCL ≥2.29 runs its TP traffic over TCP.
+Verify with `NCCL_DEBUG=INFO` (look for `NET/IB`) or the all_reduce
+microbench; fix with the v54 libmlx5 overlay.
+
 ### 3. CUDA Graph Capture Overhead
 
 | Mode | Capture Sizes | Status |
