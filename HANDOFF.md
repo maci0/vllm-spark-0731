@@ -1066,3 +1066,11 @@ segfaults against vLLM's always-on SyncActivityProfilerHandler):
   attention / MoE at small batch are all inside the fast 22 ms step). Next
   lever: measure and tune draft acceptance (greedy/temperature, markov
   bias, verify path) — compare against the golden's 66.7%.
+  **A/B (2026-08-29): `DRAFT_SAMPLE_METHOD=greedy` (the vLLM default; our
+  pin used `probabilistic`) — c1 steady-state unchanged (40.6-41.5 vs
+  40.2-43.5), c32 measured 197-286 vs 306.8 (probabilistic) → reverted.
+  Acceptance is NOT the cheap lever.** The remaining c1 target is the
+  small-batch per-layer kernel latency (~22 ms for 6 tokens = 4 ms/token is
+  high); the per-op breakdown needs the CUPTI-free instrumentation fixed
+  (the layer-timing decorator reported n=6 layer calls/step — investigate
+  before trusting it; the step-level timing is solid).
