@@ -14,14 +14,19 @@ export NODE_RANK="${NODE_RANK:-}"
 # Spark NICs from the official playbook. Override if your QSFP is on the other port.
 export SPARK_IFACES="${SPARK_IFACES:-enp1s0f1np1}"
 
-# NCCL / UCX over RoCE (ConnectX-7). GID 3 is RoCE v2 on this box.
+# NCCL / UCX over RoCE (ConnectX-7).
+# 2026-08-28: with rdma-core v54 libmlx5 (the NCCL 2.30.7-compatible
+# userspace, see docs/knowledge/05-performance.md "NCCL was running on TCP"),
+# NCCL auto-selects the working RoCE path. Forcing NCCL_IB_GID_INDEX=3 or
+# NCCL_NET_GDR_LEVEL=PHB re-breaks it (back to 0.37ms small-op latency);
+# the defaults give 0.031-0.045ms on rocep1s0f1 + roceP2p1s0f1.
 export UCX_NET_DEVICES="${UCX_NET_DEVICES:-${SPARK_IFACES}}"
 export NCCL_SOCKET_IFNAME="${NCCL_SOCKET_IFNAME:-${SPARK_IFACES}}"
 export GLOO_SOCKET_IFNAME="${GLOO_SOCKET_IFNAME:-${SPARK_IFACES}}"
 export TP_SOCKET_IFNAME="${TP_SOCKET_IFNAME:-${SPARK_IFACES}}"
-export NCCL_IB_HCA="${NCCL_IB_HCA:-mlx5}"
-export NCCL_IB_GID_INDEX="${NCCL_IB_GID_INDEX:-3}"
-export NCCL_NET_GDR_LEVEL="${NCCL_NET_GDR_LEVEL:-PHB}"
+export NCCL_IB_HCA="${NCCL_IB_HCA:-}"
+export NCCL_IB_GID_INDEX="${NCCL_IB_GID_INDEX:-}"
+export NCCL_NET_GDR_LEVEL="${NCCL_NET_GDR_LEVEL:-}"
 export NCCL_IB_DISABLE="${NCCL_IB_DISABLE:-0}"
 export CUDA_DEVICE_MAX_CONNECTIONS="${CUDA_DEVICE_MAX_CONNECTIONS:-1}"
 

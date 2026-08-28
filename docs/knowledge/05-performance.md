@@ -170,7 +170,28 @@ Deployed as overlay image `main-b12x-028-rdma`.
 | 128 MB | 3.9 GB/s | **39.3 GB/s** | 10× |
 
 Decode does ~86 all_reduces/step (2/layer × 43); the sync cost dropped from
-~32 ms to ~3 ms per step. Re-benchmark pending.
+~32 ms to ~3 ms per step.
+
+**End-to-end measured (v0.28.0 stack, golden methodology, shared coding
+prompt, natural EOS, temp 0.7) — before (TCP) -> after (RoCE)**:
+| concurrency | before | after |
+|------|------|------|
+| c1 | 17.2 | **29.8** |
+| c3 | 32.4 | **51.6** |
+| c5 | 60.4 | **83.9** |
+| c6 | 49.6 | **85.1** |
+| c8 | — | **108.0** |
+| worst-case bench c8 | 63.0 | **94.8** |
+
+Gap vs golden (c5 141, c6 157.9) narrowed ~2.3x -> ~1.7x. The remaining
+saturation/stall at higher concurrency is JIT-compiles during inference
+(mHC TileLang kernels + DSpark gumbel sampler compile on first use for new
+shapes - warmup gaps) and per-layer kernel overhead (SM util still ~47%).
+
+**NCCL env caveat**: with the v54 libmlx5, forcing `NCCL_IB_GID_INDEX=3` /
+`NCCL_NET_GDR_LEVEL=PHB` / `NCCL_IB_HCA=mlx5` re-breaks the path (0.37ms);
+leave them unset (defaults auto-select rocep1s0f1 + roceP2p1s0f1 at
+0.031-0.045ms). `configs/env.spark.sh` updated accordingly.
 
 **Implication for all images**: any vLLM container on these nodes built on
 Ubuntu 24.04 with rdma-core 50.0 + NCCL ≥2.29 runs its TP traffic over TCP.
