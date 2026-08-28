@@ -569,11 +569,14 @@ def _expand_block_scales(scale: torch.Tensor, rows: int, cols: int) -> torch.Ten
 
 
 def b12x_profile_decode_once(fn):
-    """One-shot torch.profiler wrap for the first decode ``execute_model``
-    call. Enabled by ``VLLM_PROFILE_DECODE=1``; dumps the chrome trace to
-    /tmp/decode_profile.json so a decode step can be broken down per-op
-    without the (broken in v0.28.0) engine-side profiler plumbing.
+    """One-shot timing for the first real DSpark decode step.
+
+    Enabled by ``VLLM_PROFILE_DECODE=1``. CUDA-event timing only:
+    torch.profiler's kineto/CUPTI activity segfaults against vLLM's
+    always-on SyncActivityProfilerHandler. Prints step wall/GPU split and
+    arms the per-layer timing (``b12x_profile_layer``) for this step.
     """
+
     import os
 
     if os.environ.get("VLLM_PROFILE_DECODE") != "1":
@@ -584,29 +587,61 @@ def b12x_profile_decode_once(fn):
 
         import torch
 
-        # Never profile during CUDA graph capture. The first _run_model call
-        # is the FULL-graph capture; the first real decode step (a graph
-        # replay) gets timed instead.
         if torch.cuda.is_current_stream_capturing():
             return fn(self, *args, **kwargs)
-        # CUDA-event timing only: torch.profiler's kineto/CUPTI activity
-        # segfaults against vLLM's always-on SyncActivityProfilerHandler.
-        torch.cuda.synchronize()
-        t0 = time.perf_counter()
+        _PROFILING_STEP[0] = True
+        try:
+            torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            e0 = torch.cuda.Event(enable_timing=True)
+            e1 = torch.cuda.Event(enable_timing=True)
+            e0.record()
+            out = fn(self, *args, **kwargs)
+            e1.record()
+            torch.cuda.synchronize()
+            t1 = time.perf_counter()
+            wall_ms = 1000.0 * (t1 - t0)
+            gpu_ms = e0.elapsed_time(e1)
+            ntoks = int(args[0]) if args else "?"
+            print(
+                f"b12x decode step: toks={ntoks} wall={wall_ms:.1f}ms "
+                f"gpu={gpu_ms:.1f}ms overhead={wall_ms - gpu_ms:.1f}ms",
+                flush=True,
+            )
+        finally:
+            _PROFILING_STEP[0] = False
+        return out
+
+    return wrapper
+
+
+#: Set by b12x_profile_decode_once around the profiled step so the per-layer
+#: timing below only prints for that one step.
+_PROFILING_STEP = [False]
+
+
+def b12x_profile_layer(fn):
+    """Per-layer CUDA-event timing, active only inside the profiled step."""
+
+    import os
+
+    if os.environ.get("VLLM_PROFILE_DECODE") != "1":
+        return fn
+
+    def wrapper(self, *args, **kwargs):
+        import torch
+
+        if not _PROFILING_STEP[0]:
+            return fn(self, *args, **kwargs)
+        if torch.cuda.is_current_stream_capturing():
+            return fn(self, *args, **kwargs)
         e0 = torch.cuda.Event(enable_timing=True)
         e1 = torch.cuda.Event(enable_timing=True)
         e0.record()
         out = fn(self, *args, **kwargs)
         e1.record()
         torch.cuda.synchronize()
-        t1 = time.perf_counter()
-        wall_ms = 1000.0 * (t1 - t0)
-        gpu_ms = e0.elapsed_time(e1)
-        print(
-            f"b12x decode step: wall={wall_ms:.1f}ms gpu={gpu_ms:.1f}ms "
-            f"overhead={wall_ms - gpu_ms:.1f}ms",
-            flush=True,
-        )
+        print(f"b12x layer: {e0.elapsed_time(e1):.2f}ms", flush=True)
         return out
 
     return wrapper

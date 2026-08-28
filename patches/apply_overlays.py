@@ -121,6 +121,46 @@ def copy_dsv4_warmup_ext(vllm: Path) -> None:
     print(f"ok copied {dest.relative_to(vllm.parent)}")
 
 
+def patch_layer_profiler(vllm: Path) -> None:
+    """Per-layer CUDA-event timing inside the profiled DSpark decode step.
+
+    Complements patch_decode_profiler: DeepseekV4DecoderLayer.forward is
+    decorated with b12x_profile_layer (prints per-layer ms only while the
+    step-level _PROFILING_STEP gate is set by the step decorator).
+    """
+    path = vllm / "models/deepseek_v4/nvidia/model.py"
+    replace_once(
+        path,
+        "    def forward(\n"
+        "        self,\n"
+        "        x: torch.Tensor,\n"
+        "        positions: torch.Tensor,\n"
+        "        input_ids: torch.Tensor | None,\n"
+        "        post_mix: torch.Tensor | None = None,\n"
+        "        res_mix: torch.Tensor | None = None,\n"
+        "        residual: torch.Tensor | None = None,\n"
+        "    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:\n",
+        "    @b12x_profile_layer\n"
+        "    def forward(\n"
+        "        self,\n"
+        "        x: torch.Tensor,\n"
+        "        positions: torch.Tensor,\n"
+        "        input_ids: torch.Tensor | None,\n"
+        "        post_mix: torch.Tensor | None = None,\n"
+        "        res_mix: torch.Tensor | None = None,\n"
+        "        residual: torch.Tensor | None = None,\n"
+        "    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:\n",
+        "layer profiler decorator",
+    )
+    replace_once(
+        path,
+        "from vllm.config import VllmConfig\n",
+        "from vllm.config import VllmConfig\n"
+        "from vllm.utils.sm12x_b12x_kernels import b12x_profile_layer\n",
+        "layer profiler import",
+    )
+
+
 def patch_decode_profiler(vllm: Path) -> None:
     """One-shot torch.profiler on the first DSpark decode step.
 
@@ -3023,6 +3063,7 @@ def apply(vllm: Path) -> None:
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
     patch_decode_profiler(vllm)
+    patch_layer_profiler(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
@@ -4271,6 +4312,7 @@ def apply_main(vllm: Path) -> None:
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
     patch_decode_profiler(vllm)
+    patch_layer_profiler(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
     # v0.28.0: einsum fallback/recipe/upcast overlays removed (kernel verified
@@ -4474,6 +4516,7 @@ def main() -> int:
         return 0
     if args.only == "decode-profiler":
         patch_decode_profiler(vllm)
+        patch_layer_profiler(vllm)
         return 0
     if args.only == "dsv4-warmup-ext":
         copy_dsv4_warmup_ext(vllm)
