@@ -1501,7 +1501,7 @@ _SM12X_B12X_MQA_HELPER = textwrap.dedent(
         if cached is not None:
             return cached
         try:
-            from b12x.attention.nsa_indexer._impl import (
+            from b12x.attention.dsa_indexer._impl import (
                 IndexerContiguousMetadata,
                 contiguous_logits,
                 supports_contiguous_logits_kernel,
@@ -3146,7 +3146,7 @@ _INDEXER_B12X_SCHEDULE_SM120_ALWAYS = (
     "                and current_platform.is_device_capability_family(120)\n"
     "            ):\n"
     "                try:\n"
-    "                    from b12x.attention.nsa_indexer import plan_paged_schedule\n"
+    "                    from b12x.attention.dsa_indexer import plan_paged_schedule\n"
     "\n"
     "                    seq = seq_lens\n"
     "                    if seq.dtype != torch.int32:\n"
@@ -3181,7 +3181,7 @@ _INDEXER_B12X_SCHEDULE_SM120_Q1 = (
     "                )\n"
     "                if q_rows == 1:\n"
     "                    try:\n"
-    "                        from b12x.attention.nsa_indexer import plan_paged_schedule\n"
+    "                        from b12x.attention.dsa_indexer import plan_paged_schedule\n"
     "\n"
     "                        seq = seq_lens\n"
     "                        if seq.dtype != torch.int32:\n"
