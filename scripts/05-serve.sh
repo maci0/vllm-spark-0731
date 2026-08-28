@@ -116,6 +116,13 @@ if [[ "${ENABLE_PREFIX_CACHING:-0}" == "1" ]]; then
   PREFIX_ARGS+=(--enable-prefix-caching)
 fi
 
+PROFILE_ARGS=()
+if [[ -n "${PROFILE_CONFIG:-}" ]]; then
+  # e.g. PROFILE_CONFIG='{"profiler":"torch","torch_profiler_dir":"/tmp/profile"}'
+  # exposes POST /start_profile + /stop_profile (v0.28.0 on-demand profiler).
+  PROFILE_ARGS+=(--profiler-config "${PROFILE_CONFIG}")
+fi
+
 HOST_KV_OFFLOAD_DIR="${HOST_KV_OFFLOAD_DIR:-${HOME}/lmcache-0731}"
 KV_TRANSFER_ARGS=()
 KV_OFFLOAD_DOCKER_ARGS=()
@@ -262,6 +269,7 @@ docker run -d -i --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host
     "${LOAD_ARGS[@]}" \
     "${PP_ARGS[@]}" \
     "${PREFIX_ARGS[@]}" \
+    "${PROFILE_ARGS[@]}" \
     "${KV_TRANSFER_ARGS[@]}" \
     "${HEADLESS_ARGS[@]}" \
     --block-size "${BLOCK_SIZE}" \
