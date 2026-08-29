@@ -182,7 +182,7 @@ def patch_kv_cache_dbg(vllm: Path) -> None:
         "                \"ratio=%s statebytes=%s dtype=%s heads=%s block=%s \\n\"\n"
         "                \"align=%s dtype_str=%s mv=%s slots=%s\"\n"
         "                % (\n"
-        "                    g.name,\n"
+        "                    getattr(g, \"name\", \"?\"),\n"
         "                    len(g.layer_names),\n"
         "                    type(spec).__name__,\n"
         "                    spec.page_size_bytes,\n"
