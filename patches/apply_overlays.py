@@ -161,6 +161,52 @@ def patch_layer_profiler(vllm: Path) -> None:
     )
 
 
+def patch_kv_cache_dbg(vllm: Path) -> None:
+    """Dump the per-layer KV cache spec at allocation (NVFP4-port diagnostics).
+
+    Prints, for every kv-cache group at ``_get_kv_cache_config_packed``:
+    block_stride (total bytes per block = bytes-per-token x block_size) and
+    the per-layer page/storage-block/compress-ratio/state-content values, so
+    the actual allocation path (upstream packed-MLA vs b12x bypass) is
+    visible in the boot log. No-op otherwise (prints only).
+    """
+    path = vllm / "v1/core/kv_cache_utils.py"
+    replace_once(
+        path,
+        "def _get_kv_cache_config_packed(\n",
+        "def _kv_cache_dbg_dump(kv_cache_groups):\n"
+        "    for g in kv_cache_groups:\n"
+        "        spec = g.kv_cache_spec\n"
+        "        try:\n"
+        "            print(\n"
+        "                f\"KVDBG group={g.name} layers={len(g.layer_names)} \\n\"\n"
+        "                f\"  spec={type(spec).__name__} page={spec.page_size_bytes} \\n\"\n"
+        "                f\"  real={spec.real_page_size_bytes} sblock={spec.storage_block_size} \\n\"\n"
+        "                f\"  ratio={getattr(spec, 'compress_ratio', None)} \\n\"\n"
+        "                f\"  statebytes={getattr(spec, 'state_content_bytes', None)} \\n\"\n"
+        "                f\"  dtype={getattr(spec, 'dtype', None)} heads={spec.num_heads} \\n\"\n"
+        "                f\"  block={spec.block_size} align={getattr(spec, 'alignment', None)} \\n\"\n"
+        "                f\"  dtype_str={getattr(spec, 'cache_dtype_str', None)} \\n\"\n"
+        "                f\"  mv={getattr(spec, 'model_version', None)} nheads_slots={spec.num_head_slots}\"\n"
+        "                , flush=True,\n"
+        "            )\n"
+        "        except Exception as e:\n"
+        "            print(f\"KVDBG group={g.name} ERR {e}\", flush=True)\n"
+        "\n"
+        "\n"
+        "def _get_kv_cache_config_packed(\n",
+        "kv cache dbg dump",
+    )
+    replace_once(
+        path,
+        "    block_stride, layers_by_offset = _get_packed_kv_cache_layout(kv_cache_groups)\n",
+        "    _kv_cache_dbg_dump(kv_cache_groups)\n"
+        "    print(f\"KVDBG block_stride={block_stride} bytes-per-block\", flush=True)\n"
+        "    block_stride, layers_by_offset = _get_packed_kv_cache_layout(kv_cache_groups)\n",
+        "kv cache dbg call",
+    )
+
+
 def patch_decode_profiler(vllm: Path) -> None:
     """One-shot torch.profiler on the first DSpark decode step.
 
@@ -4411,6 +4457,7 @@ def main() -> int:
             "ar-piecewise-ws",
             "dsv4-warmup-ext",
             "decode-profiler",
+            "kv-cache-dbg",
         ],
         default=None,
         help="Apply a single overlay (for patching an already-built image).",
@@ -4522,6 +4569,9 @@ def main() -> int:
         return 0
     if args.only == "ar-piecewise-ws":
         patch_tp_allreduce_piecewise_workspace(vllm)
+        return 0
+    if args.only == "kv-cache-dbg":
+        patch_kv_cache_dbg(vllm)
         return 0
     if args.only == "decode-profiler":
         patch_decode_profiler(vllm)
