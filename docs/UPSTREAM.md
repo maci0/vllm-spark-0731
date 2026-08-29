@@ -1,8 +1,24 @@
 # Upstream tracker
 
-Last verified: **2026-08-28**. Recipe repo (public, reproducible):
+Last verified: **2026-08-29**. Recipe repo (public, reproducible):
 **https://github.com/maci0/vllm-spark-0731** — all overlays, backport diffs,
 knowledge docs, and measured numbers referenced below live there.
+
+**v0.28.1rc0 checked 2026-08-29 (tag 2026-08-27, commit `79651d60`): none
+of our PRs merged** (all 12 still OPEN: #53680 #53522 #53425 #53271 #46716
+#52941 #53574 #47988 #53055 #41834 #52499 #52708; DeepGEMM #419 #337 #403
+OPEN). Relevant new commits in the range (other people's work): #53649
+(Blackwell triton batch-invariance, 33.6% E2E), #52823 (DSV4 adaptive topk
+width), #53040 (DSV4 shared experts -> MegaMoE), #52809 (DSpark inheritance
+scoped to DSV4), #52795/#52783 (DSV4 adaptive verification), #53326 (b12x
+modules before Dynamo tracing). None replaces an overlay; **stay on
+v0.28.0** (rebasing adds conflict risk in the DSV4/MoE/indexer files we
+patch). PR triage 2026-08-29: #53574 lucifer1004 implemented the SM120
+full-width-decode fix + `/ci run`; failing step is an H200 infra flake
+(MOSS-Audio timeout), awaiting maintainer retry — no action needed.
+#47988 kitch2400 independently confirmed required on GB10 (still red
+mergify conflict — author @waynehacking8 must rebase). #53055 author
+force-pushed `e1d67cc` (DCO cleared, tests pass), awaiting review label.
 
 Live runtime (2026-08-28): **v0.28.0 release** (`2cf0a6915ce5`, "DeepSeek V4:
 sparse MLA works end-to-end for plain decode, MTP, and DSpark speculative
@@ -370,6 +386,10 @@ Different stack (`B12X_MLA_SPARSE`, their nightly + rebuilt nv_dev DeepGEMM). No
 | 2026-08-28 | vllm #46716 | **rebased** onto current main (clean, +9/-1), bug still present upstream | https://github.com/vllm-project/vllm/pull/46716#issuecomment-5451316380 |
 | 2026-08-28 | all 6 PRs | **recipe repo linked** (maci0/vllm-spark-0731) as reproducible source | see each PR |
 | 2026-08-28 | vllm #52941 | DSv4 mHC warmup no-op: 2x GB10 evidence (c16 44.5→183, c32 306.8 agg) + AMD/XPU keep-path note; no duplicate opened | https://github.com/vllm-project/vllm/pull/52941#issuecomment-5453460872 |
+| 2026-08-28 | vllm #53574 | lucifer1004 implemented the SM120 eidx fix (`full_width_decode` on SM120); we confirmed the C4A-branch finding earlier | https://github.com/vllm-project/vllm/pull/53574#issuecomment-… |
+| 2026-08-28 | vllm #47988 | kitch2400 independent GB10 confirmation (required, still red mergify — author rebase needed) | https://github.com/vllm-project/vllm/pull/47988#issuecomment-… |
+| 2026-08-28 | vllm #53055 | author force-pushed `e1d67cc` (DCO cleared, tests pass), awaiting review | https://github.com/vllm-project/vllm/pull/53055#issuecomment-… |
+| 2026-08-29 | v0.28.1rc0 | verified: none of our PRs merged; relevant new commits listed in the header | https://github.com/vllm-project/vllm/releases/tag/v0.28.1rc0 |
 
 ## Patch necessity verdict (2026-08-28 audit, `patches/apply_overlays.py`)
 
