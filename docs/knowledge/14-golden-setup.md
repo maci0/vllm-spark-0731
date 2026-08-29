@@ -188,3 +188,60 @@ Asked "how can we get NVFP4 into the v0.28.0 image", tested end-to-end:
   stack stays on `B12X_MLA_SPARSE` + `nvfp4_ds_mla` (the fp8 alias). Real NVFP4
   capacity only matters for 1M-context serving; our 64k `max_model_len` holds
   1.5× concurrency at the current 99k-token pool.
+
+## 9. Port plan: FP4-packed MLA cache into v0.28.0 (scoped 2026-08-29)
+
+Goal: close the 28× KV-density gap (our 214 KB/token vs the golden's 7,650
+B/token). Investigation findings + the plan:
+
+**Confirmed:**
+- The golden's density formula (its `MLAAttentionSpec.real_page_size_bytes`,
+  `vllm/v1/kv_cache_interface.py`): for DSV4 with fp8/nvfp4_ds_mla the page =
+  `storage_block_size × 584`, where `storage_block_size = block_size //
+  compress_ratio`. The compress-ratio-aware storage blocks (C4: 146 B/token,
+  C128: 4.6 B/token, SWA separate) are what make the golden ~28× denser.
+- v0.28.0 has the SAME `MLAAttentionSpec` machinery
+  (`storage_block_size = block_size // compress_ratio`,
+  `state_content_bytes=584` for fp8_ds_mla, `vllm/v1/kv_cache_interface.py`)
+  — the compressed layout machinery EXISTS upstream.
+- **BUT our measured cache is 214 KB/token, ~28× above the formula** — the
+  running DSV4 (b12x AND flashinfer backends both measured ~100-115k tokens)
+  does not allocate via the upstream packed-MLA layout path (a debug print
+  injected in `_get_kv_cache_config_packed` never fired; the exec-patch
+  raced the engine import, so this needs the debug baked into the image
+  build to confirm precisely which allocation path runs).
+- The FP4 writer op (`fused_deepseek_v4_qnorm_rope_kv_rope_quant_insert`) is
+  compiled + registered in our image and RUNS on SM12x (verified when the
+  SM12x fp8-diversion was bypassed); its v0.28.0 layout is the 584/576
+  padded uint8, not the dense FP4.
+
+**Remaining unknowns (bake debug into the image build, then one boot):**
+1. Which cache-allocation path the live DSV4 actually uses (dump the per-layer
+   `page_size_bytes`/`storage_block_size` at allocation).
+2. Whether v0.28.0's MLA cache layer honors `compress_ratio` for the b12x
+   backend or whether b12x bypasses the upstream layout entirely.
+
+**Plan (in order):**
+1. Bake the KV-spec debug dump into the overlay build (`--only` patch on
+   `kv_cache_utils`), boot, capture the per-layer page sizes — pins down
+   whether the compressed layout is reachable with a config/spec change.
+2. If the b12x cache bypasses the upstream layout: switch the DSV4 cache to
+   the upstream MLA cache path (the spec already carries compress_ratio +
+   state_content_bytes; likely needs the FLASHINFER_MLA_SPARSE_DSV4 backend
+   + the upstream cache layer to be the allocation path), measure capacity.
+3. Port the golden's dense-FP4 writer behavior (the op's FP4 packing; the
+   v0.28.0 csrc op source is available at
+   `csrc/libtorch_stable/torch_bindings.cpp` + `ops.h`) and the reader
+   (flashinfer/b12x decode dequant for the dense layout) — the C++/kernel
+   work. The golden's op is compiled (torch 2.11 ABI, not liftable); the
+   layout intent is documented in its `attention.py` comment
+   ("padded 584-byte DSpark NVFP4 envelope") and the
+   `MLAAttentionSpec.real_page_size_bytes` formula above.
+4. Validate: KV capacity jump (target ~2M tokens), France coherence,
+   throughput (c1/c32) — keep `B12X_MLA_SPARSE` unless the upstream layout
+   path is required for the density.
+
+**Blockers/risks:** the golden's dense layout reader is the binding unknown
+(kernel-level); the writer op's FP4 mode in v0.28.0 is unverified on SM12x;
+boot/import races make exec-patching unreliable — all experiment patches must
+be baked into the overlay image.
