@@ -161,6 +161,62 @@ def patch_layer_profiler(vllm: Path) -> None:
     )
 
 
+def patch_router_gemm_cublas_sm12x(vllm: Path) -> None:
+    """Enable the cuBLAS out_dtype router GEMM on family-120 (GB10).
+
+    Backport of vllm-project/vllm#54048 (merged 2026-08-30, fixes #49921):
+    on SM120/SM121 the bf16->fp32 router GEMM fell back to a standalone copy
+    kernel that bf16-rounds the router logits before grouped_topk. The fused
+    torch.mm out_dtype epilogue is plain cuBLAS (arch-agnostic) but was gated
+    on allow_specialized_router_gemm (Hopper+SM100). Opens it to any CUDA/ROCm
+    device with no-bias bf16xbf16->fp32.
+    """
+    path = vllm / "model_executor/layers/fused_moe/router/gate_linear.py"
+    replace_once(
+        path,
+        "        # cuBLAS on CUDA (SM90+, via allow_specialized_router_gemm); hipBLASLt on\n"
+        "        # ROCm, which supports the same out_dtype epilogue.\n"
+        "        self._router_gemm_no_bias = not bias\n"
+        "        self.allow_cublas_router_gemm = (\n"
+        "            (\n"
+        "                self.allow_specialized_router_gemm\n"
+        "                or (current_platform.is_rocm() and self._router_gemm_no_bias)\n"
+        "            )\n"
+        "            and self.weight.dtype == torch.bfloat16\n"
+        "            and self.out_dtype == torch.float32\n"
+        "        )\n",
+        "        # cuBLAS on CUDA (incl. family-120/GB10) / hipBLASLt on ROCm:\n"
+        "        # the plain out_dtype epilogue (no bias term). #54048/#49921.\n"
+        "        self._router_gemm_no_bias = not bias\n"
+        "        self._router_gemm_cublas_capable = (\n"
+        "            current_platform.is_cuda() or current_platform.is_rocm()\n"
+        "        ) and self._router_gemm_no_bias\n"
+        "        self.allow_cublas_router_gemm = (\n"
+        "            self._router_gemm_cublas_capable\n"
+        "            and self.weight.dtype == torch.bfloat16\n"
+        "            and self.out_dtype == torch.float32\n"
+        "        )\n",
+        "router cublas gemm sm12x (block 1)",
+    )
+    replace_once(
+        path,
+        "        if (\n"
+        "            not self.allow_cublas_router_gemm\n"
+        "            and (\n"
+        "                self.allow_specialized_router_gemm\n"
+        "                or (current_platform.is_rocm() and self._router_gemm_no_bias)\n"
+        "            )\n"
+        "            and out_dtype == torch.float32\n"
+        "        ):\n",
+        "        if (\n"
+        "            not self.allow_cublas_router_gemm\n"
+        "            and self._router_gemm_cublas_capable\n"
+        "            and out_dtype == torch.float32\n"
+        "        ):\n",
+        "router cublas gemm sm12x (block 2)",
+    )
+
+
 def patch_kv_cache_dbg(vllm: Path) -> None:
     """Dump the per-layer KV cache spec at allocation (NVFP4-port diagnostics).
 
@@ -3127,6 +3183,7 @@ def apply(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
+    patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
@@ -4376,6 +4433,7 @@ def apply_main(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
+    patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
     patch_cutlass_sm12x_guard(vllm)
@@ -4468,6 +4526,7 @@ def main() -> int:
             "dsv4-warmup-ext",
             "decode-profiler",
             "kv-cache-dbg",
+            "router-gemm-cublas",
         ],
         default=None,
         help="Apply a single overlay (for patching an already-built image).",
@@ -4579,6 +4638,9 @@ def main() -> int:
         return 0
     if args.only == "ar-piecewise-ws":
         patch_tp_allreduce_piecewise_workspace(vllm)
+        return 0
+    if args.only == "router-gemm-cublas":
+        patch_router_gemm_cublas_sm12x(vllm)
         return 0
     if args.only == "kv-cache-dbg":
         patch_kv_cache_dbg(vllm)
