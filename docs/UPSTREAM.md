@@ -1,6 +1,6 @@
 # Upstream tracker
 
-Last verified: **2026-08-29**. Recipe repo (public, reproducible):
+Last verified: **2026-08-30**. Recipe repo (public, reproducible):
 **https://github.com/maci0/vllm-spark-0731** — all overlays, backport diffs,
 knowledge docs, and measured numbers referenced below live there.
 
@@ -13,7 +13,13 @@ width), #53040 (DSV4 shared experts -> MegaMoE), #52809 (DSpark inheritance
 scoped to DSV4), #52795/#52783 (DSV4 adaptive verification), #53326 (b12x
 modules before Dynamo tracing). None replaces an overlay; **stay on
 v0.28.0** (rebasing adds conflict risk in the DSV4/MoE/indexer files we
-patch). PR triage 2026-08-29: #53574 lucifer1004 implemented the SM120
+patch). **08-30 check**: all 12 PRs still OPEN (no merges); #47988 author rebased -> MERGEABLE;
+#53055 active review (liulanze, author fixed the import); #403 maintainers shepherding
+(bvolpato->zheanxu). New main merges since 08-28: **#54048** (cuBLAS out_dtype router
+GEMM on family-120, fixes GB10 bf16-rounded router logits, merged 08-30) — **backported
+as `patch_router_gemm_cublas_sm12x` (--only router-gemm-cublas, also in apply_main)**,
+commit a771e1a; #54277 (FlashInfer MLA for DSpark drafting, DCP-only — N/A).
+PR triage 2026-08-29: #53574 lucifer1004 implemented the SM120
 full-width-decode fix + `/ci run`; failing step is an H200 infra flake
 (MOSS-Audio timeout), awaiting maintainer retry — no action needed.
 #47988 kitch2400 independently confirmed required on GB10 (still red
