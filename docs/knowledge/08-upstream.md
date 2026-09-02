@@ -41,11 +41,11 @@ quick-reference, current gap status, and the local triage decisions.
 | KVBlockZeroer non-uniform pages (#49704) | **merged** 2026-07-24 | `patch_kv_zeroer_skip` (ratio=1); do not re-PR |
 | FlashInfer DSV4 TOPK=192 (DSpark k=5) | **merged** in flashinfer-ai | git-main FlashInfer; overlay `patch_flashinfer_dsv4_dispatch` for 0.6.16.post3 |
 | mHC broadcast + CUTLASS FP8 SM12x | **OPEN** [#53055](https://github.com/vllm-project/vllm/pull/53055) (older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase) | `pr-53055.diff`; overlays `patch_mhc` / `patch_cutlass_sm12x_guard` (applied in `--stack main`, not standalone `--only`) |
-| einsum SM12x recipe (SM90 vs SM100 packed INT32) | **OPEN** [#53521](https://github.com/vllm-project/vllm/pull/53521) | `pr-53521.diff` + `einsum-sm12x` |
+| einsum SM12x recipe (SM90 vs SM100 packed INT32) | **CLOSED** 2026-08-27 [#53521](https://github.com/vllm-project/vllm/pull/53521) (not needed; stock path correct) | drop when rebuilding; kept historically as `pr-53521.diff` |
 | DSV4 kernel block 64 on SM12x | **OPEN** [#53425](https://github.com/vllm-project/vllm/pull/53425) | `pr-53425.diff` + `dsv4-block64` |
 | Indexer paged MQA DeepGEMM gate | **OPEN** [#53522](https://github.com/vllm-project/vllm/pull/53522) (ours) | `pr-53522.diff` + `indexer-mqa` |
 | DSV4 spec-decode query shapes | **OPEN** [#52499](https://github.com/vllm-project/vllm/pull/52499) | `pr-52499.diff`; comment-only (not needed after TOPK=192) |
-| FlashInfer C128A eidx contiguity (boot crash) | **OPEN** [#53574](https://github.com/vllm-project/vllm/pull/53574) | `pr-53574.diff` + `flashinfer-eidx-contig` |
+| FlashInfer C128A eidx contiguity (boot crash) | **merged** 2026-08-31 [#53574](https://github.com/vllm-project/vllm/pull/53574) (`699e180`) | keep `pr-53574.diff` + `flashinfer-eidx-contig` until image rebases past merge |
 | Triton E8M0 upcast (`KeyError: float8_e8m0fnu`) | **OPEN** [#47988](https://github.com/vllm-project/vllm/pull/47988) | `pr-47988.diff` + `triton-e8m0-sm12x` |
 | DeepGEMM SM120/SM121 SF layout | **merged** in nv_dev (DeepGEMM #403) | `deepgemm-pr-403.diff` (idempotent, `docker/Dockerfile.main`) |
 | DeepGEMM pure-FP8 1d1d port | analysis-only | `deepgemm-fp8-1d1d-port.diff`; superseded by the pin-back — see [09](09-golden-deepgemm.md) |

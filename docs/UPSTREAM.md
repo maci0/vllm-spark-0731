@@ -1,30 +1,29 @@
 # Upstream tracker
 
-Last verified: **2026-08-30**. Recipe repo (public, reproducible):
+Last verified: **2026-09-02**. Recipe repo (public, reproducible):
 **https://github.com/maci0/vllm-spark-0731** — all overlays, backport diffs,
 knowledge docs, and measured numbers referenced below live there.
 
-**v0.28.1rc0 checked 2026-08-29 (tag 2026-08-27, commit `79651d60`): none
-of our PRs merged** (all 12 still OPEN: #53680 #53522 #53425 #53271 #46716
-#52941 #53574 #47988 #53055 #41834 #52499 #52708; DeepGEMM #419 #337 #403
-OPEN). Relevant new commits in the range (other people's work): #53649
-(Blackwell triton batch-invariance, 33.6% E2E), #52823 (DSV4 adaptive topk
-width), #53040 (DSV4 shared experts -> MegaMoE), #52809 (DSpark inheritance
-scoped to DSV4), #52795/#52783 (DSV4 adaptive verification), #53326 (b12x
-modules before Dynamo tracing). None replaces an overlay; **stay on
-v0.28.0** (rebasing adds conflict risk in the DSV4/MoE/indexer files we
-patch). **08-30 check**: all 12 PRs still OPEN (no merges); #47988 author rebased -> MERGEABLE;
-#53055 active review (liulanze, author fixed the import); #403 maintainers shepherding
-(bvolpato->zheanxu). New main merges since 08-28: **#54048** (cuBLAS out_dtype router
-GEMM on family-120, fixes GB10 bf16-rounded router logits, merged 08-30) — **backported
-as `patch_router_gemm_cublas_sm12x` (--only router-gemm-cublas, also in apply_main)**,
-commit a771e1a; #54277 (FlashInfer MLA for DSpark drafting, DCP-only — N/A).
-PR triage 2026-08-29: #53574 lucifer1004 implemented the SM120
-full-width-decode fix + `/ci run`; failing step is an H200 infra flake
-(MOSS-Audio timeout), awaiting maintainer retry — no action needed.
-#47988 kitch2400 independently confirmed required on GB10 (still red
-mergify conflict — author @waynehacking8 must rebase). #53055 author
-force-pushed `e1d67cc` (DCO cleared, tests pass), awaiting review label.
+**2026-09-02 check** (gh pr view on all tracked PRs + linked merges):
+**#53574 MERGED** 2026-08-31 (`699e180df48d`) — SM120 DSv4 contiguous C128A
+decode topk indices ([link](https://github.com/vllm-project/vllm/pull/53574));
+links #52823 (already merged). Keep local `flashinfer-eidx-contig` /
+`pr-53574.diff` until the live image rebases past that commit.
+**11 of 12 tracked vLLM PRs still OPEN**: #53680 #53522 #53425 #53271 #46716
+#52941 #47988 #53055 #41834 #52499 #52708. DeepGEMM #419 #337 #403 still OPEN
+(#337 CONFLICTING; #419/#403 MERGEABLE).
+Mergeability notes: #53680 MERGEABLE (updated 09-02); #53425 CONFLICTING;
+#41834 CONFLICTING; #47988 MERGEABLE; #53055 MERGEABLE (updated 09-01);
+#46716/#52708 MERGEABLE. Prior #54048 backport (`patch_router_gemm_cublas_sm12x`,
+a771e1a) and #54277 (DCP-only, N/A) unchanged.
+Relevant main merges since 08-30: **#54815** (RoPE construction for deepseek-v4
+sparse SWA, merged 09-02) — review for overlay impact; #54869 (FlashInfer PCIe
+IPC lazy import); #54794 (FlashInfer autotune reuse).
+**Stay on v0.28.0** (`2cf0a6915ce5`); rebasing onto post-#53574 main still
+risks conflicts in the DSV4/MoE/indexer files we patch.
+Prior context (2026-08-29/30): v0.28.1rc0 (`79651d60`) had none of our PRs;
+#53649/#52823/#53040/#52809/#52795/#52783/#53326 were already in range; #47988
+GB10 confirmation and #53055 review activity still apply.
 
 Live runtime (2026-08-28): **v0.28.0 release** (`2cf0a6915ce5`, "DeepSeek V4:
 sparse MLA works end-to-end for plain decode, MTP, and DSpark speculative
@@ -61,7 +60,7 @@ For the full backport patch registry, including active upstream PR backports (`p
 |------|-----|------|
 | vLLM **v0.28.0 release** (live image `main-b12x-028-rdma`) | `2cf0a6915ce5` | 2026-08-27 (rebase) |
 | vLLM v0.28.0rc2 (historical overlay fallback) | `74a6576b9b58` | 2026-08-21 06:47 UTC |
-| vLLM main (PR check) | default branch | 2026-08-28: #53425 #53522 #53680 #53055 #52499 #41834 #52708 #53574 #47988 still OPEN; #53521 #53898 CLOSED 2026-08-27 (einsum misread resolved as misdiagnosis — kernel correct, see table); **#46716 rebased 2026-08-28** |
+| vLLM main (PR check) | default branch | 2026-09-02: #53574 **MERGED** 2026-08-31 (`699e180`); still OPEN: #53425 #53522 #53680 #53055 #52499 #41834 #52708 #47988 #53271 #46716 #52941; #53521 #53898 CLOSED 2026-08-27; **#46716 rebased 2026-08-28** |
 | DeepGEMM in v0.27.1 / overlay `.so` | `e21c821f39a2` (DeepGEMM **main**, ~SM90/SM100) | 2026-08-04 |
 | DeepGEMM in v0.28.0rc2, vLLM main cmake, and matched-main | `8b1392b978f5` (**nv_dev** HEAD) | 2026-08-11 |
 | DeepGEMM in eugr Dockerfile | `a6b593d28267` (nv_dev, frozen) | 2026-06-29 |
@@ -169,7 +168,7 @@ Same bug in the release **and** on main today. Comment or small PR. Do not dupli
 | DSV4 kernel block `[256]` on SM12x | `[256]` on sparse MLA, FlashInfer DSV4, V4 indexer | **still `[256]`** | [#53425](https://github.com/vllm-project/vllm/pull/53425) OPEN — fixed 2026-08-26 (ed71de5): `indexer → vllm.models.deepseek_v4.sparse_mla` module-level import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import inside `get_supported_kernel_block_sizes()`. Backport: `pr-53425.diff`; Overlay: `patch_dsv4_sm12x_block_size`. |
 | Indexer paged MQA metadata uses `has_deep_gemm()` not `is_deep_gemm_supported()` | yes | still that pattern | [#53522](https://github.com/vllm-project/vllm/pull/53522) OPEN (`is_deep_gemm_supported()` + `num_states in (32, 64)`). **ivanusto reviewed 2026-08-24: test passed, gate scoped correctly**. Backport: `pr-53522.diff`; Overlay: `patch_indexer_deepgemm_guard`. |
 | DSpark SM120 spec-decode query rank / `num_tokens > 64` | #51538 in release (backend + top-k). Flat 3-D spec query may remain. | [#52499](https://github.com/vllm-project/vllm/pull/52499) open | Comment only. Not needed after TOPK=192. |
-| FlashInfer eidx contiguity (C128A builder) | `_build_c128a_metadata` view of a width-sliced `global_decode_buffer`; DSpark batches >64 tokens crash at boot | **still unpatched** 2026-08-24; [#53574](https://github.com/vllm-project/vllm/pull/53574) OPEN | Backport: `pr-53574.diff`; Overlay: `flashinfer-eidx-contig`. C4A branch verified contiguous — no C4A bug. |
+| FlashInfer eidx contiguity (C128A builder) | `_build_c128a_metadata` view of a width-sliced `global_decode_buffer`; DSpark batches >64 tokens crash at boot | **MERGED** 2026-08-31 [#53574](https://github.com/vllm-project/vllm/pull/53574) (`699e180`) | Keep backport `pr-53574.diff` + overlay `flashinfer-eidx-contig` until the live image rebases past the merge. C4A branch verified contiguous — no C4A bug. |
 | Triton E8M0 upcast gated on rocm/xpu | `KeyError: 'float8_e8m0fnu'` on SM12x | **still gated** 2026-08-24; [#47988](https://github.com/vllm-project/vllm/pull/47988) OPEN | Backport: `pr-47988.diff`; Overlay: `triton-e8m0-sm12x`. |
 | SM12x DSv4 umbrella | partial (backend exists) | [#41834](https://github.com/vllm-project/vllm/pull/41834) needs-rebase | Comment only. Pointed at the focused PRs. |
 | **DSv4 mHC TileLang warmup no-ops on the NVIDIA layer** | `deepseek_v4_mhc_warmup` gates on `layer.hc_pre`/`hc_post` which the nvidia layer lacks (it calls `mhc_pre_tilelang` / `mhc_fused_post_pre_tilelang` directly; AMD/XPU layers do have the CustomOps) | **still broken on main** | [#52941](https://github.com/vllm-project/vllm/pull/52941) OPEN (same fix + tests; older attempts #51802, #49707). **Evidence commented 2026-08-28** (c16 44.5 → 183.0, c32 306.8 agg; AMD/XPU keep-path note). Local equivalent: `patches/files/dsv4_warmup_ext.py`. Do not open a duplicate. |

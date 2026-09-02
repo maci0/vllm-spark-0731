@@ -19,7 +19,8 @@ case "${STACK}" in
   golden) PIN="${ROOT}/configs/pin.golden.env" ;;
   main) PIN="${ROOT}/configs/pin.main.env" ;;
   main-dg) PIN="${ROOT}/configs/pin.main-dg.env" ;;
-  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main|main-dg]" >&2; exit 2 ;;
+  main-dg-1m) PIN="${ROOT}/configs/pin.main-dg-1m.env" ;;
+  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main|main-dg|main-dg-1m]" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC1090

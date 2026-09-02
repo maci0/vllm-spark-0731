@@ -7,13 +7,14 @@ Deploy `deepseek-ai/DeepSeek-V4-Flash-0731` across 2x DGX Spark nodes.
 **Audit Artifact:** [outputs/vllm-spark-0731-docs-audit.md](outputs/vllm-spark-0731-docs-audit.md) — Comprehensive architecture & codebase audit ([Plan](outputs/.plans/vllm-spark-0731-docs.md)).  
 **Knowledge Base:** [docs/knowledge/00-index.md](docs/knowledge/00-index.md) — Definitive 10-chapter reference guide. **Reference stack (current):** our v0.28.0 image is the throughput reference — see [docs/knowledge/14-golden-setup.md](docs/knowledge/14-golden-setup.md); legacy anemll reference + field detail in [docs/field-notes/dgx-spark/GOLDEN.md](docs/field-notes/dgx-spark/GOLDEN.md).
 
-**Live (2026-08-26, re-served):** `vllm-spark-0731:main-b12x` (matched vLLM
-`v0.1.dev1+ge25c586b9.d20260823`, CUDA 13.3.1, torch 2.14 `12.1a`). b12x
-linear + MoE + `B12X_MLA_SPARSE` (target and DSpark draft), `nvfp4_ds_mla`
-584 B DSV4 envelope, DSpark k=5, `FULL_AND_PIECEWISE`, DSpark backbone FULL
-(sample eager), util **0.8**, `MAX_NUM_SEQS=32` (was 8), capture 192,
-TP=2 over RoCE. Pin: `scripts/05-serve.sh main`.
-Build plan: [docs/PLAN-MAIN.md](docs/PLAN-MAIN.md).
+**Live (2026-08-31, capacity profile):** `vllm-spark-0731:main-b12x-028-rdma`
+on TP=2 / NNODES=2 over RoCE. Alias `deepseek-v4-flash`. Endpoint
+`http://192.168.0.211:8000/v1`. Pin: `scripts/05-serve.sh main-dg-1m`
+([`configs/pin.main-dg-1m.env`](configs/pin.main-dg-1m.env)):
+`max_model_len=1048576`, util **0.85**, `max_num_seqs=1`, **enforce_eager**,
+`nvfp4_ds_mla` + `B12X_MLA_SPARSE` + DSpark k=5. Measured KV: **16.98 GiB /
+3,894,378 tokens** (3.71x concurrency at 1M). Throughput pin remains
+`main-dg` (util 0.8, c32). Build plan: [docs/PLAN-MAIN.md](docs/PLAN-MAIN.md).
 
 **DeepGEMM fp8 scale story — FINAL RESOLUTION (2026-08-27):**
 After full boot-free + E2E investigation, the einsum "misread" was a chain
@@ -513,8 +514,9 @@ Containers `sparkrun_<id>_node_0` / `_node_1`.
 0.0 diff), `flashinfer-eidx-contig` (`.contiguous()` on extra_sparse_indices
 so FLASHINFER_MLA_SPARSE_DSV4 boots — root cause is the C128A builder
 publishing a width-sliced view of the persistent `global_decode_buffer`,
-upstream #53574, backported as `patches/upstream/pr-53574.diff`; the C4A
-branch was verified already contiguous, so there is no C4A bug). Helper
+upstream #53574 **MERGED** 2026-08-31 (`699e180`), keep backport
+`patches/upstream/pr-53574.diff` until the image rebases past that commit;
+the C4A branch was verified already contiguous, so there is no C4A bug). Helper
 `patches/files/sm12x_b12x_kernels.py` is copied to
 `vllm/utils/sm12x_b12x_kernels.py`. `_B12X_SCHEDULE_MAX_Q_ROWS = 1`.
 `MAX_NUM_SEQS=32` (was 8), `MAX_CUDAGRAPH_CAPTURE_SIZE=192` (was 64).
@@ -788,10 +790,11 @@ DSV4 kernel block 64 ([#53425](https://github.com/vllm-project/vllm/pull/53425) 
 import broke `vllm._aiter_ops` cold start (kitch2400 report); lazy import),
 indexer DeepGEMM gate ([#53522](https://github.com/vllm-project/vllm/pull/53522) —
 **ivanusto reviewed**: test passed, gate scoped correctly),
-C128A eidx contiguity ([#53574](https://github.com/vllm-project/vllm/pull/53574)),
-Triton E8M0 upcast ([#47988](https://github.com/vllm-project/vllm/pull/47988)).
-The last two are backported as `patches/upstream/pr-53574.diff` /
-`pr-47988.diff` (applied before overlays in the build); evidence comments
+C128A eidx contiguity ([#53574](https://github.com/vllm-project/vllm/pull/53574)
+**MERGED** 2026-08-31),
+Triton E8M0 upcast ([#47988](https://github.com/vllm-project/vllm/pull/47988) still OPEN).
+Keep backports `patches/upstream/pr-53574.diff` /
+`pr-47988.diff` until the image rebases past #53574; evidence comments
 posted, no duplicate PRs (the C4A eidx branch was verified already
 contiguous). Offload flat-layout root cause → issue
 [#53607](https://github.com/vllm-project/vllm/issues/53607).

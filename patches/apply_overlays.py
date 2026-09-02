@@ -239,25 +239,25 @@ def patch_kv_cache_dbg(vllm: Path) -> None:
         "                \"align=%s dtype_str=%s mv=%s slots=%s\"\n"
         "                % (\n"
         "                    getattr(g, \"name\", \"?\"),\n"
-        "                    len(g.layer_names),\n"
+        "                    len(getattr(g, \"layer_names\", [])),\n"
         "                    type(spec).__name__,\n"
-        "                    spec.page_size_bytes,\n"
-        "                    spec.real_page_size_bytes,\n"
-        "                    spec.storage_block_size,\n"
+        "                    getattr(spec, \"page_size_bytes\", None),\n"
+        "                    getattr(spec, \"real_page_size_bytes\", getattr(spec, \"page_size_bytes\", None)),\n"
+        "                    getattr(spec, \"storage_block_size\", None),\n"
         "                    getattr(spec, \"compress_ratio\", None),\n"
         "                    getattr(spec, \"state_content_bytes\", None),\n"
         "                    getattr(spec, \"dtype\", None),\n"
-        "                    spec.num_heads,\n"
-        "                    spec.block_size,\n"
+        "                    getattr(spec, \"num_heads\", None),\n"
+        "                    getattr(spec, \"block_size\", None),\n"
         "                    getattr(spec, \"alignment\", None),\n"
         "                    getattr(spec, \"cache_dtype_str\", None),\n"
         "                    getattr(spec, \"model_version\", None),\n"
-        "                    spec.num_head_slots,\n"
+        "                    getattr(spec, \"num_head_slots\", None),\n"
         "                ),\n"
         "                flush=True,\n"
         "            )\n"
         "        except Exception as e:\n"
-        "            print(\"KVDBG group=%s ERR %s\" % (g.name, e), flush=True)\n"
+        "            print(\"KVDBG group=%s ERR %s\" % (getattr(g, \"name\", \"?\"), e), flush=True)\n"
         "\n"
         "\n"
         "def _get_kv_cache_config_packed(\n",
@@ -266,9 +266,9 @@ def patch_kv_cache_dbg(vllm: Path) -> None:
     replace_once(
         path,
         "    block_stride, layers_by_offset = _get_packed_kv_cache_layout(kv_cache_groups)\n",
+        "    block_stride, layers_by_offset = _get_packed_kv_cache_layout(kv_cache_groups)\n"
         "    _kv_cache_dbg_dump(kv_cache_groups)\n"
-        "    print(\"KVDBG block_stride=%s bytes-per-block\" % block_stride, flush=True)\n"
-        "    block_stride, layers_by_offset = _get_packed_kv_cache_layout(kv_cache_groups)\n",
+        "    print(\"KVDBG block_stride=%s bytes-per-block\" % block_stride, flush=True)\n",
         "kv cache dbg call",
     )
 
@@ -3183,7 +3183,7 @@ def apply(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
-    patch_router_gemm_cublas_sm12x(vllm)
+    # patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
@@ -4433,7 +4433,7 @@ def apply_main(vllm: Path) -> None:
     patch_dsv4_sm12x_block_size(vllm)
     copy_dsv4_warmup_ext(vllm)
     patch_kernel_warmup_ext(vllm)
-    patch_router_gemm_cublas_sm12x(vllm)
+    # patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
     patch_cutlass_sm12x_guard(vllm)
@@ -4640,10 +4640,10 @@ def main() -> int:
         patch_tp_allreduce_piecewise_workspace(vllm)
         return 0
     if args.only == "router-gemm-cublas":
-        patch_router_gemm_cublas_sm12x(vllm)
+        # patch_router_gemm_cublas_sm12x(vllm)
         return 0
     if args.only == "kv-cache-dbg":
-        patch_kv_cache_dbg(vllm)
+        # patch_kv_cache_dbg(vllm)
         return 0
     if args.only == "decode-profiler":
         patch_decode_profiler(vllm)
