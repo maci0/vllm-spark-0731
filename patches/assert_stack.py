@@ -7,7 +7,8 @@ import argparse
 import os
 import sys
 
-DSPARK_K = 5
+DSPARK_MIN_K = 5
+DSPARK_K = DSPARK_MIN_K
 ALLOWED_KV = ("fp8_ds_mla", "nvfp4_ds_mla")
 ALLOWED_MOE = ("b12x", "flashinfer_b12x")
 B12X_ATTN = "B12X_MLA_SPARSE"
@@ -35,11 +36,12 @@ def check(
     if spec != "dspark":
         raise SystemExit(
             f"refusing spec_method={spec!r}: this recipe serves DSpark only "
-            "(method=dspark, k=5, locked to 0731 n_predict=5)"
+            "(method=dspark, k>=5, 0731 n_predict=5)"
         )
-    if k != DSPARK_K:
+    if k < DSPARK_MIN_K:
         raise SystemExit(
-            f"refusing num_speculative_tokens={k}: 0731 DSpark k is locked at {DSPARK_K}"
+            f"refusing num_speculative_tokens={k}: DSpark needs at least "
+            f"k={DSPARK_MIN_K} (the checkpoint's dspark_block_size)"
         )
 
     if kv not in ALLOWED_KV:

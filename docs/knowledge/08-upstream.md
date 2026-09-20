@@ -41,14 +41,14 @@ quick-reference, current gap status, and the local triage decisions.
 | KVBlockZeroer non-uniform pages (#49704) | **merged** 2026-07-24 | `patch_kv_zeroer_skip` (ratio=1); do not re-PR |
 | FlashInfer DSV4 TOPK=192 (DSpark k=5) | **merged** in flashinfer-ai | git-main FlashInfer; overlay `patch_flashinfer_dsv4_dispatch` for 0.6.16.post3 |
 | mHC broadcast + CUTLASS FP8 SM12x | **OPEN** [#53055](https://github.com/vllm-project/vllm/pull/53055) (older [#50645](https://github.com/vllm-project/vllm/pull/50645) needs-rebase) | `pr-53055.diff`; overlays `patch_mhc` / `patch_cutlass_sm12x_guard` (applied in `--stack main`, not standalone `--only`) |
-| einsum SM12x recipe (SM90 vs SM100 packed INT32) | **CLOSED** 2026-08-27 [#53521](https://github.com/vllm-project/vllm/pull/53521) (not needed; stock path correct) | drop when rebuilding; kept historically as `pr-53521.diff` |
+| einsum SM12x recipe (SM90 vs SM100 packed INT32) | **OPEN** [#53521](https://github.com/vllm-project/vllm/pull/53521) | `pr-53521.diff` + `einsum-sm12x` |
 | DSV4 kernel block 64 on SM12x | **OPEN** [#53425](https://github.com/vllm-project/vllm/pull/53425) | `pr-53425.diff` + `dsv4-block64` |
 | Indexer paged MQA DeepGEMM gate | **OPEN** [#53522](https://github.com/vllm-project/vllm/pull/53522) (ours) | `pr-53522.diff` + `indexer-mqa` |
 | DSV4 spec-decode query shapes | **OPEN** [#52499](https://github.com/vllm-project/vllm/pull/52499) | `pr-52499.diff`; comment-only (not needed after TOPK=192) |
-| FlashInfer C128A eidx contiguity (boot crash) | **merged** 2026-08-31 [#53574](https://github.com/vllm-project/vllm/pull/53574) (`699e180`) | keep `pr-53574.diff` + `flashinfer-eidx-contig` until image rebases past merge |
-| Triton E8M0 upcast (`KeyError: float8_e8m0fnu`) | **OPEN** [#47988](https://github.com/vllm-project/vllm/pull/47988) | `pr-47988.diff` + `triton-e8m0-sm12x` |
-| DeepGEMM SM120/SM121 SF layout | **merged** in nv_dev (DeepGEMM #403) | `deepgemm-pr-403.diff` (idempotent, `docker/Dockerfile.main`) |
-| DeepGEMM pure-FP8 1d1d port | analysis-only | `deepgemm-fp8-1d1d-port.diff`; superseded by the pin-back — see [09](09-golden-deepgemm.md) |
+| FlashInfer C128A eidx contiguity (boot crash) | **MERGED** [#53574](https://github.com/vllm-project/vllm/pull/53574) 2026-08-31 (`699e180df4`, in the pin) | none: builder returns the full-width contiguous view on family 120; `pr-53574.diff` and `flashinfer-eidx-contig` retired 2026-09-14 |
+| Triton E8M0 upcast (`KeyError: float8_e8m0fnu`) | **OPEN** [#47988](https://github.com/vllm-project/vllm/pull/47988); same upcast also merged in [#56214](https://github.com/vllm-project/vllm/pull/56214) (`e77daef89e`, after our pin) | `pr-47988.diff` + `triton-e8m0-sm12x` |
+| DeepGEMM SM120/SM121 SF layout | **merged** in nv_dev (DeepGEMM #403) | in the pinned `a6b593d`; no patch applied |
+| DeepGEMM pure-FP8 1d1d port | analysis-only | port file **deleted 2026-09-15**, inert on every `a6b593d` pin; superseded by the pin-back, see [09](09-golden-deepgemm.md) |
 | DeepGEMM pin `8b1392b` → `a6b593d` (SM12x fp8 regression) | **OPEN** vllm [#53680](https://github.com/vllm-project/vllm/pull/53680), DeepGEMM [#417](https://github.com/deepseek-ai/DeepGEMM/issues/417) | `docker/Dockerfile.main` `DEEPGEMM_COMMIT=a6b593d` (already applied locally) |
 
 `pr-41834` (SM12x umbrella) is not backported: diff exceeds the GitHub 20k-line
@@ -62,23 +62,29 @@ Every gap below either has an open PR (backported as `patches/upstream/pr-*.diff
 or was verified not-a-bug. Do not open duplicate PRs. Posted-comments log:
 [docs/UPSTREAM.md → Comments / PRs we posted](../UPSTREAM.md).
 
-1. **FlashInfer eidx contiguity** — covered by **#53574** (C128A builder fix).
-   - Root cause confirmed on our pair: `_build_c128a_metadata` publishes a
+1. **FlashInfer eidx contiguity**: fixed upstream by **#53574** (C128A builder fix,
+   merged 2026-08-31, in the pin).
+   - Root cause confirmed on our pair: `_build_c128a_metadata` published a
      width-narrowed slice of the persistent `global_decode_buffer`; DSpark
      verification batches (`num_decodes*(1+K) > 64` tokens) hit the paged
      orchestrator's `eidx.IsContiguous()` check and crash at boot.
    - The 0731 checkpoint alternates `compress_ratios` `4, 128, ...`, so both
-     branches run. The C4A branch is verified **contiguous**
-     (`empty_like` of the contiguous `topk_indices_buffer` row slice in
-     `dspark.py`) — no C4A bug; the consumer `.contiguous()` is a no-op there.
-   - Backport `pr-53574.diff`; overlay `flashinfer-eidx-contig` kept as
-     defense-in-depth. Evidence comment posted on #53574.
+     branches run. The C4A branch is **contiguous** (`empty_like` of the
+     contiguous `topk_indices_buffer` row slice in `cache_utils.py`) and the
+     merged fix makes the C128A builder return the full-width buffer slice on
+     family 120, so both consumer `.contiguous()` calls were no-ops.
+   - `pr-53574.diff` and the `flashinfer-eidx-contig` overlay were retired
+     2026-09-14. Evidence comment posted on #53574.
 
 2. **Triton block-scaled MM E8M0 upcast** — covered by **#47988**
    (unconditional E8M0→fp32 upcast in `w8a8_triton_block_scaled_mm`).
    - Confirmed `KeyError: 'float8_e8m0fnu'` on SM121a with
      `LINEAR_BACKEND=triton` (rocm/xpu-only gate was the cause).
-   - Backport `pr-47988.diff` (source hunks: `cutlass.py` + `fp8_utils.py`).
+   - Backport `pr-47988.diff` (source hunks: `cutlass.py` + `fp8_utils.py`),
+     refreshed 2026-09-14. The Triton hunk is kept though upstream main now has it
+     (`e77daef89e`, #56214, five commits after our pin); do not re-fetch the patch
+     from `gh pr diff` without re-adding it. The head's `_upcast_e8m0_to_fp32`
+     rewrite is not carried.
      Overlay `triton-e8m0-sm12x` now skips when #47988's form is present.
    - Evidence comment posted on #47988 (Triton boots but is slower than b12x
      on this pair — c32 144 vs 172 tok/s — correctness fix, not a speed win).

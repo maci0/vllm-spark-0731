@@ -155,16 +155,22 @@ def _get_b12x_plan(
     spec = planned.scratch_specs()[0]
     scratch = torch.empty(spec.shape, dtype=spec.dtype, device=device)
     _b12x_plans[key] = (planned, scratch)
-    logger.info_once(
-        "B12X_MLA_SPARSE compressed MLA scratch %s bytes "
-        "(heads=%d rows=%d width=%d page=%d chunks=%d)",
-        int(scratch.numel()),
-        int(num_q_heads),
-        int(max_q_rows),
-        int(max_width),
-        int(page_size),
-        int(max_chunks),
-    )
+    # Break 7: Dynamo cannot trace logging.Logger methods and raises "logging.Logger
+    # method not supported for non-export cases" rather than falling back. The plan is
+    # cached, so this fires at most once per key -- and that once is exactly the call
+    # Dynamo traces, because the key is a miss on the first (traced) invocation.
+    # Skip it while compiling; the uncaptured path still logs.
+    if not torch.compiler.is_compiling():
+        logger.info_once(
+            "B12X_MLA_SPARSE compressed MLA scratch %s bytes "
+            "(heads=%d rows=%d width=%d page=%d chunks=%d)",
+            int(scratch.numel()),
+            int(num_q_heads),
+            int(max_q_rows),
+            int(max_width),
+            int(page_size),
+            int(max_chunks),
+        )
     return planned, scratch
 
 

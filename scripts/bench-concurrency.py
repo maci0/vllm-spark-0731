@@ -30,15 +30,26 @@ FRANCE_PROMPT = "The capital of France is"
 
 
 def one_request(base: str, model: str, chat: bool, prompt: str,
-                max_tokens: int, temp: float):
+                max_tokens: int, temp: float, seed: int | None,
+                thinking: bool = False):
+    # A request seed is required for A/B work: without one every request draws a
+    # fresh seed, the draft chain samples different tokens each run, and measured
+    # acceptance varies by about 9% between runs of the same configuration.
+    extra = {} if seed is None else {"seed": seed}
     if chat:
+        # thinking must be set explicitly. vLLM 0.29's DeepSeek V4 tokenizer
+        # defaults thinking_mode to "thinking" with reasoning_effort="high" when
+        # the request says nothing, while 0.25.2 defaults to "chat". Leaving it
+        # unset makes a chat-mode engine and a thinking-mode engine look like an
+        # engine speed difference when they are running different tasks.
         body = {"model": model,
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens, "temperature": temp}
+                "max_tokens": max_tokens, "temperature": temp,
+                "chat_template_kwargs": {"thinking": thinking}, **extra}
         url = f"{base}/chat/completions"
     else:
         body = {"model": model, "prompt": prompt,
-                "max_tokens": max_tokens, "temperature": temp}
+                "max_tokens": max_tokens, "temperature": temp, **extra}
         url = f"{base}/completions"
     req = urllib.request.Request(
         url, data=json.dumps(body).encode(),
@@ -50,11 +61,13 @@ def one_request(base: str, model: str, chat: bool, prompt: str,
     return toks, time.time() - t0
 
 
-def sweep(base, model, chat, prompt, max_tokens, temp, c):
+def sweep(base, model, chat, prompt, max_tokens, temp, c, seed=None,
+          thinking=False):
     t0 = time.time()
     with ThreadPoolExecutor(max_workers=c) as ex:
         res = list(ex.map(
-            lambda _: one_request(base, model, chat, prompt, max_tokens, temp),
+            lambda i: one_request(base, model, chat, prompt, max_tokens, temp,
+                                  None if seed is None else seed + i, thinking),
             range(c)))
     wall = time.time() - t0
     toks = sum(x for x, _ in res)
@@ -77,6 +90,14 @@ def main():
                          "always 0.0")
     ap.add_argument("--levels", nargs="+", type=int, default=[1, 6, 16, 32])
     ap.add_argument("--no-warm", action="store_true")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="fix the request seed. Strongly recommended for A/B: "
+                         "without it the draft chain re-samples per run and "
+                         "measured acceptance moves about 9%% between runs")
+    ap.add_argument("--thinking", action="store_true",
+                    help="ask for thinking mode. Default is chat, which is what "
+                         "the reference engine defaults to; leaving it unset is "
+                         "not neutral, since 0.29 defaults to thinking")
     args = ap.parse_args()
 
     prompt = args.prompt or (GOLDEN_PROMPT if args.chat else FRANCE_PROMPT)
@@ -84,13 +105,14 @@ def main():
     # always greedy (temp 0) regardless of --temp.
     temp = (args.temp if args.temp is not None else 0.7) if args.chat else 0.0
     print(f"mode={'chat' if args.chat else 'completions'} prompt={prompt[:60]!r} "
-          f"max_tokens={args.max_tokens} temp={temp}", flush=True)
+          f"max_tokens={args.max_tokens} temp={temp} seed={args.seed} "
+          f"thinking={args.thinking}", flush=True)
     if not args.no_warm:
         sweep(args.base, args.model, args.chat, prompt,
-              args.max_tokens, temp, 1)
+              args.max_tokens, temp, 1, args.seed, args.thinking)
     for c in args.levels:
         sweep(args.base, args.model, args.chat, prompt,
-              args.max_tokens, temp, c)
+              args.max_tokens, temp, c, args.seed, args.thinking)
 
 
 if __name__ == "__main__":

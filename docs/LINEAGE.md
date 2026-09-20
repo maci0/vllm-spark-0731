@@ -1,6 +1,10 @@
 # Lineage
 
-Base: vLLM **v0.28.0rc2 Python** (`74a6576`, 2026-08-21 06:47 UTC) on
+**Current matched-main pin (2026-09-19):** vLLM **`v0.30.0rc2`** (`fa6ff060667f`), image
+`vllm-spark-0731:main-030-rc2`. Overlay scan `FAIL=0` (43 applied, 12 no-op). Previous pin:
+`v0.30.0rc1` (`a00a3544b93e`) as `main-030-rc1`.
+
+Historical overlay-era base: vLLM **v0.28.0rc2 Python** (`74a6576`, 2026-08-21 06:47 UTC) on
 `vllm/vllm-openai:v0.27.1` arm64 runtime.
 
 #52016 (b12x **linear**) merged 2026-08-14, **in rc2**. `LinearBackend` has
@@ -43,4 +47,8 @@ Measured real NVFP4 KV on 2x Spark remains anemll `dspark-vllm-gx10:0.1.1`
 repos
 (`vllm-spark-main-b12x`, `vllm-spark-nvfp4`,
 `dgx-spark-deepseek-v4-flash-0731`) were absorbed here on 2026-08-25; raw
-archives: [docs/field-notes/](field-notes/README.md).
+archives: [docs/field-notes/](field-notes/README.md). The DeepSeek-V4 serving
+notes from the `nvfp4` project's sibling `serving/` directory, which that
+absorption did not name, were added under
+[`docs/field-notes/nvfp4-serving/`](field-notes/nvfp4-serving/README.md) on
+2026-09-13.

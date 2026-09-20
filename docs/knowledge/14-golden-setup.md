@@ -30,36 +30,6 @@ temp 0.7): c1 steady-state **40.2-43.5**, c8 **117.2**, c16 **183.0**,
 c24 **260.7**, c32 **306.8** tok/s agg; France logprob -0.254 (matches the
 einsum reference exactly); o_proj decode bmm active with 0 fallbacks.
 
-## 1b. 1M-context capacity profile (`main-dg-1m`)
-
-Separate from the c32 throughput pin. Serve with:
-
-```bash
-# worker first, then head
-ssh spark2 -t "cd /home/maci/vllm-spark-0731 && VLLM_USE_AOT_COMPILE=0 bash scripts/05-serve.sh main-dg-1m"
-ssh spark1 -t "cd /home/maci/vllm-spark-0731 && VLLM_USE_AOT_COMPILE=0 bash scripts/05-serve.sh main-dg-1m"
-```
-
-Config: [`configs/pin.main-dg-1m.env`](../../configs/pin.main-dg-1m.env).
-
-| Setting | Value | Why |
-|---|---|---|
-| `max_model_len` | 1,048,576 | full 1M configured context |
-| `gpu_memory_utilization` | **0.85** | highest stable GPU-resident KV after reboot; 0.89 hung both Sparks |
-| `max_num_seqs` | 1 | capacity profile, not c32 throughput |
-| `max_num_batched_tokens` | 1024 | keep prefill envelope small |
-| `enforce_eager` | 1 | SM12x `persistent_topk` cannot capture the 1M prefill shape (124 CTAs > 48 cooperative capacity) |
-| `served_model_name` | `deepseek-v4-flash` | alias replaces the HF path |
-
-Measured (2026-08-31, post-reboot, health 200):
-
-- Available KV cache memory: **16.98 GiB**
-- GPU KV cache size: **3,894,378 tokens**
-- Maximum concurrency for 1,048,576 tokens/request: **3.71x**
-- France completion coherent (`Paris...`)
-
-Limits: this is GPU-resident capacity on the 584 B `nvfp4_ds_mla` envelope, not the legacy dense-FP4 ~2M-token anemll pool. Do not raise util past 0.85 without a controlled probe; do not put repo/artifacts under `/tmp` (UMA).
-
 ## 2. The legacy anemll reference (`ghcr.io/anemll/dspark-vllm-gx10:0.1.1`)
 
 The prebuilt anemll/eugr image this stack was benchmarked against. It was

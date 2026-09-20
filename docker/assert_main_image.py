@@ -28,39 +28,26 @@ def nvcc_version() -> str:
     return out.strip()
 
 
-def find_dsv4_dispatch() -> tuple[Path, str]:
-    roots: list[Path] = []
+def check_dsv4_dispatch() -> str:
+    """DSpark k=5 needs every DSV4 decode shape at topk=192.
+
+    FlashInfer listed the instantiated (num_heads, topk) pairs in
+    ``_DECODE_DSV4_DISPATCH``; current main takes topk as a runtime kernel
+    argument and the same name answers as a membership predicate, so probe
+    it instead of reading source text.
+    """
     try:
         import flashinfer
+        from flashinfer.mla._sparse_mla_sm120 import _DECODE_DSV4_DISPATCH
+    except Exception as exc:
+        fail(f"import flashinfer DSV4 dispatch: {exc}")
 
-        roots.append(Path(flashinfer.__file__).resolve().parent)
-    except Exception:
-        pass
-    for extra in (
-        Path("/opt/flashinfer"),
-        Path("/workspace/flashinfer"),
-    ):
-        if extra.exists():
-            roots.append(extra)
-    seen: set[Path] = set()
-    for root in roots:
-        for path in root.rglob("*"):
-            if not path.is_file():
-                continue
-            if path.suffix not in {".py", ".cu", ".h", ".cuh"}:
-                continue
-            if path in seen:
-                continue
-            seen.add(path)
-            try:
-                text = path.read_text(errors="ignore")
-            except OSError:
-                continue
-            if "_DECODE_DSV4_DISPATCH" in text or "DSV4_DISPATCH" in text:
-                if "(8, 192)" in text or "(8,192)" in text or "DSV4_DISPATCH(8, 192)" in text:
-                    return path, text
-    fail("FlashInfer DSV4 dispatch with (8,192) not found")
-    raise AssertionError("unreachable")
+    heads = (8, 16, 32, 64, 128)
+    missing = [h for h in heads if (h, 192) not in _DECODE_DSV4_DISPATCH]
+    if missing:
+        fail(f"FlashInfer DSV4 dispatch missing (H, 192) for H={missing}")
+    module = Path(flashinfer.mla._sparse_mla_sm120.__file__).resolve()
+    return str(module)
 
 
 def main() -> int:
@@ -97,8 +84,7 @@ def main() -> int:
     importlib.import_module("tilelang")
     ok("import tilelang")
 
-    path, _text = find_dsv4_dispatch()
-    ok(f"FlashInfer DSV4 (8,192) in {path}")
+    ok(f"FlashInfer DSV4 (H, 192) dispatchable: {check_dsv4_dispatch()}")
 
     for mod in ("b12x", "flashinfer", "vllm"):
         importlib.import_module(mod)
@@ -121,11 +107,13 @@ def main() -> int:
     ok("import lmcache")
 
     sha_dir = Path(os.environ.get("SPARK_SHA_DIR", "/opt/spark-0731/sha"))
+    # No deepgemm entry: vLLM's own cmake FetchContent pin
+    # (cmake/external_projects/deepgemm.cmake) selects it, so this image has no
+    # revision of its own to record.
     required = (
         "pytorch",
         "nccl",
         "vllm",
-        "deepgemm",
         "b12x",
         "flashinfer",
         "instanttensor",

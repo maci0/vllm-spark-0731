@@ -21,12 +21,6 @@ ARG CUTLASS_DSL_VERSION=4.7.0
 ARG QUACK_KERNELS_VERSION=0.6.4
 ARG FLASHINFER_REPO=https://github.com/flashinfer-ai/flashinfer.git
 ARG FLASHINFER_REF=main
-ARG DEEPGEMM_REPO=https://github.com/deepseek-ai/DeepGEMM.git
-# nv_dev a6b593d = last known good for SM12x fp8 1d1d (the 8b1392b pin
-# regressed it: dropped sm100_fp8_gemm_1d1d + aliased fp8_gemm_nt to the fp4
-# dispatcher = silent corruption on GB10). Same freeze as eugr + the anemll
-# golden image (vLLM 0.25.1 pins a6b593d). See docs/knowledge/09.
-ARG DEEPGEMM_COMMIT=a6b593d2826719dcf4892609af7b84ee23aaf32a
 ARG INSTANTTENSOR_REPO=https://github.com/scitix/InstantTensor.git
 ARG INSTANTTENSOR_REF=main
 ARG FASTSAFETENSORS_REPO=https://github.com/foundation-model-stack/fastsafetensors.git
@@ -67,10 +61,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
     FLASHINFER_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST} \
     TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas \
-    VLLM_PRESERVE_SM12X_TARGET=1 \
     VLLM_ENABLE_CUDA_COMPATIBILITY=1 \
     NVIDIA_DISABLE_REQUIRE=1 \
-    DEEPGEMM_SRC_DIR=/opt/DeepGEMM \
     SPARK_SHA_DIR=/opt/spark-0731/sha \
     CUDA_HOME=/usr/local/cuda \
     MAX_JOBS=${MAX_JOBS} \
@@ -97,6 +89,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libibverbs1 libibverbs-dev rdma-core \
         libopenblas-dev libjpeg-dev libpng-dev \
         libnuma-dev \
+        libdw-dev \
         devscripts debhelper fakeroot \
     && (apt-get install -y --no-install-recommends cuda-compat-13-3 \
         || echo "WARN: cuda-compat-13-3 not in apt") \
@@ -199,36 +192,6 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     uv pip uninstall -y nvidia-nccl-cu13 || true; \
     python3 -c 'import flashinfer; print("flashinfer", flashinfer.__version__)'
 
-RUN git clone --recursive "${DEEPGEMM_REPO}" /opt/DeepGEMM \
-    && git -C /opt/DeepGEMM checkout --detach "${DEEPGEMM_COMMIT}" \
-    && git -C /opt/DeepGEMM submodule update --init --recursive \
-    && git -C /opt/DeepGEMM rev-parse HEAD > /opt/spark-0731/sha/deepgemm \
-    && cat /opt/spark-0731/sha/deepgemm
-
-# DeepGEMM SM120 fixes, applied to the pinned source before vLLM compiles it
-# via DEEPGEMM_SRC_DIR. Additive patches; each one is idempotent and non-fatal
-# (some fixes are already in nv_dev, e.g. the SM120 SF layout from #403).
-COPY patches/upstream/*deepgemm*.diff /opt/spark-0731/patches/upstream/
-RUN cd /opt/DeepGEMM \
-    && for p in /opt/spark-0731/patches/upstream/*deepgemm*.diff; do \
-         case "$(basename "$p")" in \
-           deepgemm-fp8-1d1d-port.diff) \
-             # The pure-fp8 1d1d kernel already exists on a6b593d; the port
-             # (built against 8b1392b, which removed it) must only be applied
-             # to 8b-era pins. Applying it to a6 redefines the combined
-             # runtime and breaks the build. \
-             if [ -f deep_gemm/include/deep_gemm/impls/sm100_fp8_gemm_1d1d.cuh ]; then \
-               echo "skip  deepgemm-fp8-1d1d-port.diff (kernel present on $(git rev-parse --short HEAD))"; \
-               continue; \
-             fi ;; \
-         esac; \
-         patch -p1 --forward -N < "$p" >/dev/null 2>&1 \
-           && echo "applied $(basename "$p")" \
-           || echo "skip  $(basename "$p") (already applied)"; \
-       done \
-    && git diff --stat || true
-
-COPY docker/patch_vllm_preserve_sm12x_target.py /opt/spark-0731/patch_vllm_preserve_sm12x_target.py
 COPY patches/pin_cutlass_dsl.py /opt/spark-0731/pin_cutlass_dsl.py
 COPY docker/pin_quack.py /opt/spark-0731/pin_quack.py
 COPY docker/assert_main_image.py /opt/spark-0731/assert_main_image.py
@@ -252,7 +215,6 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     --mount=type=cache,id=cargo-git,target=/opt/cargo/git \
     set -eux; \
     cd /opt/vllm; \
-    python3 /opt/spark-0731/patch_vllm_preserve_sm12x_target.py .; \
     python3 /opt/spark-0731/pin_cutlass_dsl.py "${CUTLASS_DSL_VERSION}" \
       --expected-count 1 requirements/cuda.txt; \
     python3 use_existing_torch.py; \
@@ -264,7 +226,6 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
       "fastapi[standard]>=0.115.0,<0.137.0" \
       > /tmp/wheel-override.txt; \
     uv pip install -r requirements/build/cuda.txt "setuptools-rust>=1.9.0"; \
-    export DEEPGEMM_SRC_DIR=/opt/DeepGEMM; \
     export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"; \
     export VLLM_REQUIRE_RUST_FRONTEND=1; \
     export CARGO_BUILD_JOBS="${MAX_JOBS}"; \
@@ -289,7 +250,19 @@ RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     git ls-remote "${INSTANTTENSOR_REPO}" "${INSTANTTENSOR_REF}" | awk '{print $1}' > /opt/spark-0731/sha/instanttensor; \
     git ls-remote "${FASTSAFETENSORS_REPO}" "${FASTSAFETENSORS_REF}" | awk '{print $1}' > /opt/spark-0731/sha/fastsafetensors; \
     git ls-remote "${LMCACHE_REPO}" "${LMCACHE_REF}" | awk '{print $1}' > /opt/spark-0731/sha/lmcache; \
-    git clone --depth 1 --branch "${B12X_REF}" "${B12X_REPO}" /tmp/b12x-source; \
+    # B12X_REF may be a branch/tag or a full commit SHA (same rule as VLLM_REF).
+    # vLLM v0.29.0 declares the b12x extra as b12x==1.2.6. Corrected 2026-09-13: b12x
+    # **master** (081b235931) dropped the PagedDecodeMetadata / prepare_paged_metadata /
+    # uses_paged_schedule / plan_paged_schedule names, but the **1.3.0 release still
+    # exports them**, so bumping to 1.3.0 does not require porting the SM12x overlays.
+    # 1.3.0 has no git tag, so a bump must name the release commit or install the wheel.
+    if echo "${B12X_REF}" | grep -qE '^[0-9a-f]{40}$'; then \
+      git clone --filter=blob:none --no-checkout "${B12X_REPO}" /tmp/b12x-source; \
+      git -C /tmp/b12x-source fetch --depth 1 origin "${B12X_REF}"; \
+      git -C /tmp/b12x-source checkout --detach "${B12X_REF}"; \
+    else \
+      git clone --depth 1 --branch "${B12X_REF}" "${B12X_REPO}" /tmp/b12x-source; \
+    fi; \
     git -C /tmp/b12x-source rev-parse HEAD > /opt/spark-0731/sha/b12x; \
     python3 /opt/spark-0731/pin_cutlass_dsl.py "${CUTLASS_DSL_VERSION}" \
       --expected-count 5 /tmp/b12x-source/pyproject.toml; \
@@ -314,9 +287,11 @@ checks=[('apache-tvm-ffi','${APACHE_TVM_FFI_VERSION}'),('tilelang','${TILELANG_V
 miss=[n+' '+m.version(n)+' != '+e for n,e in checks if m.version(n)!=e]; \
 sys.exit(miss[0]) if miss else print('torch', tv, torch.version.cuda, 'b12x', m.version('b12x'), 'cutlass', m.version('nvidia-cutlass-dsl'), 'tilelang', m.version('tilelang'), 'tvm-ffi', m.version('apache-tvm-ffi'), 'humming', m.version('humming-kernels'), 'tokenspeed', m.version('tokenspeed-mla'))"
 
+# VLLM_USE_DEEP_GEMM_E8M0 is deliberately not forced here: vLLM defaults it on,
+# which is the ue8m0 column this checkpoint is served with, and the DeepGEMM fork
+# refuses a float32 scale factor on arch 12 (csrc/apis/gemm.hpp:122).
 ENV CUTE_DSL_ARCH=sm_121a \
     HF_MODEL_ID=deepseek-ai/DeepSeek-V4-Flash-0731 \
-    VLLM_USE_DEEP_GEMM_E8M0=0 \
     PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
     PYTORCH_ALLOC_CONF=expandable_segments:True
 

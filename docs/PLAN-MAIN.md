@@ -64,7 +64,7 @@ has DSpark TOPK 192 and SM12x. Re-pin every SHA at build start.
 
 | Component | Pin | Why this, not a different head |
 |-----------|-----|--------------------------------|
-| vLLM | `main` (HEAD 2026-08-23 `a3561ef8e49d`) | Matched Python + `.so`. Re-pin SHA at build start. |
+| vLLM | `main` (HEAD 2026-09-16 `f37c550bf635`, tag `proto-v0.2.0`) | Matched Python + `.so`. Re-pin SHA at build start. |
 | CUDA toolkit (image) | **13.3.1** (`nvidia/cuda:13.3.1-cudnn-devel-ubuntu24.04`) | Latest CUDA on Hub/NGC for ubuntu24.04 (arm64). Not vLLM default 13.0.3. No `nvidia/cuda:13.4-*` tag. Not ubuntu26.04. |
 | PyTorch | **source** `release/2.14` (`2.14.0` RC, GA 2026-09-02) | Compile in the CUDA image with `TORCH_CUDA_ARCH_LIST=12.1a`. Official wheels stop at cu132 and ship `12.0+PTX`, not `12.1a` tensor-core kernels ([forum](https://discuss.pytorch.org/t/dgx-spark-gb10-cuda-13-0-python-3-12-sm-121/223744)). No NGC bundled torch. Record SHA. |
 | torchvision / torchaudio / triton | **vision `release/0.29` from source** / skip audio if it fights / **triton 3.7.1** pip + `TRITON_PTXAS_PATH` | Must match the local torch ABI. PyPI has no `triton==3.8.0` (nightly-only). Do not pip cu132 torch wheels over the source torch. |
@@ -117,8 +117,16 @@ Do not use ubuntu26.04 CUDA tags. There is no `nvidia/cuda:13.4-*` on Hub.
 | 13.0 / R580 (factory) | Keep the **container** on 13.3.1. Install `cuda-compat-13-3` if the image does not already have it. Set `VLLM_ENABLE_CUDA_COMPATIBILITY=1`. Do not flash an unofficial host driver as a prerequisite. |
 | Older than 13.0 | Stop. Spark GB10 is not that box. |
 
-CUDA 13.x CMake still drops `12.1` from `CUDA_SUPPORTED_ARCHS` (family `12.0`).
-Keep `VLLM_PRESERVE_SM12X_TARGET=1` and `12.1a`.
+CUDA 13.x CMake still drops `12.1` from `CUDA_SUPPORTED_ARCHS`, so vLLM's own kernels build for the
+`12.0f` family target while `TORCH_CUDA_ARCH_LIST=12.1a` still governs torch, and NCCL and
+FlashInfer keep their own `sm_121` / `12.1a` settings.
+
+Dropped 2026-09-15. Measured with `instruments/arch_codegen_probe.sh`: `sm_120`, `sm_120f` and
+`sm_121a` produce byte-identical SASS for four vLLM-shaped kernels and run within noise on the
+GB10, the `sm_120` binary runs there at all, and vLLM's `csrc/` has no SM121-only feature guard. So
+the patch bought no codegen and the recipe now builds vLLM for upstream's `12.0f` family target.
+`TORCH_CUDA_ARCH_LIST=12.1a` still governs torch, and NCCL (`-gencode arch=compute_121`) and
+FlashInfer (`FLASHINFER_CUDA_ARCH_LIST`, derived from it) keep their own target.
 
 Fallback if 13.3.1 will not load on factory R580: same compile recipe on
 `nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04` (eugr's host-compat base).
@@ -505,7 +513,7 @@ Compared to `patches/apply_overlays.py` on rc2-overlay.
 | Patch / config | Provenance | Notes |
 |----------------|------------|-------|
 | InstantTensor hybrid draft loader | eugr `mods/instanttensor-hybrid-draft-loader` | Required with `--load-format instanttensor` + DSpark |
-| CUDA 13 keep `12.1` in `CUDA_SUPPORTED_ARCHS` | eugr `patch_vllm_preserve_sm12x_target.py` | Opt-in `VLLM_PRESERVE_SM12X_TARGET=1` |
+| ~~CUDA 13 keep `12.1` in `CUDA_SUPPORTED_ARCHS`~~ | eugr `patch_vllm_preserve_sm12x_target.py` | **Dropped 2026-09-15**: measured codegen-neutral, see 4.1 |
 | b12x git + cutlass metadata 4.7.0 | eugr `pin_cutlass_dsl.py`; `patches/pin_cutlass_dsl.py` | Not a vLLM overlay. `--no-deps` git install. |
 | `DG_JIT_USE_NVRTC=0` | eugr Dockerfile | env, not a source patch |
 | LMCache GDS yaml | LMCache docs | `configs/lmcache.gds.yaml` |
@@ -580,8 +588,7 @@ start from NGC pytorch.
 - NCCL from source, `sm_121` (section 4.4)
 - PyTorch `release/2.14` from source, `TORCH_CUDA_ARCH_LIST=12.1a`, `USE_SYSTEM_NCCL=1`
 - torchvision 0.29.0 from source; `triton==3.7.1`; `TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas`
-- `VLLM_PRESERVE_SM12X_TARGET=1`
-- `DEEPGEMM_SRC_DIR` at `8b1392b` (record `.deepgemm-commit`)
+- DeepGEMM from the base's own cmake FetchContent pin (`cmake/external_projects/deepgemm.cmake`); no image-side checkout
 - `DG_JIT_USE_NVRTC=0`
 - clone vLLM `main`, `python use_existing_torch.py`, `--no-build-isolation`
 - FlashInfer from git **main** (HEAD `fb28d7242b35`; not 0.6.17; verify `_DECODE_DSV4_DISPATCH` has `(8,192)`)

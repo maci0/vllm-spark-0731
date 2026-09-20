@@ -84,13 +84,16 @@ Live pin stays `B12X_MLA_SPARSE` (better single-stream).
 
 ### FlashInfer eidx contiguity bug (fixed)
 
-`flashinfer_sparse.py:_forward_decode` passes `extra_sparse_indices` that can
-be non-contiguous — C4A uses `global_indices.view(num_decode_tokens, 1, -1)`,
-C128A a non-contiguous metadata tensor. The FlashInfer SM120 C++
+`flashinfer_sparse.py:_forward_decode` passes `extra_sparse_indices` that could
+be non-contiguous: C128A published a width-narrowed slice whose view kept the
+buffer row stride. The FlashInfer SM120 C++
 (`sparse_mla_sm120.cu`) checks `eidx.IsContiguous()` and dies with
 "eidx must be contiguous" during warmup, so `FLASHINFER_MLA_SPARSE_DSV4`
-would not boot. Fix: `.contiguous()` on both paths (overlay
-`flashinfer-eidx-contig`). Upstream PR candidate.
+would not boot. Fixed upstream by [#53574](https://github.com/vllm-project/vllm/pull/53574)
+(merged 2026-08-31, in the pin): `build_c128a_topk_metadata` returns the
+full-width buffer slice on family 120. The C4A path was already contiguous, so
+the local `pr-53574.diff` backport and the `flashinfer-eidx-contig` overlay were
+retired on 2026-09-14.
 
 ---
 

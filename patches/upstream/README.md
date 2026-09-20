@@ -1,37 +1,44 @@
 # Upstream backport patches
 
 Clean git-diff patches fetched from vLLM PRs, for applying into our build
-(vLLM main `e25c586b9`) via `git apply` / `patch -p1` before the string-replace
-overlays in `apply_overlays.py` run.
+(vLLM `a00a3544b93e`, the `v0.30.0rc1` tag commit) via `git apply` /
+`patch -p1` before the string-replace overlays in `apply_overlays.py` run.
+
+Order matters. An overlay needle is written against the post-patch text, so the patches
+run first and the overlays key on what they leave behind. `patch_cutlass_sm12x_guard`
+matches `is_supported` in `scaled_mm/cutlass.py` as `pr-53055.diff` leaves it (typed
+signature, `"CUTLASS block FP8 is not supported."`), not as the pristine base has it;
+keying it on the base text fails the overlay with `missing needle`.
 
 ## Open-PR backports (fetched 2026-08-24 via `gh pr diff`)
 
 | Patch | PR | Fix | Equivalent overlay (`--only`) |
 |---|---|---|---|
 | `pr-53055.diff` | #53055 (OPEN) | guard DeepGEMM in mHC pre-broadcast + exclude CUTLASS FP8 on SM12x | `patch_mhc`, `patch_cutlass_sm12x_guard` (applied in `--stack main`) |
-| `pr-53425.diff` | #53425 (OPEN) | DSV4 sparse MLA kernel block size 64 on SM12x; refreshed 2026-08-26 (ed71de5): lazy `sparse_mla` import in indexer (kills the `vllm._aiter_ops` cold-start import cycle) | `dsv4-block64` |
+| `pr-53425.diff` | #53425 (OPEN) | DSV4 sparse MLA kernel block size 64 on SM12x; lazy `sparse_mla` import in the indexer (kills the `vllm._aiter_ops` cold-start import cycle); **re-anchored 2026-09-14** for `7ee8a6dd`: the base added a comment above the indexer's `return [256]` and moved the method to line 246, so the hunk was regenerated from that base (the overlay's early-return would otherwise have skipped the indexer half, leaving the indexer at `[256]` against sparse MLA's `[64]`) | `dsv4-block64` |
 | `pr-53521.diff` | #53521 **CLOSED** 2026-08-27 | Hopper `fp8_einsum` recipe on SM12x — NOT NEEDED: stock `(1,1,128)` + packed E8M0 scales verified correct on GB10 (mean_rel 0.000000; E2E France coherent on `main-b12x-mn2`). **Drop this backport.** | `einsum-sm12x` |
 | `pr-53522.diff` | #53522 (OPEN) | gate indexer paged MQA metadata on `is_deep_gemm_supported()` | `indexer-mqa` |
 | `pr-53898.diff` | #53898 **CLOSED** 2026-08-27 | SM12x fp8_einsum dequant fallback + unpack — NOT NEEDED: the einsum kernel is correct with packed scales; the fallback itself was the E2E-garbage source (packed-int32-as-fp32). Real upstream fix: deepseek-ai/DeepGEMM #337 (packer mantissa mask). **Drop this backport; mn2 uses the stock path.** | `einsum-sm12x` family |
 | `pr-52499.diff` | #52499 (OPEN) | DSV4 sparse-MLA spec-decode query shapes | comment-only (we didn't need it after TOPK=192) |
-| `pr-53574.diff` | #53574 (OPEN) | C128A eidx contiguity at the builder (`_build_c128a_metadata`); root cause of the "eidx must be contiguous" DSV4+spec-decode boot crash | `flashinfer-eidx-contig` (consumer-side) |
-| `pr-47988.diff` | #47988 (OPEN) | unconditional E8M0→fp32 upcast in `w8a8_triton_block_scaled_mm` + CUTLASS SM12x `can_implement`/weight-scale handling (source hunks only) | `triton-e8m0-sm12x` (family-120 gate variant) |
+| `pr-47988.diff` | #47988 (OPEN, head `e1dbe81c` 2026-09-12; **CUTLASS hunks only**, refetched 2026-09-14) | CUTLASS SM12x `can_implement` N%128 fall-through + E8M0 weight-scale upcast at load. The Triton unconditional-upcast hunk is **gone**: `v0.29.1rc0` contains `e77daef89e` (#56214), which landed it upstream, so the hunk no longer applies and `patch_triton_e8m0_sm12x` skips. The head's `_upcast_e8m0_to_fp32` rewrite is also not carried: it differs from the base's bit-shift helper at exponent bytes 0 and 255 (measured 2026-09-14) and neither fix needs it. | `triton-e8m0-sm12x` (family-120 gate variant) |
 
 `pr-41834` (SM12x umbrella) is **not** fetched: diff exceeds the 20k-line
 GitHub limit and the PR needs-rebase — comment only, per `docs/UPSTREAM.md`.
 
-## DeepGEMM backports (applied in `docker/Dockerfile.main` via `*deepgemm*.diff`)
+## DeepGEMM patches
 
-| Patch | PR | Fix | Status |
-|---|---|---|---|
-| `deepgemm-pr-403.diff` | [deepseek-ai/DeepGEMM#403](https://github.com/deepseek-ai/DeepGEMM/pull/403) | SM120/SM121 SF layout transformation in `csrc/apis/layout.hpp` | Merged in `nv_dev 8b1392b978f5`; applied idempotently in `docker/Dockerfile.main` before vLLM compilation |
-| `deepgemm-fp8-1d1d-port.diff` | anemll 2.5.0 port | Port of golden anemll 2.5.0 `sm100_fp8_gemm_1d1d` kernel and dispatch to `nv_dev` | Staged local port for SM120 pure-FP8 GEMM; applied in `docker/Dockerfile.main` before compilation. **Upstreamed 2026-08-26 as [deepseek-ai/DeepGEMM#419](https://github.com/deepseek-ai/DeepGEMM/pull/419)** — refreshed to the reviewed state (44d9d2e: pure-fp8 excluded from AB-swap, `allow_swap_ab` layout filtering, arch-10 mixed-dtype routing, epilogue/math.cuh fixes) |
+None, and `docker/Dockerfile.main` no longer selects DeepGEMM itself: vLLM's cmake FetchContent
+pin (`cmake/external_projects/deepgemm.cmake`) fetches the fork, which is what this base needs
+(its `_hc_prenorm` path passes `activation_alpha=`, and the cmake globs
+`third-party/deep_jit/include`; neither exists in `a6b593d`). Our `DEEPGEMM_SRC_DIR` checkout and
+the `DEEPGEMM_COMMIT` build arg were removed 2026-09-17. A DeepGEMM source patch would now be a
+patch against that FetchContent tree; the upstream work the old staged port came from is
+[DeepGEMM#419](https://github.com/deepseek-ai/DeepGEMM/pull/419), still open.
 
 ## Merged-fix patches (already in the build)
 
 | Patch | PR | Status | Applied as |
 |---|---|---|---|
-| `0001-pr-52018-b12x-moe-v0.27.1.diff` | #52018 | merged | `copy_new_modules` + `patch_moe_backend` + … |
 | `0002-pr-50645-mhc-tilelang.diff` | #50645 | superseded by #53055 | `patch_mhc` |
 | `0003-nvfp4-ds-mla-v0.27.1.patch` | local | local | `patch_nvfp4_ds_mla` |
 | `b12x-utils-main.py` | #52018 | merged | copied by `patch_utils_b12x` |
@@ -45,8 +52,6 @@ main track; kept for the historical v0.27.1 build (`docker/Dockerfile.nvfp4`,
 
 | Patch | PR / origin | Relation to the files above |
 |---|---|---|
-| `b12x-linear-52016-vllm-only.diff` | #52016 (merged) | vllm-only hunks for the v0.27.1 base |
-| `b12x-moe-52018-vllm-only.diff` | #52018 (merged) | vllm-only hunks; 4 hunks dropped (target code absent in 0.27.1) |
 | `mhc-guard-50645-vllm-only.diff` | #50645 | superseded by #53055 (`pr-53055.diff`) |
 | `kv-offload-bounds-check.patch` | ours, #53271 (open) | diagnosability only; see `docs/field-notes/nvfp4/KV_OFFLOAD_MLA.md` |
 
@@ -60,8 +65,24 @@ done
 ```
 
 Notes:
-- Patches are against vLLM `main` at the PRs' merge bases (~2026-08-23/24);
-  re-fetch if our pinned vLLM commit drifts.
+- Patches are against vLLM `main` at the PRs' merge bases (~2026-08-23/24) unless a
+  row says they were re-anchored to our pin; re-fetch if our pinned vLLM commit drifts.
+  Re-fetch `pr-47988.diff` as CUTLASS hunks only: the PR's own diff no longer contains
+  the Triton upcast hunk, because main gained it in `e77daef89e` (#56214), which is in
+  `v0.29.1rc0`.
+- The glob is `pr-*.diff` on purpose. `pr54631.diff` and `pr47988.diff` have no hyphen
+  and are never applied by the image build; both touch only `tests/`, which the
+  installed tree does not need.
+- Verified against `a00a3544b93e` (`v0.30.0rc1`) on 2026-09-18: `patch -p1 --forward -N`
+  applies `pr-47988` / `pr-53425` / `pr-53522` with rc=0 (`pr-53055` skips as already
+  applied), and `scripts/port_scan.py --with-upstream-patches` reports FAIL=0 over the
+  whole overlay stack. The `mhc-tf32` pair that used to abort it is parked; see
+  `patches/README.md`. Same three-apply / one-skip pattern as `f37c550bf635`
+  (`proto-v0.2.0`) on 2026-09-17.
+- #53574 merged 2026-08-31 (`699e180df4`, an ancestor of the pin), so `pr-53574.diff`
+  and the `flashinfer-eidx-contig` overlay it fed are retired. `build_c128a_topk_metadata`
+  now returns the full-width buffer slice on family 120 (contiguous at the builder), and
+  the C4A path is `empty_like`-contiguous, so the consumer `.contiguous()` was a no-op.
 - The equivalent overlays are idempotent, so applying a patch AND the overlay
   is safe (the overlay skips when already applied); prefer the patch and keep
   the overlay as the fallback for the rc2 overlay image.

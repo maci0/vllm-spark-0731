@@ -214,3 +214,45 @@ dspark_block_size (5)`), so k must be 5 or 10.
 `examples/eugr-prod-ssd.yaml` reproduces `CUDA error: an illegal memory access
 was encountered` during startup, with and without the b12x attention backend. It
 is kept only as a record. See EUGR_B12X_PROD.md §8.
+
+## `proto2-compile-port.sh`
+
+Reproduces the compile-port arm and records the twelve Dynamo graph breaks that block it, plus the two
+measured negatives that bound what compilation has to buy (`CUDAGRAPH_MODE=NONE` and
+`MAX_CUDAGRAPH_CAPTURE_SIZE=24`, both metered). The verdict it carries: `allow_in_graph` is not a shortcut
+in this stack, so every third-party kernel on the DSv4 forward path needs `direct_register_custom_op` with
+an explicit fake impl. See `docs/UPSTREAM.md`, rounds 54-57.
+
+```bash
+configs/examples/proto2-compile-port.sh check   # static checks, no GPU
+configs/examples/proto2-compile-port.sh arm     # boot the nine-mount arm
+```
+
+## `proto2-serve-fix.sh`
+
+Not a deployment recipe: the reproducible check for the two things that stopped
+`vllm-spark-0731:main-029-proto2` from serving, plus the two-arm measurement.
+
+```bash
+configs/examples/proto2-serve-fix.sh check          # static, no GPU
+configs/examples/proto2-serve-fix.sh build          # phase 2 over the phase-1 base
+configs/examples/proto2-serve-fix.sh arm 0.86       # our arm + 3-pass meter
+configs/examples/proto2-serve-fix.sh ref            # reference arm + 3-pass meter, same day
+```
+
+| | |
+|---|---|
+| Failure 1 | our own `patch_einsum_sm12x_recipe` forced recipe `(1,128,128)` with `tma_aligned_scales=False` on SM12x; DeepGEMM rejects that at `csrc/utils/layout.hpp:113` and `VllmWorker-0` dies in `_initialize_kv_caches` |
+| Fix 1 | `apply_main` no longer calls it (nor the other two einsum overlays); `assert_image.py` asserts the override is **absent** |
+| Failure 2 | InstantTensor sizes its I/O buffer from free device memory, so a warm page cache gives `buffer_size (1059061760 B) exceeds device memory budget` |
+| Fix 2 | `harness/run-arm.sh` drops the page cache on both nodes before launching |
+
+`build` must pass the phase-1 image explicitly. The incremental form
+(`03-apply-main-overlays-029.sh <TAG>` with no base) is **not** idempotent and dies on
+`patch_o_proj_einsum_e8m0` with `missing needle in .../ops/o_proj.py`.
+
+Our arms need `GPU_MEMORY_UTILIZATION=0.86` on this base: at `0.8389` it reports 9.17 GiB
+of KV cache memory and refuses `MAX_MODEL_LEN=65536`, which needs 9.48 GiB. The reference
+recipe runs `0.82` with `max_model_len: 262144`; only the allocation differs, and at c6
+with 512-token prompts the KV pool is not the constraint. Measured standing (2026-09-17)
+and the verdict: [docs/EXPERIMENTS.md](../../docs/EXPERIMENTS.md).

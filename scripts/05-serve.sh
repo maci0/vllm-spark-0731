@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Serve DeepSeek-V4-Flash-0731 with b12x kernels and DSpark k=5.
-# Usage: 05-serve.sh [fp8|nvfp4|eugr|golden|main]
+# Serve DeepSeek-V4-Flash-0731 with b12x kernels and DSpark.
+# Usage: 05-serve.sh [fp8|nvfp4|eugr|golden|main|main-029]
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -18,9 +18,10 @@ case "${STACK}" in
   eugr) PIN="${ROOT}/configs/pin.eugr-b12x.env" ;;
   golden) PIN="${ROOT}/configs/pin.golden.env" ;;
   main) PIN="${ROOT}/configs/pin.main.env" ;;
+  main-029) PIN="${ROOT}/configs/pin.main-029.env" ;;
   main-dg) PIN="${ROOT}/configs/pin.main-dg.env" ;;
   main-dg-1m) PIN="${ROOT}/configs/pin.main-dg-1m.env" ;;
-  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main|main-dg|main-dg-1m]" >&2; exit 2 ;;
+  *) echo "usage: $0 [fp8|nvfp4|eugr|golden|main|main-029|main-dg|main-dg-1m]" >&2; exit 2 ;;
 esac
 
 # shellcheck disable=SC1090
@@ -170,9 +171,38 @@ else
   ALLOC_CONF_ARGS+=(-e PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True)
 fi
 
+# Extra `docker run -e` passthrough, space-separated KEY=VALUE pairs, for instruments that
+# need to reach the container. Example, the CUDA launch interposer:
+#   SERVE_EXTRA_ENV="LD_PRELOAD=/root/.cache/huggingface/inject/dcopy_trace.so DCOPY_TRACE_OUT=/root/.cache/huggingface/inject/dcopy.txt DCOPY_TRACE_BLOCK_X=0" scripts/05-serve.sh main-029
+EXTRA_ENV_ARGS=()
+if [[ -n "${SERVE_EXTRA_ENV:-}" ]]; then
+  # shellcheck disable=SC2206
+  for _kv in ${SERVE_EXTRA_ENV}; do
+    EXTRA_ENV_ARGS+=(-e "${_kv}")
+  done
+fi
+
+# Extra `docker run -v` passthrough, space-separated host:container[:ro] specs. Needed for
+# instruments that must be present in *every* process, not just the entry process: vLLM
+# spawns the engine core and worker with a curated environment, so an LD_PRELOAD exported
+# on PID 1 never reaches them, and a process-wide /etc/ld.so.preload does. Example:
+#   SERVE_EXTRA_MOUNTS="$HOME/.cache/huggingface/inject/ld.so.preload:/etc/ld.so.preload:ro" scripts/05-serve.sh main-029
+EXTRA_MOUNT_ARGS=()
+if [[ -n "${SERVE_EXTRA_MOUNTS:-}" ]]; then
+  # shellcheck disable=SC2206
+  for _m in ${SERVE_EXTRA_MOUNTS}; do
+    EXTRA_MOUNT_ARGS+=(-v "${_m}")
+  done
+fi
+
 CAPTURE_ARGS=()
 if [[ "${ENFORCE_EAGER:-0}" != "1" ]]; then
   _cc_parts=()
+  # vLLM's CompilationMode as an int: 0 NONE, 1 STOCK_TORCH_COMPILE, 2 DYNAMO_TRACE_ONCE,
+  # 3 VLLM_COMPILE. Unset leaves vLLM's own default, which is NONE on this stack.
+  if [[ -n "${COMPILATION_MODE:-}" ]]; then
+    _cc_parts+=("\"mode\": ${COMPILATION_MODE}")
+  fi
   if [[ -n "${MAX_CUDAGRAPH_CAPTURE_SIZE:-}" ]]; then
     _cc_parts+=("\"max_cudagraph_capture_size\": ${MAX_CUDAGRAPH_CAPTURE_SIZE}")
   fi
@@ -185,6 +215,17 @@ if [[ "${ENFORCE_EAGER:-0}" != "1" ]]; then
   if [[ -n "${CUDAGRAPH_COPY_INPUTS:-}" ]]; then
     _cc_parts+=("\"cudagraph_copy_inputs\": ${CUDAGRAPH_COPY_INPUTS}")
   fi
+  # Base mode for vLLM's registered CustomOp classes, e.g. CUSTOM_OPS='["all"]'.
+  # Only defaulted when unset: `config/vllm.py:1631` appends "none" for
+  # inductor+compiled and "all" otherwise, and `is_custom_op_enabled` reads this as
+  # the base mode. So in the compiled regime vLLM deliberately runs the *eager*
+  # implementation of every registered op, which Dynamo then has to trace -- that is
+  # what makes the sparse indexer path untraceable. Explicit "all" routes those ops
+  # through their registered torch op, whose fake impls upstream already wrote.
+  # The vendored eugr recipes already use exactly this with FULL_AND_PIECEWISE.
+  if [[ -n "${CUSTOM_OPS:-}" ]]; then
+    _cc_parts+=("\"custom_ops\": ${CUSTOM_OPS}")
+  fi
   if [[ ${#_cc_parts[@]} -gt 0 ]]; then
     _cc_joined=$(printf '%s,' "${_cc_parts[@]}")
     CAPTURE_ARGS+=(--compilation-config "{${_cc_joined%,}}")
@@ -195,6 +236,15 @@ if [[ "${ENFORCE_EAGER:-0}" == "1" ]]; then
   EAGER_ARGS+=(--enforce-eager)
 fi
 
+# Free-form extra vLLM flags for A/B runs, e.g.
+#   SERVE_EXTRA_ARGS="--async-scheduling" scripts/05-serve.sh main-029
+# Word-split on purpose: this carries flags, not values containing spaces.
+EXTRA_ARGS=()
+if [[ -n "${SERVE_EXTRA_ARGS:-}" ]]; then
+  # shellcheck disable=SC2206
+  EXTRA_ARGS=(${SERVE_EXTRA_ARGS})
+fi
+
 IB_ARGS=(--privileged --ulimit memlock=-1 --ulimit stack=67108864)
 if [[ -d /dev/infiniband ]]; then
   IB_ARGS+=(--device /dev/infiniband)
@@ -203,6 +253,21 @@ fi
 echo "serve stack=${STACK} kv=${KV_CACHE_DTYPE} moe=${MOE_BACKEND} spec=${SPEC_JSON} disable_dspark=${DISABLE_DSPARK:-0} enforce_eager=${ENFORCE_EAGER:-0} cudagraph_mode=${CUDAGRAPH_MODE:-default} copy_inputs=${CUDAGRAPH_COPY_INPUTS:-} kv_offload=${KV_OFFLOAD:-off} aot=${VLLM_USE_AOT_COMPILE:-0} rank=${NODE_RANK} master=${HEAD_IP}"
 if [[ "${NODE_RANK}" == "0" ]]; then
   echo "start the worker (rank 1) first, then this head"
+fi
+
+# Refuse to start if the port is already served. `docker run -d` succeeds even when the
+# engine cannot bind, so without this check the script prints "started" while the container
+# exits with OSError [Errno 98], and every client silently reaches whatever already holds the
+# port. That is how a still-running reference container contaminated a whole measurement
+# series: the health poll and the meter both talk to 127.0.0.1:${SERVE_PORT}.
+# `|| true` is required: the pipeline exits non-zero when the port is free, which under
+# `set -e -o pipefail` would abort every normal launch. Only the busy path was tested first.
+_holder="$(ss -ltnp 2>/dev/null | grep -E "[:.]${SERVE_PORT}[[:space:]]" | head -2 || true)"
+if [[ -n "${_holder}" ]]; then
+  echo "refusing to start ${CONTAINER_NAME}: port ${SERVE_PORT} is already in use:" >&2
+  echo "${_holder}" >&2
+  echo "stop the holder first, e.g. docker ps --format '{{.Names}}' and docker rm -f <name>" >&2
+  exit 1
 fi
 
 docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
@@ -241,13 +306,14 @@ docker run -d -i --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host
   -e VLLM_PREFIX_CACHE_RETENTION_INTERVAL="${VLLM_PREFIX_CACHE_RETENTION_INTERVAL}" \
   -e VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS="${VLLM_EXECUTE_MODEL_TIMEOUT_SECONDS}" \
   -e VLLM_ENABLE_CUDA_COMPATIBILITY="${VLLM_ENABLE_CUDA_COMPATIBILITY:-0}" \
-  -e VLLM_PRESERVE_SM12X_TARGET="${VLLM_PRESERVE_SM12X_TARGET:-0}" \
   -e DG_JIT_USE_NVRTC="${DG_JIT_USE_NVRTC:-0}" \
   -e INSTANTTENSOR_DRAFT_LOADER="${INSTANTTENSOR_DRAFT_LOADER:-auto}" \
   -e VLLM_USE_AOT_COMPILE="${VLLM_USE_AOT_COMPILE:-0}" \
   -e VLLM_PROFILE_DECODE="${VLLM_PROFILE_DECODE:-0}" \
   -e B12X_MLA_SM120_UNIFIED="${B12X_MLA_SM120_UNIFIED:-}" \
   -e B12X_MOE_FORCE_A8="${B12X_MOE_FORCE_A8:-}" \
+  -e VLLM_B12X_MOE_FP4_FORCE_A16="${VLLM_B12X_MOE_FP4_FORCE_A16:-0}" \
+  -e VLLM_B12X_INDEXER_DIRECT_GATHER="${VLLM_B12X_INDEXER_DIRECT_GATHER:-1}" \
   -e VLLM_USE_B12X_WO_PROJECTION="${VLLM_USE_B12X_WO_PROJECTION:-}" \
   -e VLLM_USE_B12X_MHC="${VLLM_USE_B12X_MHC:-}" \
   -e VLLM_USE_B12X_MOE="${VLLM_USE_B12X_MOE:-}" \
@@ -255,6 +321,8 @@ docker run -d -i --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host
   -e TORCHINDUCTOR_CACHE_DIR=/root/.cache/torchinductor \
   -e NVIDIA_DISABLE_REQUIRE=1 \
   "${ALLOC_CONF_ARGS[@]}" \
+  "${EXTRA_ENV_ARGS[@]}" \
+  "${EXTRA_MOUNT_ARGS[@]}" \
   -v "${HOME}/.triton:/root/.triton" \
   -v "${HOME}/.cache/vllm:/root/.cache/vllm" \
   -v "${HOME}/.cache/huggingface:/root/.cache/huggingface" \
@@ -298,7 +366,8 @@ docker run -d -i --name "${CONTAINER_NAME}" --gpus all --ipc=host --network host
     --tool-call-parser "${TOOL_CALL_PARSER:-deepseek_v4}" \
     --enable-auto-tool-choice \
     ${SERVED_MODEL_ARGS[@]} \
-    --trust-remote-code
+    --trust-remote-code \
+    "${EXTRA_ARGS[@]}"
 
 echo "started ${CONTAINER_NAME} $(docker inspect -f '{{.State.Status}}' "${CONTAINER_NAME}")"
 if [[ -t 1 ]]; then

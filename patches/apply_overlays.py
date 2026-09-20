@@ -29,15 +29,24 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
     text = path.read_text()
     if old == new:
         raise SystemExit(f"{label}: old == new")
-    if old not in text:
+    # Match only at a line boundary. A bare `str.replace` also matches a needle's
+    # leading indentation as the *tail* of a deeper-indented line, which silently
+    # writes the replacement at the wrong indent: on proto-v0.2.0 the needle
+    # `[16sp]compressor(compressed_kv_score, ...)` matched inside the real
+    # `[20sp]compressor(...)` line, producing `[20sp]if not b12x_skip_flag(...):`
+    # with its body also at 20 spaces, so phase 2 died on an IndentationError while
+    # `port_scan.py` still counted the overlay as applied. Anchoring turns that
+    # whole class of mistake into a loud missing-needle failure.
+    matches = [m.start() for m in re.finditer(r"(?m)^" + re.escape(old), text)]
+    if not matches:
         if new in text:
             print(f"skip {label}: already applied")
             return
         raise SystemExit(f"{label}: missing needle in {path}")
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"{label}: needle not unique ({count}) in {path}")
-    path.write_text(text.replace(old, new, 1))
+    if len(matches) != 1:
+        raise SystemExit(f"{label}: needle not unique ({len(matches)}) in {path}")
+    start = matches[0]
+    path.write_text(text[:start] + new + text[start + len(old):])
     print(f"ok {label}")
 
 
@@ -315,17 +324,355 @@ def patch_decode_profiler(vllm: Path) -> None:
     )
 
 
+def patch_step_profiler(vllm: Path) -> None:
+    """Wall + CUDA-event timing of the target decode step.
+
+    patch_decode_profiler/patch_layer_profiler hook the DSpark draft
+    (_run_model), which a no-spec arm never calls. This wraps the model
+    runner's step entry points instead: execute_model (forward),
+    sample_tokens and sample (lm_head + sampler). Env VLLM_PROFILE_DECODE=1.
+    """
+    path = vllm / "v1/worker/gpu/model_runner.py"
+    if "b12x_profile_target_step" in path.read_text():
+        print("skip target step profiler: already applied")
+        return
+    replace_once(
+        path,
+        "    @torch.inference_mode()\n"
+        "    def execute_model(\n",
+        "    @b12x_profile_target_step\n"
+        "    @torch.inference_mode()\n"
+        "    def execute_model(\n",
+        "target step profiler decorator (execute_model)",
+    )
+    replace_once(
+        path,
+        "    @torch.inference_mode()\n"
+        "    @step_eplb_after()\n"
+        "    def sample_tokens(\n",
+        "    @b12x_profile_target_step\n"
+        "    @torch.inference_mode()\n"
+        "    @step_eplb_after()\n"
+        "    def sample_tokens(\n",
+        "target step profiler decorator (sample_tokens)",
+    )
+    replace_once(
+        path,
+        "    def sample(\n"
+        "        self,\n"
+        "        hidden_states: torch.Tensor,\n"
+        "        input_batch: InputBatch,\n"
+        "        grammar_output: GrammarOutput | None,\n"
+        "    ) -> tuple[SamplerOutput, torch.Tensor, torch.Tensor]:\n",
+        "    @b12x_profile_target_step\n"
+        "    def sample(\n"
+        "        self,\n"
+        "        hidden_states: torch.Tensor,\n"
+        "        input_batch: InputBatch,\n"
+        "        grammar_output: GrammarOutput | None,\n"
+        "    ) -> tuple[SamplerOutput, torch.Tensor, torch.Tensor]:\n",
+        "target step profiler decorator (sample)",
+    )
+    replace_once(
+        path,
+        "from vllm.v1.worker.gpu.pp_utils import PPHandler\n",
+        "from vllm.v1.worker.gpu.pp_utils import PPHandler\n"
+        "from vllm.utils.sm12x_b12x_kernels import b12x_profile_target_step\n",
+        "target step profiler import",
+    )
+
+
+_WO_RETURN_OLD = (
+    "        return deep_gemm_fp8_o_proj(\n"
+    "            o,\n"
+    "            positions,\n"
+    "            self.rotary_emb.cos_sin_cache,\n"
+    "            self.wo_a,\n"
+    "            self.wo_b,\n"
+    "            n_groups=self.n_local_groups,\n"
+    "            heads_per_group=self.n_local_heads // self.n_local_groups,\n"
+    "            nope_dim=self.nope_head_dim,\n"
+    "            rope_dim=self.rope_head_dim,\n"
+    "            o_lora_rank=self.o_lora_rank,\n"
+    "            einsum_recipe=self._einsum_recipe,\n"
+    "            tma_aligned_scales=self._tma_aligned_scales,\n"
+    "        )\n"
+)
+
+_WO_RETURN_NEW = (
+    "        with b12x_profile_region(\"wo\", o):\n"
+    "            return deep_gemm_fp8_o_proj(\n"
+    "                o,\n"
+    "                positions,\n"
+    "                self.rotary_emb.cos_sin_cache,\n"
+    "                self.wo_a,\n"
+    "                self.wo_b,\n"
+    "                n_groups=self.n_local_groups,\n"
+    "                heads_per_group=self.n_local_heads // self.n_local_groups,\n"
+    "                nope_dim=self.nope_head_dim,\n"
+    "                rope_dim=self.rope_head_dim,\n"
+    "                o_lora_rank=self.o_lora_rank,\n"
+    "                einsum_recipe=self._einsum_recipe,\n"
+    "                tma_aligned_scales=self._tma_aligned_scales,\n"
+    "            )\n"
+)
+
+
+def patch_region_profiler(vllm: Path) -> None:
+    """CUDA-event time for named regions of the layer and attention forward.
+
+    Layer total (b12x_profile_layer) -> attn/ffn split -> per region:
+    indexer module, indexer logits, sparse MLA, KV insert, o_proj WO and the
+    TP all-reduce. VLLM_PROFILE_DECODE=1 for a run without CUDA graphs;
+    VLLM_PROFILE_CAPTURE=1 also records the model.py marks during CUDA graph
+    capture, so the replay re-records them (gap-free device time).
+    """
+    model = vllm / "models/deepseek_v4/nvidia/model.py"
+    if "b12x_profile_region" in model.read_text():
+        print("skip region profiler (model): already applied")
+    else:
+        replace_once(
+            model,
+            "from vllm.config import VllmConfig\n",
+            "from vllm.config import VllmConfig\n"
+            "from vllm.utils.sm12x_b12x_kernels import b12x_profile_region\n",
+            "region profiler import (model)",
+        )
+        replace_once(
+            model,
+            "        x = self.attn(positions, x, None)\n",
+            "        with b12x_profile_region(\"attn\", x):\n"
+            "            x = self.attn(positions, x, None)\n",
+            "region profiler attn",
+        )
+        replace_once(
+            model,
+            "        x = self.ffn(x, input_ids)\n",
+            "        with b12x_profile_region(\"ffn\", x):\n"
+            "            x = self.ffn(x, input_ids)\n",
+            "region profiler ffn",
+        )
+
+    attention = vllm / "models/deepseek_v4/attention.py"
+    if "b12x_profile_region" in attention.read_text():
+        print("skip region profiler (attention): already applied")
+    else:
+        replace_once(
+            attention,
+            "import vllm.envs as envs\n",
+            "import vllm.envs as envs\n"
+            "from vllm.utils.sm12x_b12x_kernels import (\n"
+            "    b12x_profile_region as _b12x_region,\n"
+            "    b12x_profile_region_fn as _b12x_region_fn,\n"
+            ")\n",
+            "region profiler import (attention)",
+        )
+        replace_once(
+            attention,
+            "            self.indexer.indexer_op(\n"
+            "                hidden_states,\n"
+            "                q_quant,\n"
+            "                None,\n"
+            "                index_weights,\n"
+            "            )\n",
+            "            with _b12x_region(\"indexer_op\", hidden_states):\n"
+            "                self.indexer.indexer_op(\n"
+            "                    hidden_states,\n"
+            "                    q_quant,\n"
+            "                    None,\n"
+            "                    index_weights,\n"
+            "                )\n",
+            "region profiler indexer logits",
+        )
+        replace_once(
+            attention,
+            "        self.forward_mqa(q, kv, positions, out)\n",
+            "        with _b12x_region(\"mla\", q):\n"
+            "            self.forward_mqa(q, kv, positions, out)\n",
+            "region profiler sparse mla",
+        )
+        replace_once(
+            attention,
+            "    def forward(\n"
+            "        self,\n"
+            "        hidden_states: torch.Tensor,\n"
+            "        qr: torch.Tensor,\n"
+            "        compressed_kv_score: torch.Tensor | None,\n"
+            "        indexer_weights: torch.Tensor,\n"
+            "        positions: torch.Tensor,\n"
+            "        rotary_emb: nn.Module,\n"
+            "        qr_scale: torch.Tensor | None = None,\n"
+            "        skip_compressor: bool = False,\n"
+            "    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:\n",
+            "    @_b12x_region_fn(\"indexer\")\n"
+            "    def forward(\n"
+            "        self,\n"
+            "        hidden_states: torch.Tensor,\n"
+            "        qr: torch.Tensor,\n"
+            "        compressed_kv_score: torch.Tensor | None,\n"
+            "        indexer_weights: torch.Tensor,\n"
+            "        positions: torch.Tensor,\n"
+            "        rotary_emb: nn.Module,\n"
+            "        qr_scale: torch.Tensor | None = None,\n"
+            "        skip_compressor: bool = False,\n"
+            "    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:\n",
+            "region profiler indexer module",
+        )
+
+    o_proj = vllm / "models/deepseek_v4/nvidia/ops/o_proj.py"
+    if "b12x_profile_region" not in o_proj.read_text():
+        replace_once(
+            o_proj,
+            "from vllm.utils.deep_gemm import fp8_einsum\n",
+            "from vllm.utils.deep_gemm import fp8_einsum\n"
+            "from vllm.utils.sm12x_b12x_kernels import b12x_profile_region\n",
+            "region profiler import (o_proj)",
+        )
+        replace_once(
+            o_proj,
+            "    b12x_out = try_b12x_wo_proj(\n"
+            "        o,\n"
+            "        positions,\n"
+            "        cos_sin_cache,\n"
+            "        wo_a,\n"
+            "        wo_b,\n"
+            "        n_groups=n_groups,\n"
+            "        heads_per_group=heads_per_group,\n"
+            "        nope_dim=nope_dim,\n"
+            "        rope_dim=rope_dim,\n"
+            "        o_lora_rank=o_lora_rank,\n"
+            "    )\n",
+            "    with b12x_profile_region(\"wo_b12x\", o):\n"
+            "        b12x_out = try_b12x_wo_proj(\n"
+            "            o,\n"
+            "            positions,\n"
+            "            cos_sin_cache,\n"
+            "            wo_a,\n"
+            "            wo_b,\n"
+            "            n_groups=n_groups,\n"
+            "            heads_per_group=heads_per_group,\n"
+            "            nope_dim=nope_dim,\n"
+            "            rope_dim=rope_dim,\n"
+            "            o_lora_rank=o_lora_rank,\n"
+            "        )\n",
+            "region profiler wo b12x call",
+        )
+
+    # Marked at the call site, not with a decorator: assert_image.py checks
+    # inspect.getsource(deep_gemm_fp8_o_proj) and a wrapper would replace it.
+    sparse = vllm / "models/deepseek_v4/nvidia/flashinfer_sparse.py"
+    sparse_text = sparse.read_text()
+    if "b12x_profile_region" not in sparse_text:
+        n = sparse_text.count(_WO_RETURN_OLD)
+        if n < 1:
+            raise SystemExit("region profiler wo call: missing needle in flashinfer_sparse.py")
+        sparse.write_text(sparse_text.replace(_WO_RETURN_OLD, _WO_RETURN_NEW))
+        print(f"ok region profiler wo call x{n}")
+        replace_once(
+            sparse,
+            "from vllm.models.deepseek_v4.nvidia.ops.o_proj import (\n",
+            "from vllm.utils.sm12x_b12x_kernels import b12x_profile_region\n"
+            "from vllm.models.deepseek_v4.nvidia.ops.o_proj import (\n",
+            "region profiler import (flashinfer_sparse)",
+        )
+
+    comm = vllm / "distributed/communication_op.py"
+    if "b12x_profile_region" not in comm.read_text():
+        replace_once(
+            comm,
+            "from .parallel_state import get_tp_group\n",
+            "from .parallel_state import get_tp_group\n"
+            "from vllm.utils.sm12x_b12x_kernels import b12x_profile_region_fn\n",
+            "region profiler import (communication_op)",
+        )
+        replace_once(
+            comm,
+            "def tensor_model_parallel_all_reduce(input_: torch.Tensor) -> torch.Tensor:\n",
+            "@b12x_profile_region_fn(\"allreduce\")\n"
+            "def tensor_model_parallel_all_reduce(input_: torch.Tensor) -> torch.Tensor:\n",
+            "region profiler allreduce",
+        )
+
+
+def patch_indexer_skip_diag(vllm: Path) -> None:
+    """Diagnostic switches for the C4A indexer stage (file flags).
+
+    Empty files under /cache/runtime (a host bind mount, so they can be
+    created while the server runs) select: skip_indexer_all,
+    skip_indexer_op, skip_compressor. The stage costs ~60ms of the no-spec
+    1-row step; these bisect it without a reboot. Output is wrong while any
+    flag is set, so only the step rate is meaningful.
+    """
+    path = vllm / "models/deepseek_v4/attention.py"
+    if "b12x_skip_flag" in path.read_text():
+        print("skip indexer-skip diagnostic: already applied")
+        return
+    replace_once(
+        path,
+        "from vllm.models.deepseek_v4.compressor import DeepseekCompressor\n",
+        "from vllm.models.deepseek_v4.compressor import DeepseekCompressor\n"
+        "from vllm.utils.sm12x_b12x_kernels import b12x_skip_flag\n",
+        "indexer skip diagnostic import",
+    )
+    replace_once(
+        path,
+        "    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:\n"
+        "        compressor = self.compressor\n",
+        "    ) -> tuple[torch.Tensor | None, torch.Tensor | None, torch.Tensor | None]:\n"
+        "        if b12x_skip_flag(\"indexer_all\"):\n"
+        "            return None, None, None\n"
+        "        compressor = self.compressor\n",
+        "indexer skip diagnostic (whole module)",
+    )
+    replace_once(
+        path,
+        # Anchored on the guarding line: the bare call is a suffix of that line's
+        # body, so it cannot pin its own indentation.
+        "                if not skip_compressor:\n"
+        "                    compressor(compressed_kv_score, positions, rotary_emb)\n",
+        "                if not skip_compressor:\n"
+        "                    if not b12x_skip_flag(\"compressor\"):\n"
+        "                        compressor(compressed_kv_score, positions, rotary_emb)\n",
+        "indexer skip diagnostic (compressor, short context)",
+    )
+    replace_once(
+        path,
+        "                lambda: compressor(compressed_kv_score, positions, rotary_emb),\n",
+        "                lambda: (\n"
+        "                    None\n"
+        "                    if b12x_skip_flag(\"compressor\")\n"
+        "                    else compressor(compressed_kv_score, positions, rotary_emb)\n"
+        "                ),\n",
+        "indexer skip diagnostic (compressor)",
+    )
+    replace_once(
+        path,
+        "        if self.indexer is not None and index_q is not None:\n",
+        "        if (\n"
+        "            self.indexer is not None\n"
+        "            and index_q is not None\n"
+        "            and not b12x_skip_flag(\"indexer_op\")\n"
+        "        ):\n",
+        "indexer skip diagnostic (logits op)",
+    )
+
+
 def patch_kernel_warmup_ext(vllm: Path) -> None:
-    """Call the mHC layer + gumbel warmups right after the upstream
-    deepseek_v4_mhc_warmup (which is a no-op for the v0.28.0 nvidia layer).
+    """Call the mHC layer + gumbel warmups the JIT warmup registry leaves open.
+
+    Upstream's own mHC warmup is gone: #50178 moved the mHC TileLang kernels
+    into that registry, which the deepseek_v4 nvidia model fills from the inner
+    kernels, and the DSpark draft gumbel sampler is warmed nowhere.
 
     The image tag accumulates overlay state across rebuilds (old and new
     warmup-ext blocks can coexist in kernel_warmup.py), so this strips any
-    previously-applied block between the upstream call and the next warmup
-    marker, then applies the fresh patch deterministically."""
+    previously-applied block between the cudagraph-capture-size line and the
+    next warmup marker, then applies the fresh patch deterministically."""
     path = vllm / "model_executor/warmup/kernel_warmup.py"
     text = path.read_text()
-    start_marker = "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n    )\n"
+    start_marker = (
+        "    cudagraph_capture_sizes = list(compilation_config.cudagraph_capture_sizes or [])\n"
+    )
     end_marker = "    # Run next so input-prep kernels JIT against pristine runner state."
     if "dsv4_warmup_ext" in text:
         i = text.find(start_marker)
@@ -338,35 +685,26 @@ def patch_kernel_warmup_ext(vllm: Path) -> None:
         print("stripped accumulated warmup-ext blocks")
     replace_once(
         path,
-        "    deepseek_v4_mhc_warmup(\n"
-        "        worker.get_model(),\n"
-        "        max_tokens=worker.scheduler_config.max_num_batched_tokens,\n"
-        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
-        "    )\n",
-        "    deepseek_v4_mhc_warmup(\n"
-        "        worker.get_model(),\n"
-        "        max_tokens=worker.scheduler_config.max_num_batched_tokens,\n"
-        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
-        "    )\n"
-        "\n"
-        "    # v0.28.0 nvidia decoder layers call mhc_pre_tilelang /\n"
-        "    # mhc_fused_post_pre_tilelang directly (no hc_pre/hc_post methods),\n"
-        "    # so the upstream mHC warmup silently no-ops; the DSpark draft gumbel\n"
-        "    # sampler is warmed nowhere either. JIT both here so the first\n"
-        "    # served request is compile-free.\n"
-        "    from vllm.model_executor.warmup.dsv4_warmup_ext import (\n"
-        "        deepseek_v4_mhc_layer_warmup,\n"
-        "        dspark_gumbel_warmup,\n"
-        "    )\n"
-        "\n"
-        "    deepseek_v4_mhc_layer_warmup(\n"
-        "        worker.get_model(),\n"
-        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
-        "    )\n"
-        "    dspark_gumbel_warmup(\n"
-        "        worker.get_model(),\n"
-        "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
-        "    )\n",
+        start_marker,
+        start_marker
+        + "\n"
+        + "    # The nvidia decoder layers call mhc_pre_tilelang /\n"
+        + "    # mhc_fused_post_pre_tilelang directly; the registry keys the inner\n"
+        + "    # TileLang kernels, and the DSpark draft gumbel sampler is warmed\n"
+        + "    # nowhere. JIT both here so the first served request is compile-free.\n"
+        + "    from vllm.model_executor.warmup.dsv4_warmup_ext import (\n"
+        + "        deepseek_v4_mhc_layer_warmup,\n"
+        + "        dspark_gumbel_warmup,\n"
+        + "    )\n"
+        + "\n"
+        + "    deepseek_v4_mhc_layer_warmup(\n"
+        + "        worker.get_model(),\n"
+        + "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        + "    )\n"
+        + "    dspark_gumbel_warmup(\n"
+        + "        worker.get_model(),\n"
+        + "        cudagraph_capture_sizes=cudagraph_capture_sizes,\n"
+        + "    )\n",
         "kernel_warmup dsv4 warmup ext",
     )
 
@@ -463,53 +801,16 @@ def patch_dsv4_b12x_sparse_backend(vllm: Path) -> None:
     )
 
 
-def patch_b12x_moe_weight_prep_v028(vllm: Path) -> None:
-    """v0.28.0 modular MoE: run the b12x experts' weight prep on GPU too.
-
-    UnquantizedFusedMoEMethod only calls ``fused_experts.process_weights_after_loading``
-    for the CPU backend; the b12x path needs it on GPU as well (the donor
-    B12xExperts raises "must be prepared by process_weights_after_loading"
-    otherwise).
-    """
-    path = vllm / "model_executor/layers/fused_moe/unquantized_fused_moe_method.py"
-    text = path.read_text()
-    if "isinstance(self.moe_kernel.fused_experts, B12xExperts)" in text:
-        print("skip b12x MoE weight prep (v0.28.0): already present")
-        return
-    old = (
-        "            if self.unquantized_backend == UnquantizedMoeBackend.CPU:\n"
-        "                # The CPU experts need the layer itself for the setup that\n"
-        "                # convert_to_unquantized_kernel_format cannot express, since\n"
-        "                # it only sees the two weight tensors: padding and prepacking\n"
-        "                # into the grouped-gemm layout (bias included), and capturing\n"
-        "                # the router config that monolithic apply() cannot carry.\n"
-        "                self.moe_kernel.fused_experts.process_weights_after_loading(layer)"
-    )
-    new = (
-        "            if (\n"
-        "                self.unquantized_backend == UnquantizedMoeBackend.CPU\n"
-        "                or isinstance(self.moe_kernel.fused_experts, B12xExperts)\n"
-        "            ):\n"
-        "                # The CPU experts need the layer itself for the setup that\n"
-        "                # convert_to_unquantized_kernel_format cannot express, since\n"
-        "                # it only sees the two weight tensors: padding and prepacking\n"
-        "                # into the grouped-gemm layout (bias included), and capturing\n"
-        "                # the router config that monolithic apply() cannot carry.\n"
-        "                # v0.28.0: the b12x experts need the same layer-level prep on GPU.\n"
-        "                self.moe_kernel.fused_experts.process_weights_after_loading(layer)"
-    )
-    assert old in text, "unquantized method needle missing"
-    text = text.replace(old, new)
-    imp_old = "from vllm.model_executor.utils import replace_parameter, set_weight_attrs"
-    imp_new = "from vllm.model_executor.layers.fused_moe.b12x import B12xExperts\nfrom vllm.model_executor.utils import replace_parameter, set_weight_attrs"
-    assert imp_old in text, "import needle missing"
-    text = text.replace(imp_old, imp_new, 1)
-    path.write_text(text)
-    print("ok b12x MoE weight prep (v0.28.0)")
-
-
 def patch_moe_backend(vllm: Path) -> None:
+    """Register the b12x MoE backend on trees that predate it.
+
+    vLLM >= v0.29.0 ships "b12x" in both the MoEBackend literal and its
+    docstring, so the append is a no-op there.
+    """
     path = vllm / "config/kernel.py"
+    if '"b12x",' in path.read_text():
+        print("skip MoEBackend b12x: already upstream")
+        return
     replace_once(
         path,
         '    "flashinfer_b12x",\n    "marlin",\n    "humming",\n    "triton_unfused",',
@@ -559,7 +860,11 @@ def patch_envs(vllm: Path) -> None:
 
 
 def patch_utils_b12x(vllm: Path) -> None:
+    """Add B12xWarmupUnit and the fused-MoE accessor. vLLM >= v0.29.0 has both."""
     path = vllm / "utils/b12x.py"
+    if "class B12xWarmupUnit" in path.read_text():
+        print("skip utils.b12x helpers: already upstream")
+        return
     replace_once(
         path,
         "from collections.abc import Iterable\n"
@@ -594,7 +899,16 @@ def patch_utils_b12x(vllm: Path) -> None:
 
 
 def patch_mxfp4_oracle(vllm: Path) -> None:
+    """Register the b12x MXFP4 MoE backends in the oracle.
+
+    vLLM >= v0.29.0 ships the enum, the backend map, the b12x weight
+    identity, and ``_get_requested_backends`` unchanged from this overlay,
+    so the whole group is a no-op there.
+    """
     path = vllm / "model_executor/layers/fused_moe/oracle/mxfp4.py"
+    if "B12X_MXFP4_MXFP8" in path.read_text():
+        print("skip mxfp4 oracle b12x: already upstream")
+        return
     replace_once(
         path,
         "import torch\n\nimport vllm.model_executor.layers.fused_moe.modular_kernel as mk\n"
@@ -853,16 +1167,6 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         "torch_utils nvfp4_ds_mla",
     )
 
-    vllm_cfg = vllm / "config/vllm.py"
-    replace_once(
-        vllm_cfg,
-        "            self.cache_config.cache_dtype.startswith(\"nvfp4\")\n"
-        "            and self.model_config.use_mla\n",
-        "            self.cache_config.cache_dtype == \"nvfp4\"\n"
-        "            and self.model_config.use_mla\n",
-        "MLA guard exact nvfp4 only",
-    )
-
     attn = vllm / "models/deepseek_v4/attention.py"
     replace_once(
         attn,
@@ -887,17 +1191,21 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         attn,
         "    if use_fp8_ds_mla_layout:\n"
         "        # fp8_ds_mla block format: UE8M0 block-scaled fp8 packed as uint8.\n"
-        "        assert kv_cache_dtype.startswith(\"fp8\"), (\n",
+        "        if kv_cache_dtype == \"auto\":\n"
+        "            kv_cache_dtype = \"fp8\"\n"
+        "        if not kv_cache_dtype.startswith(\"fp8\"):\n",
         "    if use_fp8_ds_mla_layout:\n"
         "        # fp8_ds_mla block format: UE8M0 block-scaled fp8 packed as uint8.\n"
-        '        if kv_cache_dtype in ("nvfp4", "nvfp4_ds_mla"):\n'
+        "        if kv_cache_dtype in (\"nvfp4\", \"nvfp4_ds_mla\"):\n"
         "            if cache_config is not None:\n"
-        '                cache_config.cache_dtype = "nvfp4_ds_mla"\n'
+        "                cache_config.cache_dtype = \"nvfp4_ds_mla\"\n"
         "            logger.info_once(\n"
-        '                "Using DeepSeek V4 padded nvfp4_ds_mla KV cache format."\n'
+        "                \"Using DeepSeek V4 padded nvfp4_ds_mla KV cache format.\"\n"
         "            )\n"
-        '            return "nvfp4_ds_mla", torch.uint8\n'
-        "        assert kv_cache_dtype.startswith(\"fp8\"), (\n",
+        "            return \"nvfp4_ds_mla\", torch.uint8\n"
+        "        if kv_cache_dtype == \"auto\":\n"
+        "            kv_cache_dtype = \"fp8\"\n"
+        "        if not kv_cache_dtype.startswith(\"fp8\"):\n",
         "attention resolve nvfp4_ds_mla before fp8 assert",
     )
     attn_spec_new_common = (
@@ -977,12 +1285,18 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         "            dtype=self.dtype,\n"
         "            sliding_window=self.window_size,\n"
         "            cache_dtype_str=self.cache_config.cache_dtype,\n"
-        "            # DeepseekV4 fp8_ds_mla: 584B per token (448B NoPE + 128B RoPE + 8B scales)\n"
-        "            state_content_bytes=584 if uses_fp8_ds_mla_layout else None,\n"
-        "            # 576B for FlashMLA packing; 512B for FlashInfer sparse (#44577).\n"
-        "            alignment=576 if uses_fp8_ds_mla_layout else 512,\n",
+        "            state_content_bytes=(\n"
+        "                self.packed_bytes_per_token if uses_fp8_ds_mla_layout else None\n"
+        "            ),\n"
+        "            # FlashMLA packing stride; 512B for FlashInfer sparse (#44577).\n"
+        "            alignment=self.packed_page_alignment if uses_fp8_ds_mla_layout else 512,\n",
         "        packed = self.cache_config.cache_dtype in (\"fp8_ds_mla\", \"nvfp4_ds_mla\")\n"
         "        from vllm.models.deepseek_v4.attention import _dsv4_page_alignment\n"
+        "        # nvfp4_ds_mla's 584B page doubles as its alignment; fp8_ds_mla keeps\n"
+        "        # upstream's packing stride.\n"
+        "        alignment = self.packed_page_alignment if packed else 512\n"
+        "        if self.cache_config.cache_dtype == \"nvfp4_ds_mla\":\n"
+        "            alignment = _dsv4_page_alignment(self.cache_config.cache_dtype)\n"
         "        return SlidingWindowMLASpec(\n"
         "            block_size=self.block_size,\n"
         "            num_kv_heads=1,\n"
@@ -990,8 +1304,10 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         "            dtype=self.dtype,\n"
         "            sliding_window=self.window_size,\n"
         "            cache_dtype_str=self.cache_config.cache_dtype,\n"
-        "            state_content_bytes=584 if packed else None,\n"
-        "            alignment=_dsv4_page_alignment(self.cache_config.cache_dtype),\n",
+        "            state_content_bytes=(\n"
+        "                self.packed_bytes_per_token if packed else None\n"
+        "            ),\n"
+        "            alignment=alignment,\n",
         "SWA alignment 584/576/512 ladder",
     )
     replace_optional(
@@ -1233,13 +1549,25 @@ def patch_fp8_einsum_fallback(vllm: Path) -> None:
 
 
 def patch_einsum_sm12x_recipe(vllm: Path) -> None:
-    """SM12x o_proj must emit SM90 FP32 128x128 scales, not SM100 packed INT32.
+    """SM12x o_proj would emit SM90 FP32 128x128 scales, not SM100 packed INT32.
 
-    compute_fp8_einsum_recipe treats major>=10 as Blackwell TMA (recipe
-    (1,1,128), tma_aligned_scales=True). GB10 is family 120 / major 12, so
-    fused_inv_rope_fp8_quant packed UE8M0 into int32. The Python fp8_einsum
-    fallback then did scale.to(float32) on those packed ints and o_proj
-    became noise. Force the SM90 FP32 layout on SM12x.
+    DO NOT apply this on proto-v0.2.0 or later: it is the cause of the
+    DeepGEMM startup assertion, not a fix for it. It forces
+    ``(1, 128, 128)`` with ``tma_aligned_scales=False`` on SM12x, and the
+    DeepGEMM fork now rejects that call at ``csrc/utils/layout.hpp:113``
+    (``sf.size(-2) == ceil_div(mn, gran_mn)``) inside
+    ``_initialize_kv_caches``, so ``VllmWorker-0`` dies and the engine never
+    starts. ``apply_main`` therefore does not call it; it is kept only for the
+    ``--only einsum-sm12x`` / ``--only o-proj-einsum-e8m0`` diagnostic paths.
+
+    The reason recorded here originally -- "the Python fp8_einsum fallback
+    then did scale.to(float32) on those packed ints" -- no longer holds: the
+    fallback is not applied by ``apply_main`` (see the v0.28.0 note there) and
+    ``utils/deep_gemm.py`` binds ``_fp8_einsum_impl = getattr(_dg,
+    "fp8_einsum", None)``, DeepGEMM's real kernel. Upstream's own recipe,
+    ``(1, 1, block_size)`` with ``tma_aligned_scales=True``, is the packed
+    UE8M0 layout that kernel reads, and the DSv4 o_proj shape was measured
+    accepted with it at T=10 and T=256 (docs/UPSTREAM.md, DeepGEMM #447).
     """
     path = vllm / "models/deepseek_v4/nvidia/ops/o_proj.py"
     text = path.read_text()
@@ -1250,7 +1578,7 @@ def patch_einsum_sm12x_recipe(vllm: Path) -> None:
         path,
         "    cap = current_platform.get_device_capability()\n"
         '    assert cap is not None, "DeepseekV4 attention requires a CUDA device"\n'
-        "    einsum_recipe = (1, 128, 128) if cap.major <= 9 else (1, 1, 128)\n"
+        "    einsum_recipe = (1, 128, 128) if cap.major <= 9 else (1, 1, block_size)\n"
         "    tma_aligned_scales = cap.major >= 10\n"
         "    return einsum_recipe, tma_aligned_scales\n",
         "    cap = current_platform.get_device_capability()\n"
@@ -1259,7 +1587,7 @@ def patch_einsum_sm12x_recipe(vllm: Path) -> None:
         "    # The Python fp8_einsum fallback needs SM90 FP32 128x128 scales.\n"
         "    if cap.major == 12:\n"
         "        return (1, 128, 128), False\n"
-        "    einsum_recipe = (1, 128, 128) if cap.major <= 9 else (1, 1, 128)\n"
+        "    einsum_recipe = (1, 128, 128) if cap.major <= 9 else (1, 1, block_size)\n"
         "    tma_aligned_scales = cap.major >= 10\n"
         "    return einsum_recipe, tma_aligned_scales\n",
         "compute_fp8_einsum_recipe SM12x FP32 scales",
@@ -1316,6 +1644,17 @@ def patch_einsum_sm12x_scale_upcast(vllm: Path) -> None:
 
 
 def patch_mxfp4_process_weights(vllm: Path) -> None:
+    """Hand ``layer`` to the MXFP4 kernel factory so it can prep the experts.
+
+    vLLM >= v0.29.0 builds the kernel without the layer and calls
+    ``moe_kernel.fused_experts.process_weights_after_loading(layer)`` from
+    Mxfp4MoEMethod, so this overlay would prep the same experts twice.
+    """
+    if "fused_experts.process_weights_after_loading(layer)" in (
+        vllm / "model_executor/layers/quantization/mxfp4.py"
+    ).read_text():
+        print("skip mxfp4 process_weights: upstream preps the experts in the caller")
+        return
     path = vllm / "model_executor/layers/fused_moe/oracle/mxfp4.py"
     replace_once(
         path,
@@ -2086,6 +2425,13 @@ def patch_mqa_logits_sm12x_fallback(vllm: Path) -> None:
         "    _lazy_init()\n"
         "    if _fp8_fp4_paged_mqa_logits_impl is None:\n"
         "        return _missing()\n"
+        "    # DeepGEMM asserts block_tables.stride(-1)==1. A trailing size-1 dim\n"
+        "    # (e.g. block_table shape [B,1] for short seqs under a large block_size)\n"
+        "    # can be a transposed view where .contiguous() is a no-op (torch treats the\n"
+        "    # size-1 dim's stride as irrelevant) yet stride(-1)!=1, failing the kernel.\n"
+        "    # clone to contiguous format to force stride(-1)==1.\n"
+        "    if block_tables.dim() >= 2 and block_tables.stride(-1) != 1:\n"
+        "        block_tables = block_tables.clone(memory_format=torch.contiguous_format)\n"
         "    kwargs = {} if indices is None else {\"indices\": indices}\n"
         "    return _fp8_fp4_paged_mqa_logits_impl(\n"
         "        q,\n"
@@ -2107,6 +2453,13 @@ def patch_mqa_logits_sm12x_fallback(vllm: Path) -> None:
         "    _lazy_init()\n"
         "    if _fp8_fp4_paged_mqa_logits_impl is None:\n"
         "        return _missing()\n"
+        "    # DeepGEMM asserts block_tables.stride(-1)==1. A trailing size-1 dim\n"
+        "    # (e.g. block_table shape [B,1] for short seqs under a large block_size)\n"
+        "    # can be a transposed view where .contiguous() is a no-op (torch treats the\n"
+        "    # size-1 dim's stride as irrelevant) yet stride(-1)!=1, failing the kernel.\n"
+        "    # clone to contiguous format to force stride(-1)==1.\n"
+        "    if block_tables.dim() >= 2 and block_tables.stride(-1) != 1:\n"
+        "        block_tables = block_tables.clone(memory_format=torch.contiguous_format)\n"
         "    kwargs = {} if indices is None else {\"indices\": indices}\n"
         "    return _fp8_fp4_paged_mqa_logits_impl(\n"
         "        q,\n"
@@ -2364,7 +2717,9 @@ def patch_sm12x_kv_insert(vllm: Path) -> None:
         "        if (\n"
         "            current_platform.is_device_capability_family(120)\n"
         "            # nvfp4_ds_mla falls through to the CUDA FP4 quant_insert op.\n"
-        "            and getattr(self, \"kv_cache_dtype\", None) != \"nvfp4_ds_mla\"\n"
+        "            # v0.29.0 moved this body into the module-level\n"
+        "            # _insert_context_kv(attn, ...), so read the dtype off attn.\n"
+        "            and getattr(attn, \"kv_cache_dtype\", None) != \"nvfp4_ds_mla\"\n"
         "        ):\n"
         "            from vllm.models.deepseek_v4.xpu.xpu_qnorm_rope_kv_fp8_insert import (\n"
         "                xpu_qnorm_rope_kv_fp8_insert,\n"
@@ -2515,8 +2870,14 @@ def patch_dspark_skip_cudagraph(vllm: Path) -> None:
     all-gather. On 2-node GB10 that capture leaves `lm_head.weight` at inf
     and greedy France collapses to a 96-way tie (-ln(96)). Target-model
     FULL graphs stay enabled.
+
+    vLLM >= v0.29.0 graphs the draft backbone only and leaves the shared
+    lm_head eager, which is what this overlay reaches the hard way, so skip.
     """
     path = vllm / "v1/worker/gpu/spec_decode/dflash/speculator.py"
+    if "backbone only, lm_head eager" in path.read_text():
+        print("skip DSpark draft eager: upstream graphs the backbone only")
+        return
     replace_once(
         path,
         "        # PIECEWISE cudagraphs are not supported for dflash.\n"
@@ -2795,6 +3156,9 @@ def patch_flashinfer_dsv4_dispatch(site: Path) -> None:
 
     DSpark k=5 with window_size=128 requires top_k=ceil(133/64)*64=192.
     All head counts get 192 to support any TP configuration.
+
+    Only pre-runtime-topk flashinfer has a pair set to extend; current main
+    instantiates on num_heads and takes topk as a kernel argument.
     """
     path = site / "flashinfer/mla/_sparse_mla_sm120.py"
     if not path.is_file():
@@ -3102,11 +3466,15 @@ def patch_kv_kernel_split_padded_blhnc(vllm: Path) -> None:
         "        kernel_block_size = None\n"
         "        if kernel_block_sizes is not None and group_id < len(kernel_block_sizes):\n"
         "            kernel_block_size = kernel_block_sizes[group_id]\n"
+        "        if isinstance(spec, MLAAttentionSpec) and spec.storage_block_size is not None:\n"
+        "            kernel_block_size = spec.storage_block_size\n"
         "\n"
         "        views = create_kv_cache_views(\n",
         "        kernel_block_size = None\n"
         "        if kernel_block_sizes is not None and group_id < len(kernel_block_sizes):\n"
         "            kernel_block_size = kernel_block_sizes[group_id]\n"
+        "        if isinstance(spec, MLAAttentionSpec) and spec.storage_block_size is not None:\n"
+        "            kernel_block_size = spec.storage_block_size\n"
         "        # Compressed DSV4 (0731 compress 4/128): a manager block already\n"
         "        # holds block_size/tokens_per_state slots. compress 4 + 256 is 64\n"
         "        # slots, which is the SM120 FlashInfer page. Token-splitting 256->64\n"
@@ -3186,6 +3554,8 @@ def apply(vllm: Path) -> None:
     # patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
+    patch_step_profiler(vllm)
+    patch_region_profiler(vllm)
     patch_deep_gemm_sm12x_guard(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
@@ -3209,12 +3579,22 @@ def apply(vllm: Path) -> None:
 
 
 def _flashinfer_has_topk192(site: Path) -> bool:
-    for path in (
-        site / "flashinfer/mla/_sparse_mla_sm120.py",
-        Path("/opt/flashinfer/flashinfer/mla/_sparse_mla_sm120.py"),
-    ):
-        if path.is_file() and "(8, 192)" in path.read_text(errors="ignore"):
-            return True
+    """True when flashinfer already serves topk=192 for the DSV4 shapes.
+
+    Pre-runtime-topk flashinfer enumerates the instantiated (num_heads, topk)
+    pairs, so the (H, 192) entries added by this overlay are visible in
+    ``_DECODE_DSV4_DISPATCH``. Current main declares that dispatch in
+    ``_sparse_mla_sm120_plan.py`` as a ``_DecodeDispatchEnvelope`` predicate
+    (topk is a runtime kernel argument), so every width is served.
+    """
+    for root in (site / "flashinfer/mla", Path("/opt/flashinfer/flashinfer/mla")):
+        for name in ("_sparse_mla_sm120.py", "_sparse_mla_sm120_plan.py"):
+            path = root / name
+            if not path.is_file():
+                continue
+            text = path.read_text(errors="ignore")
+            if "(8, 192)" in text or "_DecodeDispatchEnvelope" in text:
+                return True
     return False
 
 
@@ -3321,46 +3701,6 @@ def patch_mqa_packed_gather(vllm: Path) -> None:
     print(f"ok fp8_fp4_paged_mqa_logits packed gather x{n}")
 
 
-def patch_flashinfer_eidx_contig(vllm: Path) -> None:
-    """Make extra_sparse_indices contiguous for the FlashInfer SM120 kernel.
-
-    The SM120 sparse MLA C++ checks ``eidx.IsContiguous()``. vLLM's C4A decode
-    path passes ``global_indices.view(...)`` (non-contiguous) and the C128A
-    path may pass a non-contiguous metadata tensor, so FlashInfer attention
-    dies with "eidx must be contiguous" during warmup.
-
-    Root cause (upstream #53574, backported as patches/upstream/pr-53574.diff):
-    ``_build_c128a_metadata`` publishes a width-narrowed slice of the
-    persistent ``global_decode_buffer``; the view keeps the buffer's row
-    stride, so DSpark verification batches (num_decodes*(1+K) > 64 tokens)
-    hit the paged-pre fill orchestrator's eidx check and crash. The C4A
-    branch is already contiguous (``empty_like`` of the contiguous
-    ``topk_indices_buffer`` row slice); the ``.contiguous()`` there is a
-    harmless no-op kept for defense-in-depth.
-    """
-    path = vllm / "models/deepseek_v4/nvidia/flashinfer_sparse.py"
-    text = path.read_text()
-    old_c4a = (
-        "extra_sparse_indices = global_indices.view(num_decode_tokens, 1, -1)"
-    )
-    new_c4a = old_c4a + ".contiguous()"
-    old_c128a = (
-        "extra_sparse_indices = attn_metadata.c128a_global_decode_topk_indices"
-    )
-    new_c128a = old_c128a + ".contiguous()"
-    if new_c4a in text and new_c128a in text:
-        print("skip flashinfer eidx contiguous: already applied")
-        return
-    if old_c4a not in text and old_c128a not in text:
-        raise SystemExit(
-            f"flashinfer eidx contiguous: needles missing in {path}"
-        )
-    text = text.replace(old_c4a, new_c4a)
-    text = text.replace(old_c128a, new_c128a)
-    path.write_text(text)
-    print("ok flashinfer eidx contiguous")
-
-
 def patch_triton_e8m0_sm12x(vllm: Path) -> None:
     """Upcast E8M0 scales to fp32 for the Triton block-scaled MM on SM12x.
 
@@ -3453,7 +3793,14 @@ _INDEXER_B12X_SCHEDULE_SM120_Q1 = (
     "                    if seq_lens.dim() == 1\n"
     "                    else int(seq_lens.shape[0])\n"
     "                )\n"
-    "                if q_rows == 1:\n"
+    "                # Same gate the b12x paged scorer consumes under: b12x\n"
+    "                # schedules rows 1-8, so DSpark's 8-row c1 batch gets a\n"
+    "                # plan too. Wider batches get an empty schedule.\n"
+    "                from vllm.utils.sm12x_b12x_kernels import (\n"
+    "                    _B12X_SCHEDULE_MAX_Q_ROWS,\n"
+    "                )\n"
+    "\n"
+    "                if q_rows <= _B12X_SCHEDULE_MAX_Q_ROWS:\n"
     "                    try:\n"
     "                        from b12x.attention.dsa_indexer import plan_paged_schedule\n"
     "\n"
@@ -3490,6 +3837,23 @@ _INDEXER_B12X_SCHEDULE_NEW = (
     "                    self.num_sms,\n"
     "                    indices=decode_indices,\n"
     "                )\n"
+    "                schedule_metadata = self.scheduler_metadata_buffer[: metadata.shape[0]]\n"
+    "                schedule_metadata[:] = metadata\n"
+    + _INDEXER_B12X_SCHEDULE_SM120_Q1
+    + "\n"
+    "            decode_metadata = DeepSeekV32IndexerDecodeMetadata(\n"
+)
+
+# v0.29.0 inlines the DeepGEMM eligibility test (PR #53522 landed upstream),
+# so the schedule block no longer hangs off _should_build_paged_mqa_logits_metadata.
+_INDEXER_B12X_SCHEDULE_V029 = (
+    "                schedule_metadata = self.scheduler_metadata_buffer[: metadata.shape[0]]\n"
+    "                schedule_metadata[:] = metadata\n"
+    "\n"
+    "            decode_metadata = DeepSeekV32IndexerDecodeMetadata(\n"
+)
+
+_INDEXER_B12X_SCHEDULE_V029_NEW = (
     "                schedule_metadata = self.scheduler_metadata_buffer[: metadata.shape[0]]\n"
     "                schedule_metadata[:] = metadata\n"
     + _INDEXER_B12X_SCHEDULE_SM120_Q1
@@ -3591,6 +3955,11 @@ def patch_indexer_b12x_schedule(vllm: Path) -> None:
                 _INDEXER_B12X_SCHEDULE_SM120_ALWAYS,
                 _INDEXER_B12X_SCHEDULE_SM120_Q1,
                 "indexer SM12x b12x paged schedule q_rows==1",
+            ),
+            (
+                _INDEXER_B12X_SCHEDULE_V029,
+                _INDEXER_B12X_SCHEDULE_V029_NEW,
+                "indexer SM12x b12x paged schedule (v0.29 inline guard)",
             ),
         ],
     )
@@ -3772,12 +4141,13 @@ def patch_o_proj_b12x(vllm: Path) -> None:
     path = vllm / "models/deepseek_v4/nvidia/ops/o_proj.py"
     replace_once(
         path,
-        "    Shared by the FlashMLA and FlashInfer CUDA backends. ``einsum_recipe`` /\n"
-        "    ``tma_aligned_scales`` come from ``compute_fp8_einsum_recipe``.\n"
+        "    Shared by the FlashMLA and FlashInfer CUDA backends. The attention\n"
+        "    layer selects the recipe at initialization.\n"
         "    \"\"\"\n"
-        "    o_fp8, o_scale = fused_inv_rope_fp8_quant(\n",
-        "    Shared by the FlashMLA and FlashInfer CUDA backends. ``einsum_recipe`` /\n"
-        "    ``tma_aligned_scales`` come from ``compute_fp8_einsum_recipe``.\n"
+        "    use_fp8 = wo_a.weight.dtype == torch.float8_e4m3fn\n"
+        "    o_proj_input, o_scale = fused_inv_rope_fp8_quant(\n",
+        "    Shared by the FlashMLA and FlashInfer CUDA backends. The attention\n"
+        "    layer selects the recipe at initialization.\n"
         "    \"\"\"\n"
         "    from vllm.utils.sm12x_b12x_kernels import try_b12x_wo_proj\n"
         "\n"
@@ -3795,8 +4165,84 @@ def patch_o_proj_b12x(vllm: Path) -> None:
         "    )\n"
         "    if b12x_out is not None:\n"
         "        return b12x_out\n"
-        "    o_fp8, o_scale = fused_inv_rope_fp8_quant(\n",
+        "    use_fp8 = wo_a.weight.dtype == torch.float8_e4m3fn\n"
+        "    o_proj_input, o_scale = fused_inv_rope_fp8_quant(\n",
         "deep_gemm_fp8_o_proj b12x WO projection",
+    )
+
+
+def patch_o_proj_einsum_e8m0(vllm: Path) -> None:
+    """Give the SM12x o_proj einsum the 3-D is_bmm weight DeepGEMM requires.
+
+    ``fp8_bmm`` needs 3-D operands (``get_shape<3>``, csrc/utils/layout.hpp:39),
+    and only the DeepGEMM FP8 linear kernel produces that form: it calls
+    deepgemm_post_process_fp8_weight_block(is_bmm=True) at weight-load, mirroring
+
+        wq: (g*r, d) -> (g, r, d)
+        ws: (g*r/128, d/128) -> (g, r/128, d/128)
+
+    (model_executor/layers/quantization/utils/fp8_utils.py). With
+    --linear-backend b12x that never happens, so wo_a keeps the checkpoint's
+    2-D shape and every prefill batch asserts. b12x keeps needing the 2-D
+    checkpoint layout (sm12x_b12x_kernels._pack_wo_weights: "Checkpoint WO-A
+    is [groups*rank, group_width] ... do not permute here"), so the 3-D pair
+    is built once here, on the module, instead of at weight-load time.
+
+    use_e8m0=True because DeepGEMM's fp32-scale bhr_hdr_bhd path on SM120
+    only returns finite values once the block scales are UE8M0 (power of two):
+    the same requantize step the DeepGEMM FP8 kernel performs when
+    is_deep_gemm_e8m0_used() is true, which pin.main.env requests
+    (VLLM_USE_DEEP_GEMM_E8M0=1) but our family-120 DeepGEMM guard suppresses.
+    """
+    path = vllm / "models/deepseek_v4/nvidia/ops/o_proj.py"
+    replace_once(
+        path,
+        "        weight_scale = (\n"
+        "            wo_a.weight_scale\n"
+        "            if hasattr(wo_a, \"weight_scale\")\n"
+        "            else wo_a.weight_scale_inv\n"
+        "        )\n"
+        "        fp8_einsum(\n"
+        "            \"bhr,hdr->bhd\",\n"
+        "            (o_proj_input, o_scale),\n"
+        "            (wo_a.weight, weight_scale),\n"
+        "            z,\n"
+        "            recipe=einsum_recipe,\n"
+        "        )\n",
+        "        weight_scale = (\n"
+        "            wo_a.weight_scale\n"
+        "            if hasattr(wo_a, \"weight_scale\")\n"
+        "            else wo_a.weight_scale_inv\n"
+        "        )\n"
+        "        weight = wo_a.weight\n"
+        "        if weight.ndim == 2 and getattr(wo_a, \"weight_block_size\", None):\n"
+        "            from vllm.model_executor.layers.quantization.utils.fp8_utils import (\n"
+        "                deepgemm_post_process_fp8_weight_block,\n"
+        "            )\n"
+        "\n"
+        "            cached = getattr(wo_a, \"_sm12x_einsum_wo_a\", None)\n"
+        "            if cached is None or cached[2] != weight.data_ptr():\n"
+        "                weight, weight_scale = deepgemm_post_process_fp8_weight_block(\n"
+        "                    wq=weight,\n"
+        "                    ws=weight_scale,\n"
+        "                    quant_block_shape=tuple(wo_a.weight_block_size),\n"
+        "                    use_e8m0=True,\n"
+        "                    is_bmm=True,\n"
+        "                    bmm_batch_size=int(\n"
+        "                        getattr(wo_a, \"bmm_batch_size\", 0) or n_groups\n"
+        "                    ),\n"
+        "                )\n"
+        "                wo_a._sm12x_einsum_wo_a = (weight, weight_scale, weight.data_ptr())\n"
+        "            else:\n"
+        "                weight, weight_scale = cached[0], cached[1]\n"
+        "        fp8_einsum(\n"
+        "            \"bhr,hdr->bhd\",\n"
+        "            (o_proj_input, o_scale),\n"
+        "            (weight, weight_scale),\n"
+        "            z,\n"
+        "            recipe=einsum_recipe,\n"
+        "        )\n",
+        "o_proj einsum 3-D is_bmm weight (DeepGEMM mirror)",
     )
 
 
@@ -4406,11 +4852,393 @@ def patch_tp_allreduce_piecewise_workspace(vllm: Path) -> None:
     )
 
 
+def patch_nvidia_support_torch_compile(vllm: Path) -> None:
+    """Decorate the NVIDIA DeepSeek V4 model with @support_torch_compile.
+
+    Piecewise CUDA graphs are only allowed when the model is breakable-cudagraph driven or has
+    a compiled submodule (v1/worker/gpu/cudagraph_utils.py), and "compiled submodule" means a
+    TorchCompileWithNoGuardsWrapper, which only exists for a model decorated
+    @support_torch_compile. The CPU path decorates DeepseekV4Model; nothing under nvidia/ does,
+    so on GPU the model can never be torch-compiled and FULL_AND_PIECEWISE forces breakable
+    cudagraphs on, which in turn forces compilation mode to NONE (config/vllm.py).
+
+    The NVIDIA forward already takes (input_ids, positions, intermediate_tensors,
+    inputs_embeds), matching the CPU decorator's dynamic_arg_dims, so the decorator applies
+    unchanged.
+    """
+    path = vllm / "models/deepseek_v4/nvidia/model.py"
+    text = path.read_text()
+    if "support_torch_compile" in text:
+        print("skip nvidia DeepseekV4Model torch.compile decorator (already present)")
+        return
+    replace_once(
+        path,
+        "from vllm.config import VllmConfig\n",
+        "from vllm.compilation.decorators import support_torch_compile\n"
+        "from vllm.config import VllmConfig\n",
+        "nvidia model torch.compile import",
+    )
+    replace_once(
+        path,
+        "\n\nclass DeepseekV4Model(nn.Module, EagleModelMixin):\n",
+        "\n\n@support_torch_compile(\n"
+        "    dynamic_arg_dims={\n"
+        '        "input_ids": 0,\n'
+        '        "positions": -1,\n'
+        '        "intermediate_tensors": 0,\n'
+        '        "inputs_embeds": 0,\n'
+        "    }\n"
+        ")\n"
+        "class DeepseekV4Model(nn.Module, EagleModelMixin):\n",
+        "nvidia DeepseekV4Model torch.compile decorator",
+    )
+
+
+def patch_tp_allreduce_dynamo_safe(vllm: Path) -> None:
+    """Keep the all-reduce workspace guard out of the Dynamo graph.
+
+    The workspace helper installed by patch_tp_allreduce_static_workspace decides whether it may
+    allocate with torch.cuda.is_current_stream_capturing(), and Dynamo rejects that call when it
+    is reached from the traced model forward (Unsupported: torch.* op returned non-Tensor).
+    torch.compiler.is_compiling() is folded as a constant at trace time, so testing it first
+    removes the CUDA query from the graph and leaves the non-compiled path identical.
+    """
+    path = vllm / "distributed/communication_op.py"
+    text = path.read_text()
+    if "torch.compiler.is_compiling()" in text:
+        print("skip all-reduce workspace Dynamo guard (already present)")
+        return
+    replace_once(
+        path,
+        "            if torch.cuda.is_current_stream_capturing():\n",
+        "            if (\n"
+        "                torch.compiler.is_compiling()\n"
+        "                or torch.cuda.is_current_stream_capturing()\n"
+        "            ):\n",
+        "all-reduce workspace Dynamo guard",
+    )
+
+
+def patch_mhc_deep_gemm_static(vllm: Path) -> None:
+    """Move is_deep_gemm_supported() out of the traced mHC forwards.
+
+    The mHC TileLang forwards call is_deep_gemm_supported(), which reaches
+    current_platform.support_deep_gemm(), a ctypes function pointer Dynamo cannot trace
+    ("call to a callable object with no traceable __call__"), so the compiled path cannot be
+    entered. The result is a static platform property, so it is computed once at import and the
+    forwards read a plain bool, which Dynamo folds as a constant.
+    """
+    path = vllm / "model_executor/kernels/mhc/tilelang.py"
+    text = path.read_text()
+    if "_USE_DEEP_GEMM" in text:
+        print("skip mHC deep_gemm static flag (already present)")
+        return
+    replace_once(
+        path,
+        "from vllm.utils.torch_utils import direct_register_custom_op\n",
+        "from vllm.utils.torch_utils import direct_register_custom_op\n"
+        "from vllm.utils.deep_gemm import is_deep_gemm_supported as _is_deep_gemm_supported\n"
+        "\n"
+        "# Static platform property; read here so the traced forwards never call into it.\n"
+        "_USE_DEEP_GEMM = _is_deep_gemm_supported()\n",
+        "mHC deep_gemm static flag",
+    )
+    # Two call shapes: the plain assignment in the delayed forwards and the
+    # prenorm helper, which folds the TileLang fallback flag into the same line.
+    sites = (
+        (
+            "    use_deep_gemm = is_deep_gemm_supported()\n",
+            "    use_deep_gemm = _USE_DEEP_GEMM\n",
+        ),
+        (
+            "    use_deep_gemm = is_deep_gemm_supported() or not use_tilelang_fallback\n",
+            "    use_deep_gemm = _USE_DEEP_GEMM or not use_tilelang_fallback\n",
+        ),
+    )
+    text = path.read_text()
+    found = 0
+    for old, new in sites:
+        found += text.count(old)
+        text = text.replace(old, new)
+    if found == 0:
+        raise SystemExit(f"{path}: no 'use_deep_gemm = is_deep_gemm_supported()' site found")
+    # A call in any other shape is a silent under-apply, and the point of this
+    # overlay is that no traced forward reaches the ctypes pointer at all.
+    leftover = len(re.findall(r"(?<!_)\bis_deep_gemm_supported\(\)", text))
+    if leftover:
+        raise SystemExit(f"{path}: {leftover} is_deep_gemm_supported() call(s) unpatched")
+    path.write_text(text)
+    print(f"ok mHC deep_gemm static flag sites ({found})")
+
+
+def patch_deep_gemm_eager_init(vllm: Path) -> None:
+    """Resolve DeepGEMM availability at import instead of inside the traced forward.
+
+    The wrappers in utils/deep_gemm.py call _lazy_init() from inside the model forward, and
+    _lazy_init() falls through to has_deep_gemm() -> importlib.import_module, which Dynamo marks
+    as skipped ("Attempted to call function marked as skipped", module: importlib). Running the
+    initialiser once at module import takes the importlib call out of the graph.
+    """
+    path = vllm / "utils/deep_gemm.py"
+    text = path.read_text()
+    if "_EAGER_INIT_DONE" in text:
+        print("skip DeepGEMM eager init (already present)")
+        return
+    marker = (
+        "\n\n"
+        "# Resolve DeepGEMM availability here rather than inside a traced forward: the wrappers\n"
+        "# call _lazy_init(), which reaches importlib.import_module, and Dynamo refuses importlib.\n"
+        "_lazy_init()\n"
+        "_EAGER_INIT_DONE = True\n"
+    )
+    if not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text + marker)
+    print("ok DeepGEMM eager init")
+
+
+def patch_mhc_tf32_customop(vllm: Path) -> None:
+    """Register the mHC pybind GEMM as a custom op and hoist its traced imports.
+
+    Status: **parked from `apply_main`**, deliberately, like its two siblings. It is the first
+    overlay that actually advances the compile path on proto2, so it is kept reproducible here.
+
+    Verified 2026-09-17 against `vllm-spark-0731:main-029-proto2` with
+    `VLLM_USE_BREAKABLE_CUDAGRAPH=0`, bind-mounting the patched file: break 4 cleared and
+    compilation advanced to the next break. Before, the engine died with
+
+        Unsupported: Attempted to call function marked as skipped
+          module: vllm.third_party.deep_gemm._C, qualname: ...tf32_hc_prenorm_gemm
+
+    Why this shape and not `patch_mhc_tf32_uncaptured`: that sibling wraps the call in a
+    ``@torch.compiler.disable`` function, and this torch refuses to call a disabled function
+    from inside a compiled region. `direct_register_custom_op` is vLLM's own remedy and was
+    already imported at the top of the file.
+
+    **All three sites, not one.** `tilelang.py` calls the GEMM from
+    ``_hc_prenorm_gemm_outputs`` and from two functions that take ``mixes``; each is its own
+    graph break, and each is preceded by its own local ``from ... import`` block, which is
+    itself a break because Dynamo skips importlib. There are three call sites and three
+    import blocks (two of them identical), so this operates on the text directly rather than
+    through ``replace_once``.
+
+    The hoisted modules do not import this one -- ``mhc.warmup`` imports
+    ``mhc.tilelang_kernels``, and ``tilelang_kernels`` does not import ``mhc.warmup`` -- so
+    none of the three imports is circular.
+    """
+    path = vllm / "model_executor/kernels/mhc/tilelang.py"
+    text = path.read_text()
+    if 'op_name="tf32_hc_prenorm_gemm"' in text:
+        print("skip mHC tf32 custom op (already present)")
+        return
+
+    anchor_src = (
+        "# Static platform property; read here so the traced forwards never call into it.\n"
+        "_USE_DEEP_GEMM = _is_deep_gemm_supported()\n"
+    )
+    if text.count(anchor_src) != 1:
+        raise SystemExit("mHC tf32 custom op: platform-property anchor not unique")
+    text = text.replace(
+        anchor_src,
+        anchor_src
+        + '''
+
+# Hoisted out of the traced forwards: a local `from ... import` is an importlib call, and
+# Dynamo skips importlib, so each one is a graph break even when its names are not called.
+from vllm.model_executor.kernels.mhc.tilelang_kernels import (  # noqa: E402
+    compute_num_split as _b12x_compute_num_split,
+)
+
+from vllm.model_executor.kernels.mhc.warmup import (  # noqa: E402
+    MHC_PRE_NORM_KERNEL as _b12x_MHC_PRE_NORM_KERNEL,
+)
+from vllm.model_executor.kernels.mhc.warmup import (  # noqa: E402
+    compute_mhc_pre_num_splits as _b12x_compute_mhc_pre_num_splits,
+)
+
+
+def _b12x_tf32_hc_prenorm_gemm_op(
+    x: torch.Tensor,
+    fn: torch.Tensor,
+    out: torch.Tensor,
+    sqrsum: torch.Tensor,
+    num_split: int,
+) -> None:
+    """Opaque custom-op body: Dynamo never traces into the pybind kernel."""
+    from vllm.utils.deep_gemm import tf32_hc_prenorm_gemm
+
+    tf32_hc_prenorm_gemm(x, fn, out, sqrsum, num_split)
+
+
+def _b12x_tf32_hc_prenorm_gemm_fake(
+    x: torch.Tensor,
+    fn: torch.Tensor,
+    out: torch.Tensor,
+    sqrsum: torch.Tensor,
+    num_split: int,
+) -> None:
+    return None
+
+
+direct_register_custom_op(
+    op_name="tf32_hc_prenorm_gemm",
+    op_func=_b12x_tf32_hc_prenorm_gemm_op,
+    mutates_args=["out", "sqrsum"],
+    fake_impl=_b12x_tf32_hc_prenorm_gemm_fake,
+)
+
+''',
+    )
+
+    # The three local import blocks, replaced by the module-level names above.
+    block1 = (
+        "    from vllm.model_executor.kernels.mhc.tilelang_kernels import (\n"
+        "        compute_num_split,\n"
+        "    )\n"
+        "    from vllm.utils.deep_gemm import (\n"
+        "        is_deep_gemm_supported,\n"
+        "        tf32_hc_prenorm_gemm,\n"
+        "    )\n"
+        "\n"
+    )
+    block23 = (
+        "    from vllm.model_executor.kernels.mhc.warmup import (\n"
+        "        MHC_PRE_NORM_KERNEL,\n"
+        "        compute_mhc_pre_num_splits,\n"
+        "    )\n"
+        "    from vllm.utils.deep_gemm import (\n"
+        "        is_deep_gemm_supported,\n"
+        "        tf32_hc_prenorm_gemm,\n"
+        "    )\n"
+        "\n"
+    )
+    if text.count(block1) != 1 or text.count(block23) != 2:
+        raise SystemExit(
+            "mHC tf32 custom op: expected 1 + 2 local import blocks, found "
+            f"{text.count(block1)} + {text.count(block23)}"
+        )
+    text = text.replace(block1, "")
+    text = text.replace(block23, "")
+    # the hoisted aliases keep the call sites working
+    text = text.replace("    compute_num_split(", "    _b12x_compute_num_split(")
+    text = text.replace("        compute_num_split(", "        _b12x_compute_num_split(")
+    text = text.replace("        compute_mhc_pre_num_splits(", "        _b12x_compute_mhc_pre_num_splits(")
+    text = text.replace("            compute_mhc_pre_num_splits(", "            _b12x_compute_mhc_pre_num_splits(")
+    text = text.replace("    MHC_PRE_NORM_KERNEL(", "    _b12x_MHC_PRE_NORM_KERNEL(")
+    text = text.replace("        MHC_PRE_NORM_KERNEL(", "        _b12x_MHC_PRE_NORM_KERNEL(")
+    text = text.replace("            MHC_PRE_NORM_KERNEL(", "            _b12x_MHC_PRE_NORM_KERNEL(")
+
+    # All three call sites go through the registered op.
+    calls = (
+        "        tf32_hc_prenorm_gemm(x, fn, out, sqrsum, n_splits)\n",
+        "        tf32_hc_prenorm_gemm(x, fn, mixes, sqrsum, n_splits)\n",
+        "            tf32_hc_prenorm_gemm(residual_cur_2d, fn, mixes, sqrsum, n_splits)\n",
+    )
+    for call in calls:
+        if text.count(call) != 1:
+            raise SystemExit(f"mHC tf32 custom op: call site not unique: {call!r}")
+        text = text.replace(
+            call, call.replace("tf32_hc_prenorm_gemm(", "torch.ops.vllm.tf32_hc_prenorm_gemm(")
+        )
+    for call in calls:
+        if call in text:
+            raise SystemExit("mHC tf32 custom op: an unpatched tf32 call site remains")
+    if text.count("torch.ops.vllm.tf32_hc_prenorm_gemm(") != 3:
+        raise SystemExit(
+            "mHC tf32 custom op: expected 3 routed call sites, found "
+            f"{text.count('torch.ops.vllm.tf32_hc_prenorm_gemm(')}"
+        )
+
+    path.write_text(text)
+    print(
+        "ok mHC tf32 custom op: 1 registration, 3 call sites, 3 import blocks hoisted"
+    )
+
+
+def patch_mhc_tf32_uncaptured(vllm: Path) -> None:
+    """Keep the DeepGEMM tf32 kernel and its local import out of the compiled region.
+
+    Dynamo refuses tf32_hc_prenorm_gemm (a pybind11 extension) and also refuses the local
+    `from vllm.utils.deep_gemm import ...` that precedes each call, because import statements use
+    importlib, which Dynamo skips. Both are replaced by one call to a torch.compiler.disable
+    wrapper, which graph-breaks and runs the kernel eager.
+
+    Parked from ``apply_main`` on 2026-09-14: the call-site needle below predates
+    ``pr-53055.diff``, which folds the local ``tf32_hc_prenorm_gemm`` import into a guarded
+    ``is_deep_gemm_supported, tf32_hc_prenorm_gemm`` line, so the needle is gone by the time
+    the overlay runs and its ``SystemExit`` cuts off every later overlay. The wrapper is
+    inserted before that raise, so a ``--only mhc-tf32-uncaptured`` run still works; re-anchor
+    the call-site half and re-check the single-line call site before putting it back.
+    """
+    path = vllm / "model_executor/kernels/mhc/tilelang.py"
+    text = path.read_text()
+    if "_tf32_hc_prenorm_gemm_uncaptured" in text:
+        print("skip mHC tf32 uncaptured wrapper (already present)")
+        return
+    replace_once(
+        path,
+        "from vllm.utils.torch_utils import direct_register_custom_op\n",
+        "from vllm.utils.torch_utils import direct_register_custom_op\n"
+        "\n"
+        "\n"
+        "@torch.compiler.disable\n"
+        "def _tf32_hc_prenorm_gemm_uncaptured(x, fn, out, sqrsum, num_split) -> None:\n"
+        '    """Run the DeepGEMM tf32 prenorm GEMM outside the compiled region.\n'
+        "\n"
+        "    Dynamo cannot trace the pybind11 kernel, so the break is deliberate: correctness\n"
+        "    first, and a custom op can replace it once compile is known to pay off.\n"
+        '    """\n'
+        "    from vllm.utils.deep_gemm import tf32_hc_prenorm_gemm\n"
+        "\n"
+        "    tf32_hc_prenorm_gemm(x, fn, out, sqrsum, num_split)\n",
+        "mHC tf32 uncaptured wrapper",
+    )
+    old = (
+        "    from vllm.utils.deep_gemm import tf32_hc_prenorm_gemm\n"
+        "\n"
+        "    tf32_hc_prenorm_gemm(\n"
+    )
+    new = "    _tf32_hc_prenorm_gemm_uncaptured(\n"
+    text = path.read_text()
+    found = text.count(old)
+    if found == 0:
+        raise SystemExit(f"{path}: no tf32 call site with its local import found")
+    path.write_text(text.replace(old, new))
+    print(f"ok mHC tf32 uncaptured call sites ({found})")
+
+
+def patch_mhc_tf32_call_redirect(vllm: Path) -> None:
+    """Point the mHC forwards at the uncaptured tf32 wrapper instead of the pybind op.
+
+    Companion to patch_mhc_tf32_uncaptured, which inserts the wrapper. The redirect is keyed on
+    the call line alone, so it holds for every call site and does not depend on how the local
+    import is spelled.
+
+    Parked from ``apply_main`` on 2026-09-14 with the overlay above: run alone against the
+    post-``pr-53055`` tree it rewrites the three multi-line calls to a wrapper the run never
+    inserts, and it leaves the single-line call in ``mhc_pre_tilelang`` on the pybind op.
+    """
+    path = vllm / "model_executor/kernels/mhc/tilelang.py"
+    text = path.read_text()
+    if "    _tf32_hc_prenorm_gemm_uncaptured(" in text:
+        print("skip mHC tf32 call redirect (already present)")
+        return
+    old = "    tf32_hc_prenorm_gemm(\n"
+    found = text.count(old)
+    if found == 0:
+        raise SystemExit(f"{path}: no direct tf32_hc_prenorm_gemm call to redirect")
+    path.write_text(text.replace(old, "    _tf32_hc_prenorm_gemm_uncaptured(\n"))
+    print(f"ok mHC tf32 call redirect ({found} sites)")
+
+
 def apply_main(vllm: Path) -> None:
     """Keep/add SM12x overlays for a matched vLLM main tree (docs/PLAN-MAIN.md).
 
     Do not copy rc2 B12xExperts. Do not blanket-kill DeepGEMM on family 120.
-    Skip FlashInfer TOPK 192 if git main already has it. Skip lm_head restore.
+    Patches upstream already ships (b12x MoE backend, mxfp4 b12x oracle, the
+    DSV4 block-size helper, the DSpark backbone graph) skip themselves. Skip
+    FlashInfer TOPK 192 when flashinfer already serves it. Skip lm_head
+    restore.
     """
     # v0.28.0 phase-1 images do not carry the b12x MoE donor modules (the
     # MoE integration is not upstream) - provide them before the overlay run.
@@ -4423,7 +5251,6 @@ def apply_main(vllm: Path) -> None:
     print(f"ok main already has {moe.relative_to(vllm)}")
     patch_envs(vllm)
     patch_moe_backend(vllm)
-    patch_b12x_moe_weight_prep_v028(vllm)
     patch_utils_b12x(vllm)
     patch_mxfp4_oracle(vllm)
     patch_mxfp4_process_weights(vllm)
@@ -4436,10 +5263,24 @@ def apply_main(vllm: Path) -> None:
     # patch_router_gemm_cublas_sm12x(vllm)
     patch_decode_profiler(vllm)
     patch_layer_profiler(vllm)
+    patch_step_profiler(vllm)
     patch_cutlass_sm12x_guard(vllm)
     patch_indexer_deepgemm_guard(vllm)
-    # v0.28.0: einsum fallback/recipe/upcast overlays removed (kernel verified
-    # correct on SM12x with packed E8M0 scales; see apply() note above).
+    # v0.28.0: the einsum fallback/upcast overlays stay off (DeepGEMM's einsum
+    # kernel is correct on SM12x with packed E8M0 scales; see apply() note
+    # above). The *recipe* overlay stays off too, on v0.29.0/proto-v0.2.0 as
+    # well: it forces recipe (1,128,128) with tma_aligned_scales=False, and
+    # DeepGEMM now rejects that call at csrc/utils/layout.hpp:113
+    # (`sf.size(-2) == ceil_div(mn, gran_mn)`) during
+    # `_initialize_kv_caches`, so the engine never starts. Upstream's own
+    # value, (1,1,block_size) with tma_aligned_scales=True, is the packed
+    # UE8M0 layout the SM120 einsum kernel reads, and the DSv4 o_proj shape
+    # was measured accepted with it at T=10 and T=256 (docs/UPSTREAM.md,
+    # 2026-09-16 DeepGEMM #447). The override's stated reason -- the Python
+    # `fp8_einsum` fallback upcasting packed int32 -- no longer exists:
+    # `_fp8_einsum_impl = getattr(_dg, "fp8_einsum", None)` in
+    # utils/deep_gemm.py binds DeepGEMM's real kernel.
+    # patch_einsum_sm12x_recipe(vllm)  # see above: breaks engine startup
     patch_mqa_logits_sm12x_fallback(vllm)
     patch_mqa_paged_cudagraph_safe(vllm)
     patch_mqa_relu_formula(vllm)
@@ -4447,7 +5288,7 @@ def apply_main(vllm: Path) -> None:
     patch_sm12x_kv_insert(vllm)
     site = vllm.parent
     if _flashinfer_has_topk192(site):
-        print("skip flashinfer DSV4 192: already present")
+        print("skip flashinfer DSV4 192: already served")
     else:
         patch_flashinfer_dsv4_dispatch(site)
         patch_flashinfer_dsv4_cu_dispatch(site)
@@ -4461,14 +5302,21 @@ def apply_main(vllm: Path) -> None:
     copy_sm12x_b12x_kernels(vllm)
     patch_mqa_paged_kernel(vllm)
     patch_mqa_packed_gather(vllm)
-    patch_flashinfer_eidx_contig(vllm)
     patch_triton_e8m0_sm12x(vllm)
     patch_indexer_packed_insert(vllm)
     patch_indexer_store_page64(vllm)
     patch_o_proj_b12x(vllm)
+    patch_o_proj_einsum_e8m0(vllm)
     patch_indexer_b12x_schedule(vllm)
     patch_dspark_backbone_cudagraph(vllm)
     patch_tp_allreduce_static_workspace(vllm)
+    patch_region_profiler(vllm)
+    patch_indexer_skip_diag(vllm)
+    patch_nvidia_support_torch_compile(vllm)
+    patch_tp_allreduce_dynamo_safe(vllm)
+    patch_mhc_deep_gemm_static(vllm)
+    patch_deep_gemm_eager_init(vllm)
+    # mhc-tf32-uncaptured / mhc-tf32-redirect are parked: see their docstrings.
     print(f"main overlays applied under {vllm}")
 
 
@@ -4510,11 +5358,17 @@ def main() -> int:
             "indexer-packed-insert",
             "indexer-packed-insert-revert",
             "mqa-packed-gather",
-            "flashinfer-eidx-contig",
             "triton-e8m0-sm12x",
             "indexer-store-page64",
             "indexer-b12x-schedule",
             "o-proj-b12x",
+            "o-proj-einsum-e8m0",
+            "torch-compile-nvidia",
+            "allreduce-dynamo-safe",
+            "mhc-deep-gemm-static",
+            "deep-gemm-eager-init",
+            "mhc-tf32-uncaptured",
+            "mhc-tf32-redirect",
             "dspark-backbone-cg",
             "dspark-hidden-fix",
             "dspark-no-cg",
@@ -4525,6 +5379,8 @@ def main() -> int:
             "ar-piecewise-ws",
             "dsv4-warmup-ext",
             "decode-profiler",
+            "step-profiler",
+            "region-profiler",
             "kv-cache-dbg",
             "router-gemm-cublas",
         ],
@@ -4594,9 +5450,6 @@ def main() -> int:
     if args.only == "mqa-packed-gather":
         patch_mqa_packed_gather(vllm)
         return 0
-    if args.only == "flashinfer-eidx-contig":
-        patch_flashinfer_eidx_contig(vllm)
-        return 0
     if args.only == "triton-e8m0-sm12x":
         patch_triton_e8m0_sm12x(vllm)
         return 0
@@ -4614,6 +5467,31 @@ def main() -> int:
         return 0
     if args.only == "o-proj-b12x":
         patch_o_proj_b12x(vllm)
+        return 0
+    if args.only == "mhc-tf32-redirect":
+        patch_mhc_tf32_call_redirect(vllm)
+        return 0
+    if args.only == "mhc-tf32-customop":
+        patch_mhc_tf32_customop(vllm)
+        return 0
+    if args.only == "mhc-tf32-uncaptured":
+        patch_mhc_tf32_uncaptured(vllm)
+        return 0
+    if args.only == "deep-gemm-eager-init":
+        patch_deep_gemm_eager_init(vllm)
+        return 0
+    if args.only == "mhc-deep-gemm-static":
+        patch_mhc_deep_gemm_static(vllm)
+        return 0
+    if args.only == "allreduce-dynamo-safe":
+        patch_tp_allreduce_dynamo_safe(vllm)
+        return 0
+    if args.only == "torch-compile-nvidia":
+        patch_nvidia_support_torch_compile(vllm)
+        return 0
+    if args.only == "o-proj-einsum-e8m0":
+        patch_einsum_sm12x_recipe(vllm)
+        patch_o_proj_einsum_e8m0(vllm)
         return 0
     if args.only == "dspark-backbone-cg":
         patch_dspark_backbone_cudagraph(vllm)
@@ -4648,6 +5526,12 @@ def main() -> int:
     if args.only == "decode-profiler":
         patch_decode_profiler(vllm)
         patch_layer_profiler(vllm)
+        return 0
+    if args.only == "step-profiler":
+        patch_step_profiler(vllm)
+        return 0
+    if args.only == "region-profiler":
+        patch_region_profiler(vllm)
         return 0
     if args.only == "dsv4-warmup-ext":
         copy_dsv4_warmup_ext(vllm)

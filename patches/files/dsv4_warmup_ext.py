@@ -231,27 +231,34 @@ def dspark_gumbel_warmup(
         with torch.inference_mode():
             for use_fp64 in (False, True):
                 for apply_temperature in (False, True):
-                    for per_token_col in (False, True):
-                        cache = None
-                        cache_col = None
-                        if per_token_col:
-                            cache = torch.zeros(
-                                1, 1, vocab_size, dtype=torch.bfloat16, device=device
+                    for is_drafting in (False, True):
+                        for per_token_col in (False, True):
+                            cache = None
+                            cache_col = None
+                            if per_token_col:
+                                cache = torch.zeros(
+                                    1, 1, vocab_size, dtype=torch.bfloat16, device=device
+                                )
+                                cache_col = torch.zeros(
+                                    1, dtype=torch.int64, device=device
+                                )
+                            # Keywords on purpose: gumbel_sample gained
+                            # is_drafting after this warmup was written, and
+                            # binding positionally put every later argument one
+                            # slot out, so the whole warmup raised and the
+                            # kernels JIT-compiled during inference instead.
+                            gumbel_sample(
+                                logits=logits,
+                                expanded_idx_mapping=idx_map,
+                                temperature=temperature,
+                                seed=seed,
+                                pos=pos,
+                                apply_temperature=apply_temperature,
+                                is_drafting=is_drafting,
+                                logits_cache=cache,
+                                logits_cache_col=cache_col,
+                                use_fp64=use_fp64,
                             )
-                            cache_col = torch.zeros(
-                                1, dtype=torch.int64, device=device
-                            )
-                        gumbel_sample(
-                            logits,
-                            idx_map,
-                            temperature,
-                            seed,
-                            pos,
-                            apply_temperature,
-                            cache,
-                            cache_col,
-                            use_fp64,
-                        )
             torch.accelerator.synchronize()
     except Exception as exc:  # warmup must never take the worker down
         logger.warning(
@@ -264,3 +271,168 @@ def dspark_gumbel_warmup(
         "DSpark gumbel warmup finished in %.2f seconds.",
         time.perf_counter() - started,
     )
+
+
+def deepseek_v4_wo_a_einsum_warmup(model: torch.nn.Module) -> None:
+    """Pre-pack every ``wo_a`` for the DeepGEMM fp8 einsum, before compilation.
+
+    ``models/deepseek_v4/nvidia/ops/o_proj.py`` memoizes the layout transform on
+    the layer::
+
+        cached = getattr(wo_a, "_sm12x_einsum_wo_a", None)
+        if cached is None or cached[2] != weight.data_ptr():
+            weight, weight_scale = deepgemm_post_process_fp8_weight_block(...)
+            wo_a._sm12x_einsum_wo_a = (weight, weight_scale, weight.data_ptr())
+
+    On the very first forward the cache is cold, so the transform runs *inside*
+    the region Dynamo is tracing. It terminates in a ctypes call
+    (``utils/deep_gemm.py``), which Dynamo rejects::
+
+        torch._dynamo.exc.Unsupported: call to a callable object with no traceable __call__
+          Developer debug context: object=<_FuncPtr object at 0x...>
+
+    and because ``torch.compile(fullgraph=True)`` is unconditional in
+    ``compilation/wrapper.py``, that ends engine init. The same first forward is
+    ``profile_run``, so the pack has to happen strictly before it -- the
+    ``kernel_warmup`` extension below runs too late, after ``profile_run``.
+
+    Reproduces the traced call exactly, which is why it is safe: the same
+    keyword arguments, the same ``use_e8m0=True``, and ``bmm_batch_size`` from
+    ``attention.py`` (``self.wo_a.bmm_batch_size = self.n_local_groups``) rather
+    than a guess at ``n_groups``. Layers whose ``bmm_batch_size`` was never set
+    are skipped, leaving the original lazy path untouched.
+
+    ``deepgemm_post_process_fp8_weight_block`` returns a *view* of ``wo_a.weight``
+    in the ``is_bmm`` branch, so ``weight.data_ptr()`` equals
+    ``wo_a.weight.data_ptr()`` and the cache sentinel still matches.
+    """
+    if not _is_deepseek_v4(model):
+        return
+
+    from vllm.model_executor.layers.quantization.utils.fp8_utils import (
+        deepgemm_post_process_fp8_weight_block,
+    )
+
+    packed = 0
+    skipped = 0
+    started = time.perf_counter()
+    try:
+        for module in model.modules():
+            wo_a = getattr(module, "wo_a", None)
+            if wo_a is None or not hasattr(wo_a, "weight"):
+                continue
+            block = getattr(wo_a, "weight_block_size", None)
+            wq = wo_a.weight
+            if not block or wq.dtype != torch.float8_e4m3fn:
+                continue
+            ws = getattr(wo_a, "weight_scale", None)
+            if ws is None:
+                ws = getattr(wo_a, "weight_scale_inv", None)
+            if ws is None:
+                continue
+            g = int(getattr(wo_a, "bmm_batch_size", 0) or 0)
+            if g <= 0:
+                skipped += 1
+                continue
+            cached = getattr(wo_a, "_sm12x_einsum_wo_a", None)
+            if cached is not None and cached[2] == wq.data_ptr():
+                continue
+            with torch.inference_mode():
+                weight, weight_scale = deepgemm_post_process_fp8_weight_block(
+                    wq=wq,
+                    ws=ws,
+                    quant_block_shape=tuple(block),
+                    use_e8m0=True,
+                    is_bmm=True,
+                    bmm_batch_size=g,
+                )
+            wo_a._sm12x_einsum_wo_a = (weight, weight_scale, weight.data_ptr())
+            packed += 1
+    except Exception as exc:  # warmup must never take the worker down
+        logger.warning(
+            "DSv4 wo_a DeepGEMM einsum pre-pack failed: %s: %s",
+            type(exc).__name__,
+            exc,
+        )
+        return
+    if packed or skipped:
+        logger.info(
+            "DSv4 wo_a DeepGEMM einsum pre-pack: %d packed, %d skipped, %.2f s.",
+            packed,
+            skipped,
+            time.perf_counter() - started,
+        )
+
+
+def deepseek_v4_deepgemm_allow_in_graph() -> None:
+    """Make DeepGEMM's lazily-resolved entry points visible to Dynamo.
+
+    ``vllm/utils/deep_gemm.py`` resolves its implementations lazily and then
+    forwards with a bare ``return _impl(*args, **kwargs)`` (``fp8_einsum`` is
+    ``deep_gemm.py:501``). The implementations live in the third-party
+    ``deep_gemm`` package, which Dynamo skip-lists, so the forward is fatal under
+    ``torch.compile(fullgraph=True)``:
+
+        torch._dynamo.exc.Unsupported: Attempted to call function marked as skipped
+          Hint: ... if it is traceable, use `torch.compiler.allow_in_graph`.
+
+    Do **not** be tempted by the reference image here: its ``utils/deep_gemm.py``
+    has a byte-identical ``fp8_einsum`` wrapper and no registration either, and its
+    ``deep_gemm_fp8_o_proj`` calls ``fp8_einsum`` unconditionally -- so the call is
+    simply not skip-listed in that build. Ours is.
+
+    Registration must land strictly before the first traced forward. It cannot go
+    in ``_lazy_init`` (Dynamo would trace the registration itself) and it cannot go
+    in ``kernel_warmup``, which runs after ``profile_run`` has already compiled.
+    So it is called from the same pre-profile hook as the wo_a pre-pack.
+
+    .. warning::
+       **Measured on 2026-09-17: this is necessary but NOT sufficient, and on its
+       own it moves the failure rather than clearing it.** It does clear
+       ``Attempted to call function marked as skipped``, and the next failure is
+       torch telling us the same thing more precisely::
+
+           torch._dynamo.exc.ObservedRuntimeError: Dynamo failed to run FX node with
+           fake tensors: call_function <built-in method fp8_einsum ...>
+             got RuntimeError("Cannot access data pointer of Tensor (e.g. FakeTensor,
+             FunctionalTensor). ... it is likely that we are erroneously tracing into
+             a custom kernel. To fix this, please wrap the custom kernel into an
+             opaque custom op.")
+
+       ``allow_in_graph`` makes the call a graph *leaf*, and Dynamo then executes
+       that leaf with FakeTensors to derive metadata -- which a kernel that reads
+       ``data_ptr()`` cannot survive. This is the same wall the repo already hit
+       with TileLang's ``allow_in_graph`` and the unhashable SymInt. **The working
+       remedy is an opaque custom op with an explicit fake impl**, which is what
+       ``fp8_einsum`` still needs. Registered entry points are harmless to leave in
+       place; they simply do not finish the job.
+    """
+    try:
+        import torch._dynamo as dynamo
+
+        from vllm.utils import deep_gemm as dg
+
+        dg._lazy_init()
+        allowed = 0
+        skipped = 0
+        for name in [n for n in vars(dg) if n.endswith("_impl")]:
+            fn = getattr(dg, name, None)
+            if fn is None:
+                continue
+            if getattr(fn, "_b12x_allowed", False):
+                continue
+            try:
+                dynamo.allow_in_graph(fn)
+                fn._b12x_allowed = True
+                allowed += 1
+            except Exception:
+                skipped += 1
+        logger.info(
+            "DeepGEMM Dynamo registration: %d entry points allowed, %d refused.",
+            allowed,
+            skipped,
+        )
+    except Exception as exc:  # never take the worker down
+        logger.warning(
+            "DeepGEMM Dynamo registration failed: %s: %s", type(exc).__name__, exc
+        )

@@ -126,8 +126,9 @@ and its extra headers are just a6b593d's tree as packaged by vLLM 0.25.1.
 
 No kernel porting, no vendored headers, no wrapper surgery needed. The
 kernel-port work done earlier (`dg25_fp8`, wrapper, dispatch patch) served to
-isolate the regression and is preserved as analysis, not shipped
-(`patches/upstream/deepgemm-fp8-1d1d-port.diff` is analysis-only).
+isolate the regression and is preserved as analysis, not shipped. It was staged
+as `patches/upstream/deepgemm-fp8-1d1d-port.diff`, which was deleted on
+2026-09-15 once every pin carried `a6b593d` and the port could no longer apply.
 
 ## Upstream legs (shipped 2026-08-25)
 
@@ -185,8 +186,9 @@ A/B of the a6 wheel (2.5.0) vs the 8b-era wheel (2.6.1) on the same image:
   `math.cuh`'s `cast_into_bf16_and_pack` needs `cuda_bf16.h`. The TU is only
   fixable by fixing the headers (include math.cuh + `using namespace
   deep_gemm::math` before the common includes + `#include <cuda_bf16.h>`).
-  Our local port (`deepgemm-fp8-1d1d-port.diff`) does exactly this by
-  re-homing the kernel under `deep_gemm/dg25_fp8/` with fixed headers.
+  Our local port did exactly this by re-homing the kernel under
+  `deep_gemm/dg25_fp8/` with fixed headers; that file was deleted 2026-09-15
+  and this paragraph is the record of what it contained.
 - **Regression mechanism (corrected 2026-08-26)**: `fp8_gemm_nt =
   fp8_fp4_gemm_nt` is NOT new (exists in a6b593d, gemm.hpp:792). 8b1392b
   removed `sm100_fp8_gemm_1d1d.{hpp,cuh}` and rewrote the `fp8_fp4_mqa_logits`

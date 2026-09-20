@@ -8,7 +8,9 @@ main: PLAN-MAIN keep/add overlays (no blanket DeepGEMM kill).
 from __future__ import annotations
 
 import argparse
+import importlib
 import inspect
+import re
 import sys
 
 
@@ -66,7 +68,10 @@ def main(argv: list[str] | None = None) -> int:
         attn_spec_src = inspect.getsource(a.DeepseekV4Attention.get_kv_cache_spec)
         assert "_dsv4_page_alignment" in attn_spec_src
 
-    assert get_kv_quant_mode("nvfp4_ds_mla") == KVQuantMode.NVFP4
+    # The base gives nvfp4_ds_mla its own mode (10, opaque-bytes DS-MLA layouts) and
+    # tests it before the "nvfp4" prefix, which returns the plain NVFP4 mode (5).
+    assert get_kv_quant_mode("nvfp4_ds_mla") == KVQuantMode.NVFP4_DS_MLA
+    assert get_kv_quant_mode("nvfp4") == KVQuantMode.NVFP4
     assert get_kv_quant_mode("fp8_ds_mla") != KVQuantMode.NONE
 
     src = inspect.getsource(a._resolve_dsv4_kv_cache_dtype)
@@ -122,15 +127,29 @@ def main(argv: list[str] | None = None) -> int:
     assert hasattr(mx.Mxfp4MoeBackend, "B12X_MXFP4_MXFP8")
     assert "b12x" in inspect.getsource(mx.map_mxfp4_backend)
 
-    mhc_src = inspect.getsource(mhc.mhc_pre_broadcast_tilelang)
-    assert "is_deep_gemm_supported" in mhc_src
-    assert "_tilelang_hc_prenorm_gemm" in mhc_src
+    # The overlay's invariant is the opposite of what used to be asserted here: it
+    # *removes* the traced `is_deep_gemm_supported()` calls and reads the static
+    # `_USE_DEEP_GEMM` instead, so asserting the string is present in a forward
+    # cannot hold once the overlay has done its job. On proto-v0.2.0
+    # `mhc_pre_broadcast_tilelang` no longer contains the call at all, so assert
+    # the real property: the static flag exists and no bare call survives anywhere
+    # in the module. The overlay raises on leftovers too; this is the belt to that
+    # brace, and it is what the old assertion was reaching for.
+    mhc_src = inspect.getsource(mhc)
+    assert "_USE_DEEP_GEMM" in mhc_src
+    # `_tilelang_hc_prenorm_gemm` was asserted here before proto-v0.2.0 and no longer
+    # exists in this module at all (upstream renamed the prenorm path), so the name
+    # check is dropped rather than retargeted at another private symbol. What the
+    # overlay actually guarantees, and what is checked here, is that the static flag
+    # is present and that no traced call to the ctypes pointer survives.
+    leftover = re.findall(r"(?<!_)\bis_deep_gemm_supported\(\)", mhc_src)
+    assert not leftover, f"{len(leftover)} traced is_deep_gemm_supported() call(s) remain"
 
     guard = inspect.getsource(VllmConfig.validate_nvfp4_kv_cache_with_mla)
-    assert 'cache_dtype == "nvfp4"' in guard
-    assert "startswith" not in guard.split("def validate_nvfp4_kv_cache_with_mla", 1)[1][
-        :400
-    ]
+    # The guard must not reject nvfp4_ds_mla. Upstream now exempts it with a
+    # `endswith("_ds_mla")` test ahead of the nvfp4 prefix match; the older overlay
+    # narrowed the test to `cache_dtype == "nvfp4"` and is no longer needed.
+    assert 'endswith("_ds_mla")' in guard, "MLA guard would reject nvfp4_ds_mla"
 
     assert B12xWarmupUnit is not None
     assert get_b12x_fused_moe is not None
@@ -150,9 +169,10 @@ def main(argv: list[str] | None = None) -> int:
 
     from vllm.utils import deep_gemm as dg
     # 2026-08-27: the einsum "fallback" was a misdiagnosis - DeepGEMM's einsum
-    # kernel is correct on SM12x with packed E8M0 scales + recipe (1,1,128)
-    # (measured 0.000000 mean_rel; E2E coherent). The stock passthrough is
-    # required; the fallback/upcast helper must NOT be present.
+    # kernel is correct on SM12x once the recipe/scale pair is coherent
+    # (measured 0.000000 mean_rel on the v0.28 path; 0.027 max_rel against a
+    # torch reference on v0.29). The stock passthrough is required; the
+    # fallback/upcast helper must NOT be present.
     einsum_src = inspect.getsource(fp8_einsum)
     assert "is_device_capability_family(120)" not in einsum_src, (
         "fp8_einsum still carries the obsolete SM12x dequant fallback"
@@ -165,12 +185,31 @@ def main(argv: list[str] | None = None) -> int:
         compute_fp8_einsum_recipe,
         deep_gemm_fp8_o_proj,
     )
+    # proto-v0.2.0: the SM12x (1,128,128)-with-fp32-scales override is gone.
+    # apply_main no longer calls patch_einsum_sm12x_recipe, and upstream's own
+    # recipe is what the SM120 DeepGEMM einsum kernel needs: (1,1,block_size)
+    # with tma_aligned_scales=True emits packed UE8M0, where the override fed
+    # the kernel SM90-style fp32 scales and it rejected the call at
+    # csrc/utils/layout.hpp:113 during _initialize_kv_caches, so the engine
+    # never reached health. The override's precondition is also gone -- the
+    # Python fp8_einsum fallback/fp8_bmm path is not applied any more (asserted
+    # above), and utils/deep_gemm.py binds DeepGEMM's real fp8_einsum.
     recipe_src = inspect.getsource(compute_fp8_einsum_recipe)
     assert "cap.major == 12" not in recipe_src, (
-        "o_proj recipe still carries the obsolete SM12x (1,128,128) override"
+        "o_proj recipe still carries the SM12x (1,128,128) override, which "
+        "DeepGEMM rejects at layout.hpp:113 and which stops the engine starting"
+    )
+    assert "einsum_recipe = (1, 128, 128) if cap.major <= 9 else (1, 1, block_size)" in recipe_src, (
+        "o_proj recipe is not upstream's (1,1,block_size) for major >= 10"
+    )
+    assert "tma_aligned_scales = cap.major >= 10" in recipe_src, (
+        "o_proj recipe no longer requests TMA-aligned scales on major >= 10"
     )
     o_src = inspect.getsource(deep_gemm_fp8_o_proj)
     assert "try_b12x_wo_proj" in o_src, "o_proj missing b12x WO projection try"
+    assert "deepgemm_post_process_fp8_weight_block" in o_src and "is_bmm=True" in o_src, (
+        "o_proj einsum missing the 3-D is_bmm wo_a weight (fp8_bmm needs 3-D)"
+    )
 
     from vllm.utils.deep_gemm import fp8_fp4_mqa_logits, fp8_fp4_paged_mqa_logits
     mqa_src = inspect.getsource(fp8_fp4_mqa_logits)
@@ -238,22 +277,29 @@ def main(argv: list[str] | None = None) -> int:
             "main B12xExperts missing process_weights_after_loading"
         )
 
-    # FlashInfer DSV4 dispatch: all (H, 192) must be registered for DSpark k=5
+    # FlashInfer DSV4 dispatch: every (H, 192) must be served for DSpark k=5.
+    # flashinfer main takes topk as a runtime kernel argument, so membership
+    # answers over the whole envelope instead of an enumerated pair set.
     from flashinfer.mla._sparse_mla_sm120 import _DECODE_DSV4_DISPATCH
     for h in (8, 16, 32, 64, 128):
         assert (h, 192) in _DECODE_DSV4_DISPATCH, (
-            f"FlashInfer _DECODE_DSV4_DISPATCH missing ({h}, 192): {sorted(_DECODE_DSV4_DISPATCH)}"
+            f"FlashInfer _DECODE_DSV4_DISPATCH missing ({h}, 192): "
+            f"{_DECODE_DSV4_DISPATCH!r}"
         )
 
-    # FlashInfer DSV4 C++ source: TOPK=192 dispatch entries for JIT compilation
+    # FlashInfer DSV4 C++ source: only a pre-runtime-topk flashinfer carries a
+    # TOPK dispatch table to extend; current main instantiates on num_heads.
     from pathlib import Path as P
     cu_path = P("/usr/local/lib/python3.12/dist-packages/flashinfer/data/csrc/sparse_mla_sm120_decode_dsv4.cu")
     if cu_path.is_file():
         cu_src = cu_path.read_text()
-        assert "DSV4_DISPATCH(32, 192)" in cu_src, "C++ DSV4 dispatch missing TOPK=192"
+        if "DSV4_DISPATCH(8, 128)" in cu_src:
+            assert "DSV4_DISPATCH(32, 192)" in cu_src, "C++ DSV4 dispatch missing TOPK=192"
 
     from vllm.distributed.communication_op import tensor_model_parallel_all_reduce
-    ar_src = inspect.getsource(tensor_model_parallel_all_reduce)
+    # The SM12x profiling overlay wraps this callable (functools.wraps), so
+    # follow __wrapped__ to keep checking the patched body.
+    ar_src = inspect.getsource(inspect.unwrap(tensor_model_parallel_all_reduce))
     assert "static workspace" in ar_src, "TP all-reduce missing default-allocator workspace"
 
     from vllm.v1.worker.gpu.spec_decode.dflash.speculator import DFlashSpeculator
@@ -270,10 +316,19 @@ def main(argv: list[str] | None = None) -> int:
         assert "_instanttensor_draft_load_config" in gm_src, (
             "main stack missing InstantTensor hybrid draft loader"
         )
-        from vllm.model_executor.kernels.linear.scaled_mm.b12x_block import (
-            _run_b12x_fp8_block_scaled_mm,
-        )
-        b12x_mm_src = inspect.getsource(_run_b12x_fp8_block_scaled_mm)
+        # v0.28.0 split the combined b12x.py into b12x_block.py / b12x_tensor.py
+        # (#52016); v0.29.0 merged it back into b12x.py. Try both names.
+        b12x_mm = None
+        for name in ("b12x_block", "b12x"):
+            try:
+                b12x_mm = importlib.import_module(
+                    f"vllm.model_executor.kernels.linear.scaled_mm.{name}"
+                )
+                break
+            except ImportError:
+                continue
+        assert b12x_mm is not None, "main stack missing scaled_mm b12x kernel"
+        b12x_mm_src = inspect.getsource(b12x_mm._run_b12x_fp8_block_scaled_mm)
         assert "block_fp8=True" in b12x_mm_src, (
             "main stack missing git-b12x mm_block_fp8 compatibility"
         )

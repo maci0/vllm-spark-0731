@@ -170,7 +170,6 @@ PIN_MATRIX = {
         "LINEAR_BACKEND": "b12x",
         "GPU_MEMORY_UTILIZATION": "0.8",
         "MAX_NUM_SEQS": "32",
-        "DEEPGEMM_COMMIT": "a6b593d2826719dcf4892609af7b84ee23aaf32a",
         "DG_JIT_USE_NVRTC": "0",
     },
     "pin.nvfp4.env": {
@@ -223,7 +222,6 @@ def check_pins() -> list[str]:
         re.findall(r"^ARG\s+([A-Z0-9_]+)=(\S+)", dftxt, re.M)
     )
     for arg, want in [
-        ("DEEPGEMM_COMMIT", "a6b593d2826719dcf4892609af7b84ee23aaf32a"),
         ("TORCH_REF", "release/2.14"),
         ("CUTLASS_DSL_VERSION", "4.7.0"),
         ("TRITON_VERSION", "3.7.1"),
@@ -283,7 +281,7 @@ def check_numbers() -> list[str]:
 DOCUMENTED_ONLY = [
     # patches/README.md table + knowledge/08 + UPSTREAM backport table
     "b12x-sparse", "o-proj-b12x", "indexer-store-page64", "indexer-b12x-schedule",
-    "indexer-mqa", "mqa-packed-gather", "mqa-paged-kernel", "flashinfer-eidx-contig",
+    "indexer-mqa", "mqa-packed-gather", "mqa-paged-kernel",
     "triton-e8m0-sm12x", "einsum-sm12x", "sm12x-kv-insert", "instanttensor-hybrid",
     "dsv4-block64", "dspark-backbone-cg", "dspark-backbone-none", "ar-piecewise-ws",
 ]

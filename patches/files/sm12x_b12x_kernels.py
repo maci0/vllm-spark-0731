@@ -9,10 +9,34 @@ scales). o_proj on SM12x is otherwise PyTorch einsum dequant.
 
 from __future__ import annotations
 
+import contextlib
+import functools
 import os
 from typing import Any
 
 import torch
+
+# --- Dynamo cannot trace builtin `print` -------------------------------------
+# There are 24 diagnostic `print(...)` calls left in this module, and inside a
+# `torch.compile(fullgraph=True)` capture a single one is fatal:
+#
+#   torch._dynamo.exc.Unsupported: Encountered graph break when attempting to
+#   trace CALL: Dynamo does not know how to trace builtin operator `print` with
+#   argument types ['str'] (has_kwargs True)
+#
+# Found by the round-58 enumeration run at lines 330, 807 and 1093, all on the
+# decode path. Deleting 24 blocks would be a larger and riskier diff than it
+# looks -- some sit in exception handlers that log why a fallback fired -- so
+# shadow the builtin with a module-level no-op instead. Dynamo then traces a
+# trivial function returning None rather than an opaque builtin. Set
+# `B12X_DEBUG=1` to get the prints back; the read happens once at import, so the
+# guard is a constant at trace time.
+if os.environ.get("B12X_DEBUG", "") != "1":
+
+    def print(*args: Any, **kwargs: Any) -> None:  # noqa: A001
+        """No-op stand-in for the builtin; see the note above."""
+        return None
+
 
 _INDEX_HEAD_DIM = 128
 _PAGE_SIZE = 64
@@ -52,16 +76,18 @@ _SIDECAR_MIN_OVERFLOW = 1024
 _arange128: torch.Tensor | None = None
 _arange4: torch.Tensor | None = None
 _paged_sched_cache: dict[tuple[int, str], torch.Tensor] = {}
-# b12x uses the scheduled paged scorer when max_pages >= 1024 and q_rows <= 8.
-# The 1-row kernel is the only scheduled path that is a win on this pin.
-# Multi-row (q_rows 2-8) measured slower than the unscheduled 1023-page
-# scorer for DSpark 1-way (6 tokens, often padded to 8). 8-way capture is
-# 48 rows, so uses_paged_schedule is already false. Do not plan inside
-# CUDA-graph capture (frozen warmup seqlens). If the vLLM buffer is missing
-# or q_rows != 1, trim one page so decode stays unscheduled. Last 64 tokens
-# of a 65536 context are then not indexed.
+# b12x uses the scheduled paged scorer when max_pages >= 1024 and q_rows <= 8
+# (verified on the -029 image: uses_paged_schedule(rows, 4096) is True for
+# rows 1-8 and False from 16 up). The old 1-row cap left even the 8-row
+# DSpark c1 batch on the unscheduled 1023-page scorer, trimmed by
+# trim_page_table_skip_schedule. Multi-row (2-8) was measured slower than the
+# unscheduled scorer on the v0.28 pin; that is what the scheduled path has to
+# beat again here. Do not plan inside CUDA-graph capture (frozen warmup
+# seqlens). If the vLLM buffer is missing or q_rows > 8, trim one page so
+# decode stays unscheduled; the indexer writes an empty schedule for those
+# shapes, which is what keeps a stale plan from being consumed later.
 _B12X_SCHEDULE_MIN_PAGES = 1024
-_B12X_SCHEDULE_MAX_Q_ROWS = 1
+_B12X_SCHEDULE_MAX_Q_ROWS = 8
 
 
 def expand_block_table_to_page64(
@@ -95,7 +121,7 @@ def _consume_vllm_paged_schedule(
     q_rows: int,
     schedule_ok: bool,
 ) -> bool:
-    """Use the vLLM-filled schedule only for the b12x 1-row scorer."""
+    """Use the vLLM-filled schedule for every shape b12x schedules."""
     return (
         need_sched
         and schedule_ok
@@ -229,6 +255,57 @@ def lookup_packed_indexer_k(kv_cache: torch.Tensor) -> torch.Tensor | None:
     return sc[:n_pages]
 
 
+# --- runtime flag probes, off the traced graph -------------------------------
+# `b12x_skip_flag` and the marker check in `_indexer_direct_gather` both probe the
+# filesystem, and `os.path.exists` is a builtin Dynamo skip-lists. Reached from
+# inside the traced forward that is fatal:
+#
+#   attention.py:1131  if b12x_skip_flag("indexer_all"):
+#   sm12x_b12x_kernels.py:1396  return os.path.exists(os.path.join(root, "skip_" + name))
+#   Unsupported: Attempted to call function marked as skipped
+#
+# `/cache/runtime` is a host bind mount and the whole point of the markers is that
+# they can be created or removed while the server runs, so the answer cannot simply
+# be frozen. Instead the traced path reads `_RUNTIME_FILES`, a snapshot that
+# `b12x_refresh_runtime_flags()` retakes, while the eager path keeps `os.path.exists`
+# exactly as it was -- so every skip-flag instrument from rounds 39-48 behaves
+# identically in the shipping `CompilationMode.NONE` regime.
+_RUNTIME_FILES: frozenset[str] = frozenset()
+
+
+def b12x_refresh_runtime_flags() -> frozenset[str]:
+    """Retake the runtime-flag snapshot. Safe to call at any time."""
+    global _RUNTIME_FILES
+    root = os.environ.get("VLLM_SKIP_FLAG_DIR", "/cache/runtime")
+    try:
+        _RUNTIME_FILES = frozenset(os.listdir(root))
+    except OSError:
+        _RUNTIME_FILES = frozenset()
+    return _RUNTIME_FILES
+
+
+def _indexer_direct_gather() -> bool:
+    """Opt-in fast path for the packed-sidecar gather.
+
+    The default flatten+gather reshapes a strided slice of the KV cache, which
+    materialises a full-cache copy on every layer of every decode step (~57
+    ms/step at 1 row). Reading the cache directly removes it and measured
+    10.1 -> 25.5 tok/s on the no-spec arm, but draft acceptance drops from ~60%
+    to ~41-50%, so it stays off until that is understood.
+
+    VLLM_B12X_INDEXER_DIRECT_GATHER=1 enables it. A marker file at
+    $VLLM_SKIP_FLAG_DIR/indexer-direct-gather also enables it, so a running
+    server can be switched within one boot for an A/B under identical state.
+    """
+    if os.environ.get("VLLM_B12X_INDEXER_DIRECT_GATHER", "0") == "1":
+        return True
+    if torch.compiler.is_compiling():
+        # os.path.exists is a Dynamo skip-listed builtin; see the note above.
+        return "indexer-direct-gather" in _RUNTIME_FILES
+    root = os.environ.get("VLLM_SKIP_FLAG_DIR", "/cache/runtime")
+    return os.path.exists(os.path.join(root, "indexer-direct-gather"))
+
+
 def sync_packed_indexer_k(
     kv_cache: torch.Tensor,
     slot_mapping: torch.Tensor,
@@ -277,13 +354,22 @@ def sync_packed_indexer_k(
     dummy = dummy.clamp(max=sc.shape[0] - 1)
     kpage = torch.where(valid, kpage.clamp(max=n_pages - 1), dummy)
     within = torch.where(valid, within, torch.zeros_like(within))
-    if kv_cache.dim() == 4:
-        raw = kv_cache[:, :, 0, :_TOKEN_BYTES]
+    if _indexer_direct_gather():
+        # Gather only the T inserted tokens. Flattening the sliced cache first
+        # materialises a full-cache copy here on every layer of every step.
+        blocks = int(kv_cache.shape[0])
+        blk = block_id.clamp(max=blocks - 1)
+        if kv_cache.dim() == 4:
+            tok = kv_cache[blk, off, 0, :_TOKEN_BYTES]
+        else:
+            tok = kv_cache[blk, off, :_TOKEN_BYTES]
     else:
-        raw = kv_cache[..., :_TOKEN_BYTES]
-    flat_tokens = raw.reshape(-1, _TOKEN_BYTES)
-    tok_idx = clamped.clamp(max=flat_tokens.shape[0] - 1)
-    tok = flat_tokens[tok_idx]
+        if kv_cache.dim() == 4:
+            raw = kv_cache[:, :, 0, :_TOKEN_BYTES]
+        else:
+            raw = kv_cache[..., :_TOKEN_BYTES]
+        flat_tokens = raw.reshape(-1, _TOKEN_BYTES)
+        tok = flat_tokens[clamped.clamp(max=flat_tokens.shape[0] - 1)]
     k_idx = kpage.unsqueeze(1) * _PACKED_PAGE_BYTES + within.unsqueeze(1) * _INDEX_HEAD_DIM + _arange128
     s_idx = (
         kpage.unsqueeze(1) * _PACKED_PAGE_BYTES
@@ -587,10 +673,16 @@ def b12x_profile_decode_once(fn):
 
         import torch
 
-        if torch.cuda.is_current_stream_capturing():
+        if torch.cuda.is_current_stream_capturing() or _DECODE_PROFILED[0]:
             return fn(self, *args, **kwargs)
         _PROFILING_STEP[0] = True
-        _LAYER_EVENTS[0] = []
+        # This hook wraps the DSpark DRAFT (`DFlashSpeculator._run_model`). It must
+        # not clobber `_LAYER_EVENTS[0]`, which the target's 43 decoder layers write
+        # into and `_b12x_print_layers()` reports: the draft forward runs after the
+        # target's `execute_model` in the same engine step, so resetting the shared
+        # list here made the reported layer count the draft's three MTP blocks.
+        _DRAFT_PHASE[0] = True
+        _DRAFT_LAYER_EVENTS[0] = []
         try:
             torch.cuda.synchronize()
             t0 = time.perf_counter()
@@ -604,9 +696,9 @@ def b12x_profile_decode_once(fn):
             wall_ms = 1000.0 * (t1 - t0)
             gpu_ms = e0.elapsed_time(e1)
             ntoks = int(args[0]) if args else "?"
-            layer_ms = [a.elapsed_time(b) for a, b in _LAYER_EVENTS[0]]
+            layer_ms = [a.elapsed_time(b) for a, b in _DRAFT_LAYER_EVENTS[0]]
             print(
-                f"b12x decode step: toks={ntoks} wall={wall_ms:.1f}ms "
+                f"b12x draft step: toks={ntoks} wall={wall_ms:.1f}ms "
                 f"gpu={gpu_ms:.1f}ms overhead={wall_ms - gpu_ms:.1f}ms",
                 flush=True,
             )
@@ -614,13 +706,15 @@ def b12x_profile_decode_once(fn):
                 n = len(layer_ms)
                 total = sum(layer_ms)
                 print(
-                    f"b12x layers: n={n} sum={total:.1f}ms avg={total / n:.2f}ms "
+                    f"b12x draft layers: n={n} sum={total:.1f}ms avg={total / n:.2f}ms "
                     f"max={max(layer_ms):.2f}ms@L{layer_ms.index(max(layer_ms))} "
                     f"p95={sorted(layer_ms)[int(n * 0.95) - 1]:.2f}ms",
                     flush=True,
                 )
+            _DECODE_PROFILED[0] = True
         finally:
             _PROFILING_STEP[0] = False
+            _DRAFT_PHASE[0] = False
         return out
 
     return wrapper
@@ -629,6 +723,21 @@ def b12x_profile_decode_once(fn):
 #: Set by b12x_profile_decode_once around the profiled step so the per-layer
 #: timing below only prints for that one step.
 _PROFILING_STEP = [False]
+
+#: True only while the DSpark draft's `_run_model` is executing. The draft and the
+#: target both run `DeepseekV4DecoderLayer.forward`, so the layer hook needs to know
+#: which model it is timing or the two sets of events interleave in one list.
+_DRAFT_PHASE = [False]
+
+#: The draft's own (e0, e1) pairs. Kept separate from `_LAYER_EVENTS` so the target's
+#: 43 layers survive into `_b12x_print_layers()`; the draft's reset used to discard
+#: them and its three MTP layers were reported as "n=3" in their place.
+_DRAFT_LAYER_EVENTS = [[]]
+
+#: b12x_profile_decode_once runs per draft forward (up to k+1 times per engine step)
+#: on the eager path; the docstring promises one-shot, so stop after the first real
+#: print rather than printing the same step repeatedly.
+_DECODE_PROFILED = [False]
 
 
 def b12x_profile_layer(fn):
@@ -647,16 +756,20 @@ def b12x_profile_layer(fn):
     def wrapper(self, *args, **kwargs):
         import torch
 
-        if not _PROFILING_STEP[0]:
-            return fn(self, *args, **kwargs)
-        if torch.cuda.is_current_stream_capturing():
+        if not _b12x_region_active(_b12x_tokens_of(args, kwargs)):
             return fn(self, *args, **kwargs)
         e0 = torch.cuda.Event(enable_timing=True)
         e1 = torch.cuda.Event(enable_timing=True)
-        e0.record()
+        try:
+            e0.record()
+        except Exception:
+            _CAPTURE_PROFILE["on"] = False
+            return fn(self, *args, **kwargs)
         out = fn(self, *args, **kwargs)
         e1.record()
-        _LAYER_EVENTS[0].append((e0, e1))
+        # The draft and the target are both DeepseekV4DecoderLayer, so route the pair
+        # to whichever phase is running instead of letting them share one list.
+        (_DRAFT_LAYER_EVENTS if _DRAFT_PHASE[0] else _LAYER_EVENTS)[0].append((e0, e1))
         return out
 
     return wrapper
@@ -1007,39 +1120,15 @@ def try_b12x_wo_proj(
     head_dim = nope_dim + rope_dim
     n_heads = n_groups * heads_per_group
     group_width = heads_per_group * head_dim
-    dbg_n = getattr(try_b12x_wo_proj, "_n", 0) + 1
-    try_b12x_wo_proj._n = dbg_n
-    if dbg_n <= 8:
-        wa = getattr(wo_a, "weight", None)
-        wb = getattr(wo_b, "weight", None)
-        sa = getattr(wo_a, "weight_scale", None)
-        if sa is None:
-            sa = getattr(wo_a, "weight_scale_inv", None)
-        print(
-            "DBG wo_proj ENTRY#%d: o=%s dim=%d g=%d hpg=%d nope=%d rope=%d gw=%d "
-            "rank=%d wa=%s sa=%s wb=%s capt=%s"
-            % (
-                dbg_n, tuple(o_in.shape), o_in.dim(), n_groups, heads_per_group,
-                nope_dim, rope_dim, group_width, o_lora_rank,
-                tuple(wa.shape) if wa is not None else None,
-                tuple(sa.shape) if sa is not None else None,
-                tuple(wb.shape) if wb is not None else None,
-                torch.cuda.is_current_stream_capturing(),
-            ),
-            flush=True,
-        )
     if o_in.dim() == 2 and o_in.shape[-1] == n_heads * head_dim:
         o_in = o_in.view(o_in.shape[0], n_heads, head_dim)
     elif o_in.dim() == 4:
         o_in = o_in.reshape(o_in.shape[0], n_heads, head_dim)
+    # Kept as a plain shape guard: returning None hands the layer back to the
+    # einsum path. The DBG prints that used to sit here were removed because
+    # torch.cuda.is_current_stream_capturing() returns a Python bool and that is a
+    # fatal `torch.* op returned non-Tensor` graph break under fullgraph compile.
     if o_in.dim() != 3 or o_in.shape[0] > 256:
-        er = getattr(try_b12x_wo_proj, "_er", 0)
-        if er < 8:
-            try_b12x_wo_proj._er = er + 1
-            print(
-                f"DBG wo_proj EARLY-RETURN#{er + 1}: dim={o_in.dim()} shape={tuple(o_in.shape)}",
-                flush=True,
-            )
         return None
     try:
         o_fp8, o_scale = fused_inv_rope_fp8_quant(
@@ -1084,7 +1173,21 @@ def try_b12x_wo_proj(
             return None
         a_ws, z_ws, flat_ws = ws
         a_ws.copy_(tgd.permute(1, 0, 2))
-        torch.bmm(a_ws, w_bmm, out=z_ws)
+        # `z_ws` is `_z_ws[:, :tokens]` out of a `(groups, cap_t, rank)` buffer, so
+        # it is non-contiguous whenever tokens < cap_t, and Dynamo refuses an
+        # `out=` into a non-contiguous tensor:
+        #
+        #   Attempted to call op with non-contiguous `out=` tensor
+        #     torch.bmm(a_ws, w_bmm, out=z_ws)
+        #
+        # Compute into a fresh tensor and copy. Gated on is_compiling(), which
+        # Dynamo folds to a constant, so the eager path keeps the zero-copy `out=`
+        # form and only the compiled path pays the extra (groups, tokens, rank)
+        # copy.
+        if torch.compiler.is_compiling():
+            z_ws.copy_(torch.bmm(a_ws, w_bmm))
+        else:
+            torch.bmm(a_ws, w_bmm, out=z_ws)
         d = o_lora_rank
         for g in range(n_groups):
             flat_ws[:, g * d : (g + 1) * d].copy_(z_ws[g])
@@ -1267,3 +1370,303 @@ def packed_gather_mqa_logits(
         if out_end > out_start:
             logits[:, out_start:out_end] = part[:, : out_end - out_start]
     return logits
+
+
+# Per-step target decode profiler (VLLM_PROFILE_DECODE=1).
+#
+# b12x_profile_decode_once/b12x_profile_layer cover the DSpark draft
+# (_run_model) only, which the no-spec arm never calls. These wrap the model
+# runner instead: forward (execute_model), sampling (sample_tokens/sample) and
+# the host gap in between. Nothing is synchronized per step (that would
+# serialize host and device); the window's events resolve behind one sync when
+# it closes. On a run without CUDA graphs the layer decorator collects as well
+# and the per-layer breakdown is printed with the step.
+
+_STEP_PROFILE: dict[str, Any] = {
+    "limit": int(os.environ.get("VLLM_PROFILE_DECODE_STEPS", "12")),
+    "steps": 0,
+    "samples": [],
+    "last_end": 0.0,
+    "printed": False,
+}
+
+#: device time per named region of the profiled step, filled by the
+#: b12x_profile_region marks (decoder layer, indexer, WO, all-reduce...).
+_REGION_EVENTS: dict[str, list[tuple[Any, Any, float]]] = {}
+
+#: VLLM_PROFILE_CAPTURE=1: arm the region marks while the CUDA graph is
+#: captured, so the event records become graph nodes and the next replay
+#: re-records them. That is the only way to get gap-free device time for a
+#: graph-replayed step. Only 1-row work is recorded, so the piecewise prefill
+#: captures cannot mix in.
+_CAPTURE_PROFILE: dict[str, Any] = {
+    "on": os.environ.get("VLLM_PROFILE_CAPTURE") == "1",
+    "printed": False,
+}
+
+
+def _b12x_tokens_of(args: tuple, kwargs: dict) -> int | None:
+    """First tensor argument's leading dim: the batch token count."""
+    for value in list(args) + list(kwargs.values()):
+        shape = getattr(value, "shape", None)
+        if shape is not None and len(shape) > 0:
+            try:
+                return int(shape[0])
+            except Exception:
+                return None
+    return None
+
+
+def b12x_skip_flag(name: str) -> bool:
+    """Diagnostic switch: /cache/runtime/skip_<name> exists.
+
+    /cache/runtime is a host bind mount, so a flag file can be created or
+    removed while the server runs. Correctness is lost while one is set:
+    these only measure what a stage costs.
+
+    Under `torch.compile` the probe reads the `_RUNTIME_FILES` snapshot instead,
+    because `os.path.exists` is a Dynamo skip-listed builtin and this call sits
+    inside the traced forward; see the note above `_RUNTIME_FILES`. The eager path
+    is unchanged, so flags can still be toggled mid-run in the shipping regime.
+    """
+    if torch.compiler.is_compiling():
+        return ("skip_" + name) in _RUNTIME_FILES
+    root = os.environ.get("VLLM_SKIP_FLAG_DIR", "/cache/runtime")
+    return os.path.exists(os.path.join(root, "skip_" + name))
+
+
+def _b12x_tokens_value(value: Any) -> int | None:
+    """Token count from an int or a tensor's leading dim."""
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    shape = getattr(value, "shape", None)
+    if shape is not None and len(shape) > 0:
+        try:
+            return int(shape[0])
+        except Exception:
+            return None
+    return None
+
+
+def _b12x_region_active(tokens: int | None) -> bool:
+    if _PROFILING_STEP[0]:
+        return True
+    if not _CAPTURE_PROFILE["on"] or tokens != 1:
+        return False
+    return bool(torch.cuda.is_current_stream_capturing())
+
+
+@contextlib.contextmanager
+def b12x_profile_region(name: str, tokens: int | None = None):
+    """CUDA-event + wall time for one named region of the profiled forward.
+
+    ``tokens`` is the batch token count, given as an int or as a tensor whose
+    leading dim is the token axis (the layer marks pass ``x``).
+    """
+    tokens = _b12x_tokens_value(tokens)
+    if not _b12x_region_active(tokens):
+        yield
+        return
+    import time
+
+    import torch
+
+    e0 = torch.cuda.Event(enable_timing=True)
+    e1 = torch.cuda.Event(enable_timing=True)
+    t0 = time.perf_counter()
+    try:
+        e0.record()
+    except Exception:
+        _CAPTURE_PROFILE["on"] = False
+        yield
+        return
+    try:
+        yield
+    finally:
+        e1.record()
+        t1 = time.perf_counter()
+        _REGION_EVENTS.setdefault(name, []).append((e0, e1, (t1 - t0) * 1e3))
+
+
+def b12x_profile_region_fn(name: str):
+    """Wrap a callable in b12x_profile_region, deriving the token count."""
+
+    def decorate(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with b12x_profile_region(name, _b12x_tokens_of(args, kwargs)):
+                return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorate
+
+
+def _b12x_print_step_profile() -> None:
+    if not _STEP_PROFILE["samples"]:
+        return
+    torch.cuda.synchronize()
+    rows = [
+        (label, info, wall_ms, e0.elapsed_time(e1), gap_ms)
+        for label, info, e0, e1, wall_ms, gap_ms in _STEP_PROFILE["samples"]
+    ]
+    _STEP_PROFILE["samples"] = []
+    for label, info, wall_ms, gpu_ms, gap_ms in rows:
+        print(
+            f"b12x step {label}{info}: wall={wall_ms:.1f}ms gpu={gpu_ms:.1f}ms "
+            f"gap={gap_ms:.1f}ms",
+            flush=True,
+        )
+    steps = [r for r in rows if r[0] == "sample_tokens"]
+    if steps:
+        fwd = [r for r in rows if r[0] == "execute_model"]
+        samp = [r for r in rows if r[0] == "sample"]
+        step_wall = sum(r[2] for r in steps)
+        gap_before_fwd = sum(r[4] for r in fwd if r[4] > 0)
+        print(
+            f"b12x profile window: steps={len(steps)} "
+            f"wall/step={step_wall / len(steps):.1f}ms "
+            f"fwd_gpu/step={sum(r[3] for r in fwd) / len(fwd):.1f}ms "
+            f"samp_gpu/step={(sum(r[3] for r in samp) / len(samp)) if samp else -1:.1f}ms "
+            f"gap_before_fwd/step={gap_before_fwd / len(fwd):.1f}ms",
+            flush=True,
+        )
+    _b12x_print_detail()
+    _b12x_print_layers()
+
+
+def _b12x_print_layers() -> None:
+    try:
+        torch.cuda.synchronize()
+    except Exception:
+        return
+    layer_ms = [a.elapsed_time(b) for a, b in _LAYER_EVENTS[0]]
+    if not layer_ms:
+        return
+    order = sorted(range(len(layer_ms)), key=lambda i: layer_ms[i], reverse=True)
+    total = sum(layer_ms)
+    top = " ".join(f"L{i}={layer_ms[i]:.2f}" for i in order[:12])
+    print(
+        f"b12x layers: n={len(layer_ms)} sum={total:.1f}ms "
+        f"avg={total / len(layer_ms):.2f}ms top: {top}",
+        flush=True,
+    )
+
+
+def _b12x_print_detail() -> None:
+    """Resolve and print the region events collected for the last forward."""
+    try:
+        torch.cuda.synchronize()
+    except Exception:
+        return
+    for name in sorted(_REGION_EVENTS):
+        events = _REGION_EVENTS[name]
+        try:
+            ms = [a.elapsed_time(b) for a, b, _ in events]
+        except Exception as exc:
+            print(f"b12x region {name}: unresolvable ({exc})", flush=True)
+            continue
+        wall = [w for _, _, w in events]
+        print(
+            f"b12x region {name}: n={len(ms)} gpu_sum={sum(ms):.1f}ms "
+            f"gpu_min={min(ms):.2f}ms gpu_avg={sum(ms) / len(ms):.2f}ms "
+            f"gpu_max={max(ms):.2f}ms wall_sum={sum(wall):.1f}ms",
+            flush=True,
+        )
+    _REGION_EVENTS.clear()
+
+
+def _b12x_capture_step(self, fn, args: tuple, kwargs: dict):
+    """Capture mode: print the first real 1-row step's captured region times.
+
+    The region/layer events were recorded while the CUDA graph was captured,
+    so they are graph nodes and the replay re-records them. Nothing else is
+    timed: the point is the gap-free device split inside the graph.
+    """
+    import time
+
+    import torch
+
+    if (
+        _CAPTURE_PROFILE["printed"]
+        or fn.__name__ != "execute_model"
+        or kwargs.get("dummy_run", False)
+        or torch.cuda.is_current_stream_capturing()
+    ):
+        return fn(self, *args, **kwargs)
+    scheduler_output = args[0] if args else kwargs.get("scheduler_output")
+    if (
+        getattr(scheduler_output, "total_num_scheduled_tokens", None) != 1
+        or not _REGION_EVENTS
+    ):
+        return fn(self, *args, **kwargs)
+    _CAPTURE_PROFILE["printed"] = True
+    t0 = time.perf_counter()
+    out = fn(self, *args, **kwargs)
+    wall_ms = (time.perf_counter() - t0) * 1e3
+    print(
+        f"b12x capture profile: 1-row replay wall={wall_ms:.1f}ms",
+        flush=True,
+    )
+    _b12x_print_detail()
+    _b12x_print_layers()
+    return out
+
+
+def b12x_profile_target_step(fn):
+    """Wall + CUDA-event timing of one target decode step (VLLM_PROFILE_DECODE=1).
+
+    Prints the first VLLM_PROFILE_DECODE_STEPS real (non-dummy, non-capture)
+    calls as "b12x step <name>: wall/gpu/gap"; gap is the host time since the
+    previous profiled call returned.
+    """
+
+    import os
+
+    if os.environ.get("VLLM_PROFILE_DECODE") != "1":
+        return fn
+
+    def wrapper(self, *args, **kwargs):
+        import time
+
+        import torch
+
+        if _CAPTURE_PROFILE["on"]:
+            return _b12x_capture_step(self, fn, args, kwargs)
+        if (
+            _STEP_PROFILE["printed"]
+            or kwargs.get("dummy_run", False)
+            or torch.cuda.is_current_stream_capturing()
+        ):
+            return fn(self, *args, **kwargs)
+        label = fn.__name__
+        info = ""
+        if label == "execute_model":
+            so = args[0] if args else kwargs.get("scheduler_output")
+            info = f" tok={getattr(so, 'total_num_scheduled_tokens', '?')}"
+            _PROFILING_STEP[0] = True
+            _LAYER_EVENTS[0] = []
+            _REGION_EVENTS.clear()
+        e0 = torch.cuda.Event(enable_timing=True)
+        e1 = torch.cuda.Event(enable_timing=True)
+        t0 = time.perf_counter()
+        e0.record()
+        out = fn(self, *args, **kwargs)
+        e1.record()
+        t1 = time.perf_counter()
+        if label == "execute_model":
+            _PROFILING_STEP[0] = False
+        last_end = _STEP_PROFILE["last_end"]
+        gap_ms = (t0 - last_end) * 1e3 if last_end else -1.0
+        _STEP_PROFILE["last_end"] = t1
+        _STEP_PROFILE["samples"].append((label, info, e0, e1, (t1 - t0) * 1e3, gap_ms))
+        if label == "sample_tokens":
+            _STEP_PROFILE["steps"] += 1
+            if _STEP_PROFILE["steps"] >= _STEP_PROFILE["limit"]:
+                _b12x_print_step_profile()
+                _STEP_PROFILE["printed"] = True
+        return out
+
+    return wrapper

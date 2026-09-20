@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Rewrite quack-kernels CUTLASS pins to 4.7.0 and install --no-deps."""
+"""Rewrite quack-kernels CUTLASS pins to 4.7.0 and install --no-deps.
+
+quack-kernels 0.6.4 declared two exact pins (``nvidia-cutlass-dsl==4.6.2`` and its
+``[cu13]`` extra), so both had to be rewritten to the version we install. 0.6.5 declares
+``nvidia-cutlass-dsl>=4.7`` instead, which 4.7.0 already satisfies and which
+``pin_text`` therefore rewrites zero times. The old ``total != 2`` guard read that as a
+failure. Verify the requirement set instead of counting rewrites: a requirement that the
+target version does not satisfy still fails loudly, whether or not it was rewritten.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +17,29 @@ import tarfile
 import zipfile
 from pathlib import Path
 
+from packaging.requirements import Requirement
+
 from pin_cutlass_dsl import pin_text
+
+
+def unsatisfied(text: str, version: str) -> list[str]:
+    """nvidia-cutlass-dsl requirements in ``text`` that ``version`` does not satisfy."""
+    bad = []
+    for line in text.splitlines():
+        line = line.strip()
+        if "nvidia-cutlass-dsl" not in line:
+            continue
+        if line.startswith("Requires-Dist:"):
+            line = line[len("Requires-Dist:"):].strip()
+        try:
+            req = Requirement(line)
+        except Exception:  # noqa: BLE001 - non-requirement metadata line
+            continue
+        if not req.name.startswith("nvidia-cutlass-dsl"):
+            continue
+        if not req.specifier.contains(version, prereleases=True):
+            bad.append(line)
+    return bad
 
 
 def main() -> int:
@@ -43,8 +73,17 @@ def main() -> int:
         text, n = pin_text(meta.read_text(), version)
         total += n
         meta.write_text(text)
-    if total != 2:
-        raise SystemExit(f"quack rewrite expected 2, got {total} in {metas}")
+
+    if total not in (0, 2):
+        raise SystemExit(f"quack rewrite expected 0 or 2, got {total} in {metas}")
+
+    bad = [f"{meta.name}: {req}" for meta in metas for req in unsatisfied(meta.read_text(), version)]
+    if bad:
+        raise SystemExit(
+            f"quack CUTLASS DSL {version} does not satisfy: " + "; ".join(bad)
+        )
+    if total == 0:
+        print(f"{src.name} already requires CUTLASS DSL {version}; no rewrite needed")
 
     if kind == "wheel":
         out = Path("/tmp") / src.name

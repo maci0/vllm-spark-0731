@@ -1,6 +1,6 @@
 diff --git a/tests/v1/attention/test_dsv4_kernel_block_size.py b/tests/v1/attention/test_dsv4_kernel_block_size.py
 new file mode 100644
-index 0000000..1cc0f02
+index 0000000000..1cc0f0239a
 --- /dev/null
 +++ b/tests/v1/attention/test_dsv4_kernel_block_size.py
 @@ -0,0 +1,36 @@
@@ -41,18 +41,19 @@ index 0000000..1cc0f02
 +    ]
 +    assert DeepseekV4IndexerBackend.get_supported_kernel_block_sizes() == [256]
 diff --git a/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py b/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
-index bca71ab..517950d 100644
+index 883ef5ecaf..81e5ea8e33 100644
 --- a/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
 +++ b/vllm/models/deepseek_v4/nvidia/flashinfer_sparse.py
-@@ -24,7 +24,6 @@ from vllm.models.deepseek_v4.sparse_mla import (
+@@ -25,7 +25,7 @@ from vllm.models.deepseek_v4.sparse_mla import (
  )
  from vllm.platforms.interface import DeviceCapability
  from vllm.utils.flashinfer import flashinfer_trtllm_batch_decode_sparse_mla_dsv4
--from vllm.v1.attention.backend import MultipleOf
+-from vllm.v1.attention.backend import AttentionCGSupport, MultipleOf
++from vllm.v1.attention.backend import AttentionCGSupport
  from vllm.v1.attention.backends.mla.compressor_utils import (
      get_dspark_swa_index_width,
  )
-@@ -105,10 +104,6 @@ class DeepseekV4FlashInferMLASparseBackend(DeepseekV4SparseMLABackend):
+@@ -110,10 +110,6 @@ class DeepseekV4FlashInferMLASparseBackend(DeepseekV4SparseMLABackend):
          "fp8_ds_mla",
      ]
  
@@ -64,18 +65,10 @@ index bca71ab..517950d 100644
      def get_name() -> str:
          return "FLASHINFER_MLA_SPARSE_DSV4"
 diff --git a/vllm/models/deepseek_v4/sparse_mla.py b/vllm/models/deepseek_v4/sparse_mla.py
-index ebff031..4e9efe5 100644
+index 4953bdc925..5f44c1465a 100644
 --- a/vllm/models/deepseek_v4/sparse_mla.py
 +++ b/vllm/models/deepseek_v4/sparse_mla.py
-@@ -9,6 +9,7 @@ import torch
- 
- from vllm.config import VllmConfig
- from vllm.config.cache import CacheDType
-+from vllm.platforms import current_platform
- from vllm.platforms.interface import DeviceCapability
- from vllm.triton_utils import tl, triton
- from vllm.utils.math_utils import cdiv
-@@ -32,6 +33,19 @@ from vllm.v1.kv_cache_interface import AttentionSpec
+@@ -39,6 +39,19 @@ from vllm.v1.kv_cache_interface import AttentionSpec
  _C128A_TOPK_ALIGNMENT = 128
  
  
@@ -95,7 +88,7 @@ index ebff031..4e9efe5 100644
  class DeepseekV4SparseMLABackend(AttentionBackend):
      """DeepSeek-V4 sparse-MLA backend base.
  
-@@ -51,7 +65,7 @@ class DeepseekV4SparseMLABackend(AttentionBackend):
+@@ -58,7 +71,7 @@ class DeepseekV4SparseMLABackend(AttentionBackend):
  
      @staticmethod
      def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
@@ -105,13 +98,13 @@ index ebff031..4e9efe5 100644
      @staticmethod
      def get_builder_cls() -> type["DeepseekV4SparseMLAMetadataBuilder"]:
 diff --git a/vllm/v1/attention/backends/mla/indexer.py b/vllm/v1/attention/backends/mla/indexer.py
-index 4700fbe..0752d7f 100644
+index 7bc0b442c3..54645dc711 100644
 --- a/vllm/v1/attention/backends/mla/indexer.py
 +++ b/vllm/v1/attention/backends/mla/indexer.py
-@@ -193,7 +193,15 @@ class DeepseekV4IndexerBackend(DeepseekV32IndexerBackend):
- 
+@@ -246,7 +246,15 @@ class DeepseekV4IndexerBackend(DeepseekV32IndexerBackend):
      @staticmethod
      def get_supported_kernel_block_sizes() -> list[int | MultipleOf]:
+         # Block sizes count uncompressed tokens: C4 indexer pages hold 64 rows.
 -        return [256]
 +        # Imported lazily: vllm.models.deepseek_v4 transitively imports
 +        # vllm._aiter_ops (via fused_moe), which would deadlock cold start
@@ -124,4 +117,4 @@ index 4700fbe..0752d7f 100644
 +        return dsv4_supported_kernel_block_sizes()
  
  
- @dataclass
+ class DeepseekV41IndexerBackend(DeepseekV4IndexerBackend):

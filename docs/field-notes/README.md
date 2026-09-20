@@ -3,7 +3,9 @@
 Raw, verbatim write-ups from the two GitHub repositories that this repo
 (`vllm-spark-0731`) absorbed, plus the older `vllm-spark-main-b12x` lineage
 (which was already fully contained here as an earlier snapshot — nothing was
-left behind).
+left behind), plus the DeepSeek-V4 serving notes added on 2026-09-13 from a
+sibling directory of the `nvfp4` project that the 2026-08-25 absorption did not
+name.
 
 `oh-my-dgx-spark/` is different: it is a **third-party corpus vendored
 verbatim** (a Korean-language DGX Spark lab book + research logs). It is kept
@@ -18,6 +20,7 @@ consolidated, cross-linked version of this knowledge lives in
 |---|---|---|
 | [`nvfp4/`](nvfp4/README.md) | `maci0/vllm-spark-nvfp4` | NVFP4 MLA KV cache lineage: patch write-ups, DeepGEMM call-site gaps, KV offload root cause, MHC/DeepGEMM SM121 failure, eugr NVFP4 experiment |
 | [`dgx-spark/`](dgx-spark/README.md) | `maci0/dgx-spark-deepseek-v4-flash-0731` | Field notes: full quant × framework sweep, golden recipe, KV ceiling, tuning, troubleshooting, session/test logs, prod configs, deadlock bug report |
+| [`nvfp4-serving/`](nvfp4-serving/README.md) | `Projects/nvfp4/serving/` (directory, not a repo) | DeepSeek-V4 serving notes: quant × framework × image sweep, 2-node 1M-context runbook, DSpark-on-B12X, the NVFP4+B12X SwiGLU-clamp patch, Spark Arena submission mechanics, `sparkrun` recipe |
 
 ## Where each document maps in the knowledge base
 

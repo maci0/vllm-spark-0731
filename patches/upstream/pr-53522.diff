@@ -66,7 +66,7 @@ index 1177d8b27..bf616400e 100644
 +            # DeepGEMM paged MQA metadata helper asserts 32 or 64 states
              schedule_metadata = self.scheduler_metadata_buffer
 -            if current_platform.is_cuda() and has_deep_gemm():
-+            if _should_build_paged_mqa_logits_metadata(self.kv_cache_spec.storage_block_size):
++            if _should_build_paged_mqa_logits_metadata(self.kv_cache_spec.num_states):
                  metadata = get_paged_mqa_logits_metadata(
                      seq_lens,
-                     self.kv_cache_spec.storage_block_size,
+                     self.kv_cache_spec.num_states,

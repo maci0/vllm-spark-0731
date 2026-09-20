@@ -43,9 +43,12 @@ class TestAssertStack(unittest.TestCase):
         with self.assertRaises(SystemExit):
             check("fp8_ds_mla", "", "b12x", "mtp", 5)
 
-    def test_refuse_wrong_k(self) -> None:
+    def test_refuse_k_below_min(self) -> None:
+        # The guard enforces a minimum (DSPARK_MIN_K), so any k at or above it is
+        # legal; 7 is what the D1 recipes serve.
         with self.assertRaises(SystemExit):
-            check("fp8_ds_mla", "", "b12x", "dspark", 7)
+            check("fp8_ds_mla", "", "b12x", "dspark", 4)
+        self.assertEqual(check("fp8_ds_mla", "", "b12x", "dspark", 7), "fp8")
 
     def test_refuse_unknown_attn(self) -> None:
         with self.assertRaises(SystemExit):
