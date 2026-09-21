@@ -1,0 +1,251 @@
+== hum-a16-rc2: 5 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-21T14:33:47+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: 
+-- pass 1 at 2026-09-21T14:33:48+08:00
+== hum-a16-rc2-1 metered start 2026-09-21T14:33:48+08:00
+== health=200 after 1 polls at 2026-09-21T14:33:48+08:00
+== tag hum-a16-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  57.8 tok/s  agg=   57.8  wall=  8.9s  toks=512
+-- level 1
+wall_s                  8.90
+drafts_per_req           108      12.14 /s
+gen_tokens               512      57.55 tok/s
+tokens_per_step        4.741
+accept_rate             62.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.8  75.9  63.0  57.4  48.1  41.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.3 tok/s  agg=  102.8  wall= 14.9s  toks=1536
+-- level 3
+wall_s                 14.99
+drafts_per_req           334      22.28 /s
+gen_tokens              1536     102.44 tok/s
+tokens_per_step        4.599
+accept_rate             60.1 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    87.7  75.1  61.7  54.5  45.8  35.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.2 tok/s  agg=  126.1  wall= 20.3s  toks=2560
+-- level 5
+wall_s                 20.33
+drafts_per_req           575      28.28 /s
+gen_tokens              2560     125.90 tok/s
+tokens_per_step        4.452
+accept_rate             57.6 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    88.2  73.9  60.9  48.3  41.2  33.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  25.3 tok/s  agg=  152.1  wall= 20.2s  toks=3072
+-- level 6
+wall_s                 20.24
+drafts_per_req           651      32.16 /s
+gen_tokens              3072     151.74 tok/s
+tokens_per_step        4.719
+accept_rate             62.3 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.9  78.2  66.5  55.0  44.7  38.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-a16-rc2-1.meter.txt
+== hum-a16-rc2-1 metered done 2026-09-21T14:34:56+08:00
+-- pass 2 at 2026-09-21T14:34:56+08:00
+== hum-a16-rc2-2 metered start 2026-09-21T14:34:56+08:00
+== health=200 after 1 polls at 2026-09-21T14:34:56+08:00
+== tag hum-a16-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  59.8 tok/s  agg=   59.8  wall=  8.6s  toks=512
+-- level 1
+wall_s                  8.63
+drafts_per_req           104      12.06 /s
+gen_tokens               512      59.36 tok/s
+tokens_per_step        4.923
+accept_rate             65.5 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.3  79.8  68.3  59.6  51.0  43.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.3 tok/s  agg=  102.9  wall= 14.9s  toks=1536
+-- level 3
+wall_s                 15.00
+drafts_per_req           334      22.27 /s
+gen_tokens              1536     102.40 tok/s
+tokens_per_step        4.599
+accept_rate             60.3 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.0  76.0  63.2  52.4  43.4  35.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.1 tok/s  agg=  135.5  wall= 18.9s  toks=2560
+-- level 5
+wall_s                 18.94
+drafts_per_req           555      29.31 /s
+gen_tokens              2560     135.18 tok/s
+tokens_per_step        4.613
+accept_rate             60.6 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.3  77.3  65.9  53.2  42.5  34.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.9 tok/s  agg=  149.5  wall= 20.6s  toks=3072
+-- level 6
+wall_s                 20.60
+drafts_per_req           664      32.24 /s
+gen_tokens              3072     149.14 tok/s
+tokens_per_step        4.627
+accept_rate             60.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.0  77.1  65.4  53.2  42.2  35.4
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-a16-rc2-2.meter.txt
+== hum-a16-rc2-2 metered done 2026-09-21T14:36:04+08:00
+-- pass 3 at 2026-09-21T14:36:04+08:00
+== hum-a16-rc2-3 metered start 2026-09-21T14:36:04+08:00
+== health=200 after 1 polls at 2026-09-21T14:36:04+08:00
+== tag hum-a16-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.9 tok/s  agg=   55.9  wall=  9.2s  toks=512
+-- level 1
+wall_s                  9.20
+drafts_per_req           112      12.17 /s
+gen_tokens               512      55.63 tok/s
+tokens_per_step        4.571
+accept_rate             59.8 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    87.5  75.9  61.6  50.9  45.5  37.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  35.5 tok/s  agg=  106.4  wall= 14.4s  toks=1536
+-- level 3
+wall_s                 14.49
+drafts_per_req           328      22.64 /s
+gen_tokens              1536     106.03 tok/s
+tokens_per_step        4.683
+accept_rate             61.3 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.6  77.4  64.6  54.6  45.7  35.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.0 tok/s  agg=  134.9  wall= 19.0s  toks=2560
+-- level 5
+wall_s                 19.04
+drafts_per_req           554      29.10 /s
+gen_tokens              2560     134.45 tok/s
+tokens_per_step        4.621
+accept_rate             60.5 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.6  78.0  65.0  53.2  43.0  33.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.3 tok/s  agg=  146.1  wall= 21.0s  toks=3072
+-- level 6
+wall_s                 21.09
+drafts_per_req           685      32.47 /s
+gen_tokens              3072     145.63 tok/s
+tokens_per_step        4.485
+accept_rate             58.4 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.8  75.2  61.9  50.2  40.6  33.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-a16-rc2-3.meter.txt
+== hum-a16-rc2-3 metered done 2026-09-21T14:37:11+08:00
+-- pass 4 at 2026-09-21T14:37:11+08:00
+== hum-a16-rc2-4 metered start 2026-09-21T14:37:11+08:00
+== health=200 after 1 polls at 2026-09-21T14:37:11+08:00
+== tag hum-a16-rc2-4
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  56.5 tok/s  agg=   56.5  wall=  9.1s  toks=512
+-- level 1
+wall_s                  9.13
+drafts_per_req           110      12.05 /s
+gen_tokens               512      56.09 tok/s
+tokens_per_step        4.655
+accept_rate             60.8 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.0  82.7  61.8  53.6  40.9  35.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  33.9 tok/s  agg=  101.7  wall= 15.1s  toks=1536
+-- level 3
+wall_s                 15.15
+drafts_per_req           324      21.38 /s
+gen_tokens              1536     101.36 tok/s
+tokens_per_step        4.741
+accept_rate             63.0 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.1  78.1  67.0  56.5  47.2  39.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.9 tok/s  agg=  134.5  wall= 19.0s  toks=2560
+-- level 5
+wall_s                 19.10
+drafts_per_req           560      29.32 /s
+gen_tokens              2560     134.01 tok/s
+tokens_per_step        4.571
+accept_rate             59.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.6  77.0  63.7  50.9  42.1  34.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  25.5 tok/s  agg=  152.7  wall= 20.1s  toks=3072
+-- level 6
+wall_s                 20.15
+drafts_per_req           669      33.19 /s
+gen_tokens              3072     152.42 tok/s
+tokens_per_step        4.592
+accept_rate             60.4 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    88.6  78.6  64.1  52.3  43.3  35.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-a16-rc2-4.meter.txt
+== hum-a16-rc2-4 metered done 2026-09-21T14:38:19+08:00
+-- pass 5 at 2026-09-21T14:38:19+08:00
+== hum-a16-rc2-5 metered start 2026-09-21T14:38:19+08:00
+== health=200 after 1 polls at 2026-09-21T14:38:19+08:00
+== tag hum-a16-rc2-5
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  59.0 tok/s  agg=   59.0  wall=  8.7s  toks=512
+-- level 1
+wall_s                  8.72
+drafts_per_req           105      12.05 /s
+gen_tokens               512      58.74 tok/s
+tokens_per_step        4.876
+accept_rate             64.4 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.5  80.0  67.6  61.9  48.6  39.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.9 tok/s  agg=  104.6  wall= 14.7s  toks=1536
+-- level 3
+wall_s                 14.73
+drafts_per_req           322      21.85 /s
+gen_tokens              1536     104.25 tok/s
+tokens_per_step        4.770
+accept_rate             63.1 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.4  78.0  65.8  56.2  48.8  40.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.3 tok/s  agg=  136.3  wall= 18.8s  toks=2560
+-- level 5
+wall_s                 18.84
+drafts_per_req           543      28.82 /s
+gen_tokens              2560     135.88 tok/s
+tokens_per_step        4.715
+accept_rate             62.0 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.0  78.1  65.6  53.4  46.6  37.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.0 tok/s  agg=  144.0  wall= 21.3s  toks=3072
+-- level 6
+wall_s                 21.39
+drafts_per_req           687      32.11 /s
+gen_tokens              3072     143.61 tok/s
+tokens_per_step        4.472
+accept_rate             58.2 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.4  74.1  60.6  51.1  40.3  33.9
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-a16-rc2-5.meter.txt
+== hum-a16-rc2-5 metered done 2026-09-21T14:39:27+08:00
+tag hum-a16-rc2, 5 passes
+ level   n  median agg tok/s    spread   values
+     1   5              57.8      6.7%   57.8 59.8 55.9 56.5 59.0
+     3   5             102.9      4.6%   102.8 102.9 106.4 101.7 104.6
+     5   5             134.9      7.6%   126.1 135.5 134.9 134.5 136.3
+     6   5             149.5      5.8%   152.1 149.5 146.1 152.7 144.0
+== hum-a16-rc2 done 2026-09-21T14:39:27+08:00

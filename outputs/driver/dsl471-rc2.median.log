@@ -1,0 +1,155 @@
+== dsl471-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T00:04:03+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: 
+-- pass 1 at 2026-09-20T00:04:03+08:00
+== dsl471-rc2-1 metered start 2026-09-20T00:04:03+08:00
+== health=200 after 1 polls at 2026-09-20T00:04:03+08:00
+== tag dsl471-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.9 tok/s  agg=   55.9  wall=  9.2s  toks=512
+-- level 1
+wall_s                  9.20
+drafts_per_req           106      11.52 /s
+gen_tokens               512      55.66 tok/s
+tokens_per_step        4.830
+accept_rate             55.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    84.0  73.6  63.2  54.7  46.2  36.8  28.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.1 tok/s  agg=  102.2  wall= 15.0s  toks=1536
+-- level 3
+wall_s                 15.09
+drafts_per_req           326      21.60 /s
+gen_tokens              1536     101.80 tok/s
+tokens_per_step        4.712
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.9  78.5  62.3  50.3  40.8  30.4  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.7 tok/s  agg=  128.3  wall= 20.0s  toks=2560
+-- level 5
+wall_s                 20.01
+drafts_per_req           555      27.74 /s
+gen_tokens              2560     127.94 tok/s
+tokens_per_step        4.613
+accept_rate             51.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.6  75.1  60.4  49.5  38.4  29.5  21.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.4 tok/s  agg=  140.6  wall= 21.8s  toks=3072
+-- level 6
+wall_s                 21.90
+drafts_per_req           660      30.13 /s
+gen_tokens              3072     140.25 tok/s
+tokens_per_step        4.655
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.4  74.8  60.9  50.5  39.7  30.6  20.5
+== wrote /home/maci/vllm-spark-0731/outputs/driver/dsl471-rc2-1.meter.txt
+== dsl471-rc2-1 metered done 2026-09-20T00:05:14+08:00
+-- pass 2 at 2026-09-20T00:05:14+08:00
+== dsl471-rc2-2 metered start 2026-09-20T00:05:14+08:00
+== health=200 after 1 polls at 2026-09-20T00:05:14+08:00
+== tag dsl471-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  56.3 tok/s  agg=   56.3  wall=  9.1s  toks=512
+-- level 1
+wall_s                  9.13
+drafts_per_req           106      11.60 /s
+gen_tokens               512      56.05 tok/s
+tokens_per_step        4.830
+accept_rate             55.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.6  78.3  62.3  55.7  43.4  34.0  23.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.2 tok/s  agg=   96.6  wall= 15.9s  toks=1536
+-- level 3
+wall_s                 15.95
+drafts_per_req           344      21.57 /s
+gen_tokens              1536      96.33 tok/s
+tokens_per_step        4.465
+accept_rate             49.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.3  72.4  60.2  48.0  37.8  29.1  15.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.2 tok/s  agg=  125.9  wall= 20.3s  toks=2560
+-- level 5
+wall_s                 20.38
+drafts_per_req           573      28.12 /s
+gen_tokens              2560     125.64 tok/s
+tokens_per_step        4.468
+accept_rate             49.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.7  73.1  57.6  46.9  36.6  28.8  17.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.4 tok/s  agg=  140.3  wall= 21.9s  toks=3072
+-- level 6
+wall_s                 21.97
+drafts_per_req           679      30.91 /s
+gen_tokens              3072     139.85 tok/s
+tokens_per_step        4.524
+accept_rate             50.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.9  73.9  59.4  47.1  37.4  29.9  18.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/dsl471-rc2-2.meter.txt
+== dsl471-rc2-2 metered done 2026-09-20T00:06:25+08:00
+-- pass 3 at 2026-09-20T00:06:25+08:00
+== dsl471-rc2-3 metered start 2026-09-20T00:06:25+08:00
+== health=200 after 1 polls at 2026-09-20T00:06:25+08:00
+== tag dsl471-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.8 tok/s  agg=   54.8  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.38
+drafts_per_req           109      11.62 /s
+gen_tokens               512      54.60 tok/s
+tokens_per_step        4.697
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.7  76.1  61.5  52.3  41.3  29.4  21.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.8 tok/s  agg=   98.5  wall= 15.6s  toks=1536
+-- level 3
+wall_s                 15.64
+drafts_per_req           330      21.10 /s
+gen_tokens              1536      98.22 tok/s
+tokens_per_step        4.655
+accept_rate             52.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.7  73.6  62.7  52.4  40.9  27.6  19.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.7 tok/s  agg=  133.6  wall= 19.2s  toks=2560
+-- level 5
+wall_s                 19.20
+drafts_per_req           534      27.81 /s
+gen_tokens              2560     133.33 tok/s
+tokens_per_step        4.794
+accept_rate             54.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  77.3  64.6  54.3  43.1  33.0  20.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.8 tok/s  agg=  142.6  wall= 21.5s  toks=3072
+-- level 6
+wall_s                 21.60
+drafts_per_req           666      30.84 /s
+gen_tokens              3072     142.25 tok/s
+tokens_per_step        4.613
+accept_rate             51.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.5  75.1  61.7  48.6  38.7  29.6  18.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/dsl471-rc2-3.meter.txt
+== dsl471-rc2-3 metered done 2026-09-20T00:07:35+08:00
+tag dsl471-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              55.9      2.7%   55.9 56.3 54.8
+     3   3              98.5      5.7%   102.2 96.6 98.5
+     5   3             128.3      6.0%   128.3 125.9 133.6
+     6   3             140.6      1.6%   140.6 140.3 142.6
+== dsl471-rc2 done 2026-09-20T00:07:35+08:00

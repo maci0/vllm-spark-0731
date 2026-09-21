@@ -9,3 +9,6 @@ __pycache__/
 .venv/
 .pi-subagents/
 .scratch/
+
+# Result record: keep the per-arm medians (the raw meter streams stay ignored).
+!outputs/driver/*.median.log

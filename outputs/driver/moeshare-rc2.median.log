@@ -1,0 +1,155 @@
+== moeshare-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-19T18:52:13+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-19T18:52:13+08:00
+== moeshare-rc2-1 metered start 2026-09-19T18:52:13+08:00
+== health=200 after 1 polls at 2026-09-19T18:52:13+08:00
+== tag moeshare-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  49.3 tok/s  agg=   49.3  wall= 10.4s  toks=512
+-- level 1
+wall_s                 10.43
+drafts_per_req           121      11.60 /s
+gen_tokens               512      49.07 tok/s
+tokens_per_step        4.231
+accept_rate             46.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.0  66.9  51.2  43.8  35.5  25.6  16.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.7 tok/s  agg=   98.0  wall= 15.7s  toks=1536
+-- level 3
+wall_s                 15.71
+drafts_per_req           337      21.45 /s
+gen_tokens              1536      97.75 tok/s
+tokens_per_step        4.558
+accept_rate             51.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.7  73.0  59.9  49.0  38.0  28.8  19.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.5 tok/s  agg=  132.3  wall= 19.3s  toks=2560
+-- level 5
+wall_s                 19.41
+drafts_per_req           554      28.54 /s
+gen_tokens              2560     131.89 tok/s
+tokens_per_step        4.621
+accept_rate             51.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  75.6  59.0  48.9  39.9  30.3  20.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.2 tok/s  agg=  139.2  wall= 22.1s  toks=3072
+-- level 6
+wall_s                 22.12
+drafts_per_req           681      30.79 /s
+gen_tokens              3072     138.88 tok/s
+tokens_per_step        4.511
+accept_rate             50.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.4  73.6  59.9  47.3  38.2  26.7  18.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moeshare-rc2-1.meter.txt
+== moeshare-rc2-1 metered done 2026-09-19T18:53:25+08:00
+-- pass 2 at 2026-09-19T18:53:25+08:00
+== moeshare-rc2-2 metered start 2026-09-19T18:53:25+08:00
+== health=200 after 1 polls at 2026-09-19T18:53:25+08:00
+== tag moeshare-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  56.2 tok/s  agg=   56.2  wall=  9.1s  toks=512
+-- level 1
+wall_s                  9.17
+drafts_per_req           105      11.45 /s
+gen_tokens               512      55.85 tok/s
+tokens_per_step        4.876
+accept_rate             56.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    93.3  83.8  63.8  50.5  42.9  34.3  23.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.4 tok/s  agg=   97.2  wall= 15.8s  toks=1536
+-- level 3
+wall_s                 15.87
+drafts_per_req           330      20.80 /s
+gen_tokens              1536      96.80 tok/s
+tokens_per_step        4.655
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.4  75.8  60.0  51.2  40.9  30.6  18.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.8 tok/s  agg=  129.2  wall= 19.8s  toks=2560
+-- level 5
+wall_s                 19.87
+drafts_per_req           543      27.33 /s
+gen_tokens              2560     128.86 tok/s
+tokens_per_step        4.715
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.4  77.5  61.9  50.5  41.3  31.5  21.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.5 tok/s  agg=  147.1  wall= 20.9s  toks=3072
+-- level 6
+wall_s                 20.93
+drafts_per_req           657      31.39 /s
+gen_tokens              3072     146.75 tok/s
+tokens_per_step        4.676
+accept_rate             52.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.6  76.0  60.6  49.6  39.9  31.1  21.9
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moeshare-rc2-2.meter.txt
+== moeshare-rc2-2 metered done 2026-09-19T18:54:35+08:00
+-- pass 3 at 2026-09-19T18:54:35+08:00
+== moeshare-rc2-3 metered start 2026-09-19T18:54:35+08:00
+== health=200 after 1 polls at 2026-09-19T18:54:35+08:00
+== tag moeshare-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  51.3 tok/s  agg=   51.3  wall= 10.0s  toks=512
+-- level 1
+wall_s                 10.01
+drafts_per_req           115      11.48 /s
+gen_tokens               512      51.13 tok/s
+tokens_per_step        4.452
+accept_rate             49.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.2  70.4  60.0  48.7  39.1  25.2  15.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.0 tok/s  agg=  102.1  wall= 15.0s  toks=1536
+-- level 3
+wall_s                 15.08
+drafts_per_req           318      21.08 /s
+gen_tokens              1536     101.84 tok/s
+tokens_per_step        4.830
+accept_rate             55.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.7  75.5  62.6  57.2  44.7  33.6  23.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.9 tok/s  agg=  129.3  wall= 19.8s  toks=2560
+-- level 5
+wall_s                 19.86
+drafts_per_req           560      28.20 /s
+gen_tokens              2560     128.90 tok/s
+tokens_per_step        4.571
+accept_rate             51.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.2  75.0  59.1  48.9  40.4  27.3  18.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.0 tok/s  agg=  144.2  wall= 21.3s  toks=3072
+-- level 6
+wall_s                 21.35
+drafts_per_req           652      30.53 /s
+gen_tokens              3072     143.87 tok/s
+tokens_per_step        4.712
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.9  76.2  62.9  51.4  40.2  30.8  21.9
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moeshare-rc2-3.meter.txt
+== moeshare-rc2-3 metered done 2026-09-19T18:55:45+08:00
+tag moeshare-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              51.3     13.5%   49.3 56.2 51.3
+     3   3              98.0      5.0%   98.0 97.2 102.1
+     5   3             129.3      2.4%   132.3 129.2 129.3
+     6   3             144.2      5.5%   139.2 147.1 144.2
+== moeshare-rc2 done 2026-09-19T18:55:45+08:00

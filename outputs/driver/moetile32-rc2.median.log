@@ -1,0 +1,155 @@
+== moetile32-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T00:29:12+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-20T00:29:12+08:00
+== moetile32-rc2-1 metered start 2026-09-20T00:29:12+08:00
+== health=200 after 1 polls at 2026-09-20T00:29:12+08:00
+== tag moetile32-rc2-1
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  56.4 tok/s  agg=   56.4  wall=  9.1s  toks=512
+-- level 1
+wall_s                  9.14
+drafts_per_req           105      11.49 /s
+gen_tokens               512      56.04 tok/s
+tokens_per_step        4.876
+accept_rate             55.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.7  81.9  62.9  54.3  42.9  36.2  26.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.9 tok/s  agg=   98.8  wall= 15.5s  toks=1536
+-- level 3
+wall_s                 15.60
+drafts_per_req           327      20.96 /s
+gen_tokens              1536      98.45 tok/s
+tokens_per_step        4.697
+accept_rate             52.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  78.0  63.3  51.1  40.1  30.0  18.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  24.9 tok/s  agg=  124.4  wall= 20.6s  toks=2560
+-- level 5
+wall_s                 20.63
+drafts_per_req           550      26.66 /s
+gen_tokens              2560     124.09 tok/s
+tokens_per_step        4.655
+accept_rate             52.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.6  75.3  60.5  50.9  40.5  29.6  20.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.0 tok/s  agg=  143.8  wall= 21.4s  toks=3072
+-- level 6
+wall_s                 21.43
+drafts_per_req           657      30.66 /s
+gen_tokens              3072     143.37 tok/s
+tokens_per_step        4.676
+accept_rate             52.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.4  72.9  59.7  50.4  41.9  33.0  21.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moetile32-rc2-1.meter.txt
+== moetile32-rc2-1 metered done 2026-09-20T00:30:23+08:00
+-- pass 2 at 2026-09-20T00:30:23+08:00
+== moetile32-rc2-2 metered start 2026-09-20T00:30:23+08:00
+== health=200 after 1 polls at 2026-09-20T00:30:23+08:00
+== tag moetile32-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  53.7 tok/s  agg=   53.7  wall=  9.5s  toks=512
+-- level 1
+wall_s                  9.58
+drafts_per_req           109      11.38 /s
+gen_tokens               512      53.47 tok/s
+tokens_per_step        4.697
+accept_rate             53.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.2  75.2  62.4  53.2  44.0  30.3  20.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  31.9 tok/s  agg=   95.7  wall= 16.0s  toks=1536
+-- level 3
+wall_s                 16.09
+drafts_per_req           340      21.13 /s
+gen_tokens              1536      95.47 tok/s
+tokens_per_step        4.518
+accept_rate             50.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.5  71.5  55.6  46.5  40.3  30.9  21.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.5 tok/s  agg=  127.5  wall= 20.1s  toks=2560
+-- level 5
+wall_s                 20.15
+drafts_per_req           563      27.94 /s
+gen_tokens              2560     127.06 tok/s
+tokens_per_step        4.547
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.3  73.9  58.3  48.3  39.3  29.1  18.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.5 tok/s  agg=  147.1  wall= 20.9s  toks=3072
+-- level 6
+wall_s                 20.94
+drafts_per_req           653      31.19 /s
+gen_tokens              3072     146.72 tok/s
+tokens_per_step        4.704
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.2  75.8  63.4  50.8  41.0  30.8  21.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moetile32-rc2-2.meter.txt
+== moetile32-rc2-2 metered done 2026-09-20T00:31:34+08:00
+-- pass 3 at 2026-09-20T00:31:34+08:00
+== moetile32-rc2-3 metered start 2026-09-20T00:31:34+08:00
+== health=200 after 1 polls at 2026-09-20T00:31:34+08:00
+== tag moetile32-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  52.0 tok/s  agg=   52.0  wall=  9.8s  toks=512
+-- level 1
+wall_s                  9.89
+drafts_per_req           114      11.53 /s
+gen_tokens               512      51.79 tok/s
+tokens_per_step        4.491
+accept_rate             49.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.6  73.7  57.0  47.4  36.8  28.1  16.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.1 tok/s  agg=   96.4  wall= 15.9s  toks=1536
+-- level 3
+wall_s                 16.00
+drafts_per_req           339      21.19 /s
+gen_tokens              1536      96.00 tok/s
+tokens_per_step        4.531
+accept_rate             50.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.6  71.1  57.2  47.2  39.8  31.6  20.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.6 tok/s  agg=  128.2  wall= 20.0s  toks=2560
+-- level 5
+wall_s                 20.01
+drafts_per_req           559      27.93 /s
+gen_tokens              2560     127.92 tok/s
+tokens_per_step        4.580
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.9  73.9  60.5  50.1  39.2  28.6  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.1 tok/s  agg=  144.4  wall= 21.3s  toks=3072
+-- level 6
+wall_s                 21.33
+drafts_per_req           645      30.24 /s
+gen_tokens              3072     144.04 tok/s
+tokens_per_step        4.763
+accept_rate             54.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.1  77.1  62.3  51.6  41.7  33.2  23.3
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moetile32-rc2-3.meter.txt
+== moetile32-rc2-3 metered done 2026-09-20T00:32:46+08:00
+tag moetile32-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              53.7      8.2%   56.4 53.7 52.0
+     3   3              96.4      3.2%   98.8 95.7 96.4
+     5   3             127.5      3.0%   124.4 127.5 128.2
+     6   3             144.4      2.3%   143.8 147.1 144.4
+== moetile32-rc2 done 2026-09-20T00:32:46+08:00

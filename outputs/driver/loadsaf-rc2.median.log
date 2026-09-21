@@ -1,0 +1,175 @@
+== loadsaf-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T14:37:15+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-20T14:37:15+08:00
+== loadsaf-rc2-1 metered start 2026-09-20T14:37:15+08:00
+== health=200 after 1 polls at 2026-09-20T14:37:15+08:00
+== tag loadsaf-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  52.3 tok/s  agg=   52.3  wall=  9.8s  toks=512
+-- level 1
+wall_s                  9.85
+drafts_per_req           113      11.47 /s
+gen_tokens               512      51.98 tok/s
+tokens_per_step        4.531
+accept_rate             50.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.0  70.8  59.3  44.2  38.1  31.9  23.0
+== loadsaf-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T14:44:44+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 4 minutes
+== engine: 
+-- pass 1 at 2026-09-20T14:44:44+08:00
+== loadsaf-rc2-1 metered start 2026-09-20T14:44:44+08:00
+== health=200 after 1 polls at 2026-09-20T14:44:44+08:00
+== tag loadsaf-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.9 tok/s  agg=   55.9  wall=  9.2s  toks=512
+-- level 1
+wall_s                  9.21
+drafts_per_req           106      11.50 /s
+gen_tokens               512      55.57 tok/s
+tokens_per_step        4.830
+accept_rate             55.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.7  76.4  63.2  52.8  42.5  35.8  27.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.3 tok/s  agg=   96.9  wall= 15.9s  toks=1536
+-- level 3
+wall_s                 15.91
+drafts_per_req           328      20.61 /s
+gen_tokens              1536      96.52 tok/s
+tokens_per_step        4.683
+accept_rate             52.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.7  75.9  60.7  51.8  39.6  28.7  24.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.4 tok/s  agg=  127.0  wall= 20.2s  toks=2560
+-- level 5
+wall_s                 20.23
+drafts_per_req           561      27.74 /s
+gen_tokens              2560     126.57 tok/s
+tokens_per_step        4.563
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  73.8  59.4  49.0  39.2  29.6  19.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.9 tok/s  agg=  149.3  wall= 20.6s  toks=3072
+-- level 6
+wall_s                 20.64
+drafts_per_req           637      30.86 /s
+gen_tokens              3072     148.84 tok/s
+tokens_per_step        4.823
+accept_rate             54.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.3  74.3  63.4  54.6  44.6  34.4  24.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/loadsaf-rc2-1.meter.txt
+== loadsaf-rc2-1 metered done 2026-09-20T14:45:54+08:00
+-- pass 2 at 2026-09-20T14:45:54+08:00
+== loadsaf-rc2-2 metered start 2026-09-20T14:45:54+08:00
+== health=200 after 1 polls at 2026-09-20T14:45:54+08:00
+== tag loadsaf-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.3 tok/s  agg=   54.3  wall=  9.4s  toks=512
+-- level 1
+wall_s                  9.49
+drafts_per_req           109      11.49 /s
+gen_tokens               512      53.97 tok/s
+tokens_per_step        4.697
+accept_rate             53.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.1  78.0  61.5  49.5  43.1  32.1  20.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  31.9 tok/s  agg=   95.8  wall= 16.0s  toks=1536
+-- level 3
+wall_s                 16.07
+drafts_per_req           342      21.28 /s
+gen_tokens              1536      95.56 tok/s
+tokens_per_step        4.491
+accept_rate             50.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  73.7  57.9  46.5  38.3  27.8  18.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.2 tok/s  agg=  125.8  wall= 20.3s  toks=2560
+-- level 5
+wall_s                 20.41
+drafts_per_req           571      27.98 /s
+gen_tokens              2560     125.44 tok/s
+tokens_per_step        4.483
+accept_rate             50.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.4  72.5  58.1  47.1  37.3  28.0  19.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.1 tok/s  agg=  144.9  wall= 21.2s  toks=3072
+-- level 6
+wall_s                 21.25
+drafts_per_req           658      30.96 /s
+gen_tokens              3072     144.54 tok/s
+tokens_per_step        4.669
+accept_rate             52.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.4  76.9  60.2  50.0  39.7  31.8  20.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/loadsaf-rc2-2.meter.txt
+== loadsaf-rc2-2 metered done 2026-09-20T14:47:06+08:00
+-- pass 3 at 2026-09-20T14:47:06+08:00
+== loadsaf-rc2-3 metered start 2026-09-20T14:47:06+08:00
+== health=200 after 1 polls at 2026-09-20T14:47:06+08:00
+== tag loadsaf-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.3 tok/s  agg=   55.3  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.29
+drafts_per_req           106      11.40 /s
+gen_tokens               512      55.08 tok/s
+tokens_per_step        4.830
+accept_rate             55.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.7  76.4  62.3  53.8  45.3  34.0  25.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.5 tok/s  agg=  103.5  wall= 14.8s  toks=1536
+-- level 3
+wall_s                 14.90
+drafts_per_req           320      21.48 /s
+gen_tokens              1536     103.08 tok/s
+tokens_per_step        4.800
+accept_rate             54.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.0  77.2  63.4  52.2  43.1  32.8  21.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.0 tok/s  agg=  135.2  wall= 18.9s  toks=2560
+-- level 5
+wall_s                 18.99
+drafts_per_req           532      28.02 /s
+gen_tokens              2560     134.84 tok/s
+tokens_per_step        4.812
+accept_rate             54.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.2  78.2  63.3  52.4  43.0  32.7  22.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.8 tok/s  agg=  142.9  wall= 21.5s  toks=3072
+-- level 6
+wall_s                 21.54
+drafts_per_req           671      31.15 /s
+gen_tokens              3072     142.59 tok/s
+tokens_per_step        4.578
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.3  74.4  61.3  48.4  38.6  29.4  18.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/loadsaf-rc2-3.meter.txt
+== loadsaf-rc2-3 metered done 2026-09-20T14:48:15+08:00
+tag loadsaf-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              55.3      2.9%   55.9 54.3 55.3
+     3   3              96.9      7.9%   96.9 95.8 103.5
+     5   3             127.0      7.4%   127.0 125.8 135.2
+     6   3             144.9      4.4%   149.3 144.9 142.9
+== loadsaf-rc2 done 2026-09-20T14:48:15+08:00

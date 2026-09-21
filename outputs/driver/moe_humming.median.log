@@ -1,0 +1,155 @@
+== moe_humming: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-13T07:22:48+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: v0.1.1.dev0+g69db1c26b
+-- pass 1 at 2026-09-13T07:22:48+08:00
+== moe_humming-1 metered start 2026-09-13T07:22:48+08:00
+== health=200 after 1 polls at 2026-09-13T07:22:48+08:00
+== tag moe_humming-1
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  42.0 tok/s  agg=   42.0  wall= 12.2s  toks=512
+-- level 1
+wall_s                 12.26
+drafts_per_req           104       8.48 /s
+gen_tokens               512      41.75 tok/s
+tokens_per_step        4.923
+accept_rate             56.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.4  79.8  66.3  54.8  45.2  34.6  25.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  26.7 tok/s  agg=   80.0  wall= 19.2s  toks=1536
+-- level 3
+wall_s                 19.25
+drafts_per_req           340      17.66 /s
+gen_tokens              1536      79.80 tok/s
+tokens_per_step        4.518
+accept_rate             50.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.8  72.9  59.7  48.8  40.0  27.6  17.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  21.8 tok/s  agg=  109.1  wall= 23.5s  toks=2560
+-- level 5
+wall_s                 23.52
+drafts_per_req           571      24.28 /s
+gen_tokens              2560     108.84 tok/s
+tokens_per_step        4.483
+accept_rate             50.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.7  73.7  58.7  47.8  37.5  27.5  17.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  21.1 tok/s  agg=  126.4  wall= 24.3s  toks=3072
+-- level 6
+wall_s                 24.37
+drafts_per_req           651      26.71 /s
+gen_tokens              3072     126.04 tok/s
+tokens_per_step        4.719
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.1  73.9  63.0  53.1  41.5  31.8  20.4
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moe_humming-1.meter.txt
+== moe_humming-1 metered done 2026-09-13T07:24:13+08:00
+-- pass 2 at 2026-09-13T07:24:13+08:00
+== moe_humming-2 metered start 2026-09-13T07:24:13+08:00
+== health=200 after 1 polls at 2026-09-13T07:24:13+08:00
+== tag moe_humming-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  42.4 tok/s  agg=   42.4  wall= 12.1s  toks=512
+-- level 1
+wall_s                 12.15
+drafts_per_req           102       8.40 /s
+gen_tokens               512      42.14 tok/s
+tokens_per_step        5.020
+accept_rate             57.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.2  77.5  65.7  53.9  45.1  41.2  30.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  26.3 tok/s  agg=   78.8  wall= 19.5s  toks=1536
+-- level 3
+wall_s                 19.56
+drafts_per_req           352      18.00 /s
+gen_tokens              1536      78.54 tok/s
+tokens_per_step        4.364
+accept_rate             48.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.5  69.6  56.2  47.4  35.2  25.9  17.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  21.1 tok/s  agg=  105.7  wall= 24.2s  toks=2560
+-- level 5
+wall_s                 24.25
+drafts_per_req           576      23.75 /s
+gen_tokens              2560     105.55 tok/s
+tokens_per_step        4.444
+accept_rate             49.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.8  72.2  58.5  47.4  37.0  25.9  15.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  20.1 tok/s  agg=  120.7  wall= 25.5s  toks=3072
+-- level 6
+wall_s                 25.51
+drafts_per_req           679      26.62 /s
+gen_tokens              3072     120.42 tok/s
+tokens_per_step        4.524
+accept_rate             50.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.9  72.2  59.9  48.0  38.0  28.3  20.2
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moe_humming-2.meter.txt
+== moe_humming-2 metered done 2026-09-13T07:25:40+08:00
+-- pass 3 at 2026-09-13T07:25:40+08:00
+== moe_humming-3 metered start 2026-09-13T07:25:40+08:00
+== health=200 after 1 polls at 2026-09-13T07:25:40+08:00
+== tag moe_humming-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  40.8 tok/s  agg=   40.8  wall= 12.6s  toks=512
+-- level 1
+wall_s                 12.61
+drafts_per_req           106       8.40 /s
+gen_tokens               512      40.60 tok/s
+tokens_per_step        4.830
+accept_rate             55.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.8  70.8  57.5  54.7  47.2  40.6  31.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  26.4 tok/s  agg=   79.3  wall= 19.4s  toks=1536
+-- level 3
+wall_s                 19.44
+drafts_per_req           346      17.80 /s
+gen_tokens              1536      79.00 tok/s
+tokens_per_step        4.439
+accept_rate             49.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.5  71.4  56.4  47.4  36.4  29.2  19.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  22.8 tok/s  agg=  113.9  wall= 22.5s  toks=2560
+-- level 5
+wall_s                 22.54
+drafts_per_req           539      23.91 /s
+gen_tokens              2560     113.55 tok/s
+tokens_per_step        4.750
+accept_rate             53.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.4  77.7  62.9  51.4  42.3  32.3  19.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  20.5 tok/s  agg=  122.8  wall= 25.0s  toks=3072
+-- level 6
+wall_s                 25.08
+drafts_per_req           679      27.07 /s
+gen_tokens              3072     122.47 tok/s
+tokens_per_step        4.524
+accept_rate             50.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  74.2  61.1  47.4  37.4  27.1  18.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/moe_humming-3.meter.txt
+== moe_humming-3 metered done 2026-09-13T07:27:05+08:00
+tag moe_humming, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              42.0      3.8%   42.0 42.4 40.8
+     3   3              79.3      1.5%   80.0 78.8 79.3
+     5   3             109.1      7.5%   109.1 105.7 113.9
+     6   3             122.8      4.6%   126.4 120.7 122.8
+== moe_humming done 2026-09-13T07:27:05+08:00

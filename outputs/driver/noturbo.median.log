@@ -1,0 +1,155 @@
+== noturbo: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-18T20:09:28+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: 
+-- pass 1 at 2026-09-18T20:09:28+08:00
+== noturbo-1 metered start 2026-09-18T20:09:28+08:00
+== health=200 after 1 polls at 2026-09-18T20:09:28+08:00
+== tag noturbo-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 'E5=8F='
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  56.5 tok/s  agg=   56.5  wall=  9.1s  toks=512
+-- level 1
+wall_s                  9.12
+drafts_per_req           105      11.51 /s
+gen_tokens               512      56.14 tok/s
+tokens_per_step        4.876
+accept_rate             55.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.5  76.2  61.9  54.3  47.6  34.3  23.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.0 tok/s  agg=   96.1  wall= 16.0s  toks=1536
+-- level 3
+wall_s                 16.04
+drafts_per_req           338      21.07 /s
+gen_tokens              1536      95.76 tok/s
+tokens_per_step        4.544
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.1  73.4  59.8  47.3  40.2  29.3  16.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.8 tok/s  agg=  128.8  wall= 19.9s  toks=2560
+-- level 5
+wall_s                 19.93
+drafts_per_req           556      27.90 /s
+gen_tokens              2560     128.47 tok/s
+tokens_per_step        4.604
+accept_rate             51.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.5  74.3  60.1  50.4  39.7  29.9  18.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.5 tok/s  agg=  147.2  wall= 20.9s  toks=3072
+-- level 6
+wall_s                 20.93
+drafts_per_req           654      31.25 /s
+gen_tokens              3072     146.78 tok/s
+tokens_per_step        4.697
+accept_rate             52.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.5  75.1  62.1  51.1  41.1  31.7  21.9
+== wrote /home/maci/vllm-spark-0731/outputs/driver/noturbo-1.meter.txt
+== noturbo-1 metered done 2026-09-18T20:10:40+08:00
+-- pass 2 at 2026-09-18T20:10:40+08:00
+== noturbo-2 metered start 2026-09-18T20:10:40+08:00
+== health=200 after 1 polls at 2026-09-18T20:10:40+08:00
+== tag noturbo-2
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '0x9a,0'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  51.7 tok/s  agg=   51.7  wall=  9.9s  toks=512
+-- level 1
+wall_s                  9.95
+drafts_per_req           115      11.56 /s
+gen_tokens               512      51.46 tok/s
+tokens_per_step        4.452
+accept_rate             49.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    84.3  71.3  54.8  49.6  39.1  27.8  18.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  31.6 tok/s  agg=   94.9  wall= 16.2s  toks=1536
+-- level 3
+wall_s                 16.24
+drafts_per_req           338      20.82 /s
+gen_tokens              1536      94.61 tok/s
+tokens_per_step        4.544
+accept_rate             50.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.8  73.1  58.6  49.1  40.2  29.6  18.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  24.3 tok/s  agg=  121.3  wall= 21.1s  toks=2560
+-- level 5
+wall_s                 21.15
+drafts_per_req           584      27.61 /s
+gen_tokens              2560     121.01 tok/s
+tokens_per_step        4.384
+accept_rate             48.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.6  72.3  57.0  45.7  35.4  26.0  17.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.1 tok/s  agg=  144.5  wall= 21.3s  toks=3072
+-- level 6
+wall_s                 21.30
+drafts_per_req           644      30.23 /s
+gen_tokens              3072     144.21 tok/s
+tokens_per_step        4.770
+accept_rate             54.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.6  76.7  63.4  51.9  41.1  31.4  21.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/noturbo-2.meter.txt
+== noturbo-2 metered done 2026-09-18T20:11:53+08:00
+-- pass 3 at 2026-09-18T20:11:53+08:00
+== noturbo-3 metered start 2026-09-18T20:11:53+08:00
+== health=200 after 1 polls at 2026-09-18T20:11:53+08:00
+== tag noturbo-3
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 'E5=8F='
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  53.7 tok/s  agg=   53.7  wall=  9.5s  toks=512
+-- level 1
+wall_s                  9.59
+drafts_per_req           110      11.47 /s
+gen_tokens               512      53.40 tok/s
+tokens_per_step        4.655
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    81.8  75.5  65.5  50.9  41.8  30.9  20.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.1 tok/s  agg=   96.4  wall= 15.9s  toks=1536
+-- level 3
+wall_s                 15.97
+drafts_per_req           345      21.60 /s
+gen_tokens              1536      96.19 tok/s
+tokens_per_step        4.452
+accept_rate             49.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.2  73.9  58.6  48.1  37.7  25.5  16.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.0 tok/s  agg=  129.8  wall= 19.7s  toks=2560
+-- level 5
+wall_s                 19.78
+drafts_per_req           554      28.00 /s
+gen_tokens              2560     129.41 tok/s
+tokens_per_step        4.621
+accept_rate             52.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.8  73.1  59.6  50.4  40.1  31.0  20.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.9 tok/s  agg=  143.6  wall= 21.4s  toks=3072
+-- level 6
+wall_s                 21.43
+drafts_per_req           667      31.12 /s
+gen_tokens              3072     143.34 tok/s
+tokens_per_step        4.606
+accept_rate             51.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.7  74.8  59.8  48.6  40.0  30.7  19.2
+== wrote /home/maci/vllm-spark-0731/outputs/driver/noturbo-3.meter.txt
+== noturbo-3 metered done 2026-09-18T20:13:04+08:00
+tag noturbo, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              53.7      8.9%   56.5 51.7 53.7
+     3   3              96.1      1.6%   96.1 94.9 96.4
+     5   3             128.8      6.6%   128.8 121.3 129.8
+     6   3             144.5      2.5%   147.2 144.5 143.6
+== noturbo done 2026-09-18T20:13:04+08:00

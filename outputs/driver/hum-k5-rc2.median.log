@@ -1,0 +1,671 @@
+== hum-k5-rc2: 5 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-21T14:20:24+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-21T14:20:24+08:00
+== hum-k5-rc2-1 metered start 2026-09-21T14:20:24+08:00
+== health=200 after 1 polls at 2026-09-21T14:20:24+08:00
+== tag hum-k5-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+== hum-k5-rc2: 5 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-21T14:20:25+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-21T14:20:25+08:00
+== hum-k5-rc2-1 metered start 2026-09-21T14:20:25+08:00
+== health=200 after 1 polls at 2026-09-21T14:20:25+08:00
+== tag hum-k5-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  42.6 tok/s  agg=   42.6  wall= 12.0s  toks=512
+-- level 1
+wall_s                 12.09
+drafts_per_req           200      16.54 /s
+gen_tokens               832      68.82 tok/s
+tokens_per_step        4.160
+accept_rate             63.3 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.5  74.0  60.5  51.0  41.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  36.0 tok/s  agg=   36.0  wall= 14.2s  toks=512
+-- level 1
+wall_s                 14.27
+drafts_per_req           105       7.36 /s
+gen_tokens               443      31.03 tok/s
+tokens_per_step        4.219
+accept_rate             64.6 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    87.6  75.2  66.7  51.4  41.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  27.1 tok/s  agg=   81.4  wall= 18.9s  toks=1536
+-- level 3
+wall_s                 18.94
+drafts_per_req           555      29.31 /s
+gen_tokens              2374     125.37 tok/s
+tokens_per_step        4.277
+accept_rate             65.7 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.4  76.8  65.6  52.1  44.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  26.8 tok/s  agg=   80.3  wall= 19.1s  toks=1536
+-- level 3
+wall_s                 19.20
+drafts_per_req           140       7.29 /s
+gen_tokens               654      34.06 tok/s
+tokens_per_step        4.671
+accept_rate             73.9 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    95.0  85.0  75.0  65.0  49.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  22.6 tok/s  agg=  113.1  wall= 22.6s  toks=2560
+-- level 5
+wall_s                 22.69
+drafts_per_req           678      29.87 /s
+gen_tokens              2970     130.87 tok/s
+tokens_per_step        4.381
+accept_rate             67.9 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.6  78.6  67.1  57.1  46.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  14.2 tok/s  agg=   70.8  wall= 36.2s  toks=2560
+-- level 5
+wall_s                 36.24
+drafts_per_req           648      17.88 /s
+gen_tokens              2881      79.50 tok/s
+tokens_per_step        4.446
+accept_rate             69.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.0  80.7  68.2  56.2  48.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  13.7 tok/s  agg=   81.9  wall= 37.5s  toks=3072
+-- level 6
+wall_s                 37.56
+drafts_per_req           727      19.35 /s
+gen_tokens              3191      84.95 tok/s
+tokens_per_step        4.389
+accept_rate             68.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.5  78.7  66.7  57.1  45.9
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-1.meter.txt
+== hum-k5-rc2-1 metered done 2026-09-21T14:22:00+08:00
+-- pass 2 at 2026-09-21T14:22:00+08:00
+== hum-k5-rc2-2 metered start 2026-09-21T14:22:00+08:00
+== health=200 after 1 polls at 2026-09-21T14:22:00+08:00
+== tag hum-k5-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  13.4 tok/s  agg=   80.2  wall= 38.3s  toks=3072
+-- level 6
+wall_s                 38.36
+drafts_per_req           266       6.93 /s
+gen_tokens              1260      32.84 tok/s
+tokens_per_step        4.737
+accept_rate             75.2 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    92.9  85.7  74.4  65.8  57.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-1.meter.txt
+== hum-k5-rc2-1 metered done 2026-09-21T14:22:19+08:00
+-- pass 2 at 2026-09-21T14:22:19+08:00
+== hum-k5-rc2-2 metered start 2026-09-21T14:22:19+08:00
+== health=200 after 1 polls at 2026-09-21T14:22:19+08:00
+== tag hum-k5-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  33.4 tok/s  agg=   33.4  wall= 15.3s  toks=512
+-- level 1
+wall_s                 15.37
+drafts_per_req             2       0.13 /s
+gen_tokens                11       0.72 tok/s
+tokens_per_step        5.500
+accept_rate             90.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    100.0  100.0  100.0  100.0  50.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  31.3 tok/s  agg=   31.3  wall= 16.3s  toks=512
+-- level 1
+wall_s                 16.41
+drafts_per_req           461      28.10 /s
+gen_tokens              2014     122.77 tok/s
+tokens_per_step        4.369
+accept_rate             67.5 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.1  78.1  64.6  56.6  47.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  30.7 tok/s  agg=   92.1  wall= 16.7s  toks=1536
+-- level 3
+wall_s                 16.74
+drafts_per_req             4       0.24 /s
+gen_tokens                25       1.49 tok/s
+tokens_per_step        6.250
+accept_rate             95.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    100.0  100.0  100.0  100.0  75.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  25.7 tok/s  agg=   77.1  wall= 19.9s  toks=1536
+-- level 3
+wall_s                 19.98
+drafts_per_req           729      36.49 /s
+gen_tokens              3144     157.38 tok/s
+tokens_per_step        4.313
+accept_rate             66.6 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    88.3  77.9  65.8  54.9  46.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  14.3 tok/s  agg=   71.5  wall= 35.8s  toks=2560
+-- level 5
+wall_s                 35.84
+drafts_per_req           630      17.58 /s
+gen_tokens              2658      74.16 tok/s
+tokens_per_step        4.219
+accept_rate             64.4 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    88.4  74.8  62.7  52.4  43.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  14.8 tok/s  agg=   73.8  wall= 34.7s  toks=2560
+-- level 5
+wall_s                 34.76
+drafts_per_req           677      19.48 /s
+gen_tokens              2960      85.16 tok/s
+tokens_per_step        4.372
+accept_rate             67.7 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.3  79.0  66.8  55.4  46.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  14.0 tok/s  agg=   83.8  wall= 36.7s  toks=3072
+-- level 6
+wall_s                 36.74
+drafts_per_req           677      18.43 /s
+gen_tokens              2924      79.59 tok/s
+tokens_per_step        4.319
+accept_rate             66.6 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.8  76.2  65.4  54.5  45.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-2.meter.txt
+== hum-k5-rc2-2 metered done 2026-09-21T14:23:54+08:00
+-- pass 3 at 2026-09-21T14:23:54+08:00
+== hum-k5-rc2-3 metered start 2026-09-21T14:23:54+08:00
+== health=200 after 1 polls at 2026-09-21T14:23:54+08:00
+== tag hum-k5-rc2-3
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  15.6 tok/s  agg=   93.5  wall= 32.9s  toks=3072
+-- level 6
+wall_s                 32.92
+drafts_per_req           128       3.89 /s
+gen_tokens               567      17.22 tok/s
+tokens_per_step        4.430
+accept_rate             68.9 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.8  76.6  67.2  60.2  50.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-2.meter.txt
+== hum-k5-rc2-2 metered done 2026-09-21T14:24:09+08:00
+-- pass 3 at 2026-09-21T14:24:09+08:00
+== hum-k5-rc2-3 metered start 2026-09-21T14:24:09+08:00
+== health=200 after 1 polls at 2026-09-21T14:24:09+08:00
+== tag hum-k5-rc2-3
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  42.4 tok/s  agg=   42.4  wall= 12.1s  toks=512
+-- level 1
+wall_s                 12.14
+drafts_per_req             4       0.33 /s
+gen_tokens                25       2.06 tok/s
+tokens_per_step        6.250
+accept_rate            100.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    100.0  100.0  100.0  100.0  100.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  30.9 tok/s  agg=   92.7  wall= 16.6s  toks=1536
+-- level 3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  29.7 tok/s  agg=   29.7  wall= 17.2s  toks=512
+wall_s                 16.65
+drafts_per_req           480      28.84 /s
+gen_tokens              2040     122.56 tok/s
+tokens_per_step        4.250
+accept_rate             65.2 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    86.9  74.0  64.4  54.6  46.0
+-- level 1
+no steps counted
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.3 tok/s  agg=  131.7  wall= 19.4s  toks=2560
+-- level 5
+wall_s                 19.51
+drafts_per_req           726      37.22 /s
+gen_tokens              3145     161.24 tok/s
+tokens_per_step        4.332
+accept_rate             66.7 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.7  78.9  65.2  53.9  44.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  13.9 tok/s  agg=   41.8  wall= 36.7s  toks=1536
+-- level 3
+wall_s                 36.80
+drafts_per_req           648      17.61 /s
+gen_tokens              2862      77.77 tok/s
+tokens_per_step        4.417
+accept_rate             68.4 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    92.1  80.2  67.1  56.8  45.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  14.3 tok/s  agg=   85.6  wall= 35.9s  toks=3072
+-- level 6
+wall_s                 35.96
+drafts_per_req           685      19.05 /s
+gen_tokens              2918      81.15 tok/s
+tokens_per_step        4.260
+accept_rate             65.3 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.7  77.4  62.0  53.1  43.2
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-3.meter.txt
+== hum-k5-rc2-3 metered done 2026-09-21T14:25:27+08:00
+-- pass 4 at 2026-09-21T14:25:27+08:00
+== hum-k5-rc2-4 metered start 2026-09-21T14:25:27+08:00
+== health=200 after 1 polls at 2026-09-21T14:25:27+08:00
+== tag hum-k5-rc2-4
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  17.0 tok/s  agg=   84.9  wall= 30.2s  toks=2560
+-- level 5
+wall_s                 30.23
+drafts_per_req            98       3.24 /s
+gen_tokens               456      15.09 tok/s
+tokens_per_step        4.653
+accept_rate             73.5 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    87.8  83.7  75.5  64.3  56.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  33.9 tok/s  agg=   33.9  wall= 15.1s  toks=512
+-- level 1
+wall_s                 15.17
+drafts_per_req           378      24.92 /s
+gen_tokens              1539     101.45 tok/s
+tokens_per_step        4.071
+accept_rate             61.2 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    87.0  72.0  58.5  49.7  38.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  18.3 tok/s  agg=  109.9  wall= 28.0s  toks=3072
+-- level 6
+wall_s                 28.01
+drafts_per_req           598      21.35 /s
+gen_tokens              2612      93.25 tok/s
+tokens_per_step        4.368
+accept_rate             67.4 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    88.8  77.3  66.1  57.2  47.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-3.meter.txt
+== hum-k5-rc2-3 metered done 2026-09-21T14:26:07+08:00
+-- pass 4 at 2026-09-21T14:26:07+08:00
+== hum-k5-rc2-4 metered start 2026-09-21T14:26:07+08:00
+== health=200 after 1 polls at 2026-09-21T14:26:07+08:00
+== tag hum-k5-rc2-4
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  19.6 tok/s  agg=   58.8  wall= 26.1s  toks=1536
+-- level 3
+wall_s                 26.20
+drafts_per_req            15       0.57 /s
+gen_tokens                69       2.63 tok/s
+tokens_per_step        4.600
+accept_rate             74.7 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    100.0  100.0  86.7  60.0  26.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  28.9 tok/s  agg=   28.9  wall= 17.7s  toks=512
+-- level 1
+wall_s                 17.78
+drafts_per_req           647      36.39 /s
+gen_tokens              2735     153.82 tok/s
+tokens_per_step        4.227
+accept_rate             64.4 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.4  74.7  62.1  51.2  43.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.0 tok/s  agg=  130.2  wall= 19.7s  toks=2560
+-- level 5
+wall_s                 19.73
+drafts_per_req            84       4.26 /s
+gen_tokens               375      19.01 tok/s
+tokens_per_step        4.464
+accept_rate             71.2 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.5  82.1  76.2  63.1  44.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  25.0 tok/s  agg=   75.0  wall= 20.5s  toks=1536
+-- level 3
+wall_s                 20.55
+drafts_per_req           671      32.66 /s
+gen_tokens              2970     144.55 tok/s
+tokens_per_step        4.426
+accept_rate             68.6 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    92.1  80.0  66.3  58.0  46.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  13.6 tok/s  agg=   81.4  wall= 37.7s  toks=3072
+-- level 6
+wall_s                 37.80
+drafts_per_req           737      19.50 /s
+gen_tokens              3187      84.32 tok/s
+tokens_per_step        4.324
+accept_rate             66.8 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.4  77.3  66.4  55.4  45.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-4.meter.txt
+== hum-k5-rc2-4 metered done 2026-09-21T14:27:13+08:00
+-- pass 5 at 2026-09-21T14:27:13+08:00
+== hum-k5-rc2-5 metered start 2026-09-21T14:27:13+08:00
+== health=200 after 1 polls at 2026-09-21T14:27:13+08:00
+== tag hum-k5-rc2-5
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  15.1 tok/s  agg=   75.4  wall= 33.9s  toks=2560
+-- level 5
+wall_s                 33.99
+drafts_per_req           166       4.88 /s
+gen_tokens               702      20.65 tok/s
+tokens_per_step        4.229
+accept_rate             64.5 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    88.0  77.1  65.7  52.4  39.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  31.2 tok/s  agg=   31.2  wall= 16.4s  toks=512
+-- level 1
+wall_s                 16.49
+drafts_per_req           342      20.74 /s
+gen_tokens              1431      86.78 tok/s
+tokens_per_step        4.184
+accept_rate             63.7 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.2  76.9  62.3  49.7  40.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  18.6 tok/s  agg=  111.9  wall= 27.5s  toks=3072
+-- level 6
+wall_s                 27.52
+drafts_per_req           615      22.34 /s
+gen_tokens              2630      95.56 tok/s
+tokens_per_step        4.276
+accept_rate             66.1 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.8  75.1  63.9  55.4  46.5
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-4.meter.txt
+== hum-k5-rc2-4 metered done 2026-09-21T14:27:54+08:00
+-- pass 5 at 2026-09-21T14:27:54+08:00
+== hum-k5-rc2-5 metered start 2026-09-21T14:27:55+08:00
+== health=200 after 1 polls at 2026-09-21T14:27:55+08:00
+== tag hum-k5-rc2-5
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  18.3 tok/s  agg=   55.0  wall= 27.9s  toks=1536
+-- level 3
+wall_s                 27.99
+drafts_per_req            47       1.68 /s
+gen_tokens               210       7.50 tok/s
+tokens_per_step        4.468
+accept_rate             72.3 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    91.5  85.1  76.6  59.6  48.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  26.9 tok/s  agg=   26.9  wall= 19.1s  toks=512
+-- level 1
+wall_s                 19.13
+drafts_per_req           635      33.20 /s
+gen_tokens              2742     143.34 tok/s
+tokens_per_step        4.318
+accept_rate             66.2 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.2  77.0  64.6  54.3  44.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.7 tok/s  agg=  133.6  wall= 19.2s  toks=2560
+-- level 5
+wall_s                 19.22
+drafts_per_req            69       3.59 /s
+gen_tokens               325      16.91 tok/s
+tokens_per_step        4.710
+accept_rate             74.8 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.9  82.6  76.8  68.1  56.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  25.5 tok/s  agg=   76.5  wall= 20.1s  toks=1536
+-- level 3
+wall_s                 20.15
+drafts_per_req           666      33.05 /s
+gen_tokens              2894     143.61 tok/s
+tokens_per_step        4.345
+accept_rate             66.9 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    90.2  78.1  66.1  55.0  45.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  13.7 tok/s  agg=   82.5  wall= 37.2s  toks=3072
+-- level 6
+wall_s                 37.30
+drafts_per_req           714      19.14 /s
+gen_tokens              3070      82.30 tok/s
+tokens_per_step        4.300
+accept_rate             66.0 %
+per_position      p0  p1  p2  p3  p4
+  acceptance %    89.8  77.7  64.8  53.6  44.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-5.meter.txt
+== hum-k5-rc2-5 metered done 2026-09-21T14:29:01+08:00
+tag hum-k5-rc2, 5 passes
+ level   n  median agg tok/s    spread   values
+     1   5              29.7     30.6%   36.0 31.3 29.7 28.9 26.9
+     3   5              76.5     50.3%   80.3 77.1 41.8 75.0 76.5
+     5   5              75.4     83.3%   70.8 73.8 84.9 75.4 133.6
+     6   5              93.5     33.9%   80.2 93.5 109.9 111.9 82.5
+== hum-k5-rc2 done 2026-09-21T14:29:01+08:00
+    raise RemoteDisconnected("Remote end closed connection without"
+http.client.RemoteDisconnected: Remote end closed connection without response
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/urllib/request.py", line 1344, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+  File "/usr/lib/python3.12/http/client.py", line 1365, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1411, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1360, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1120, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.12/http/client.py", line 1064, in send
+    self.connect()
+  File "/usr/lib/python3.12/http/client.py", line 1030, in connect
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 852, in create_connection
+    raise exceptions[0]
+  File "/usr/lib/python3.12/socket.py", line 837, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 96, in <module>
+    main()
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 58, in main
+    json.dump(fetch(), f)
+              ^^^^^^^
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 33, in fetch
+    with urllib.request.urlopen(f"{BASE}/metrics", timeout=20) as r:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1347, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 111] Connection refused>
+-- level 5
+Traceback (most recent call last):
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 96, in <module>
+    main()
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 65, in main
+    after = json.load(open(sys.argv[3]))
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/urllib/request.py", line 1344, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+  File "/usr/lib/python3.12/http/client.py", line 1365, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1411, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1360, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1120, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.12/http/client.py", line 1064, in send
+    self.connect()
+  File "/usr/lib/python3.12/http/client.py", line 1030, in connect
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 852, in create_connection
+    raise exceptions[0]
+  File "/usr/lib/python3.12/socket.py", line 837, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 96, in <module>
+    main()
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 58, in main
+    json.dump(fetch(), f)
+              ^^^^^^^
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 33, in fetch
+    with urllib.request.urlopen(f"{BASE}/metrics", timeout=20) as r:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1347, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 111] Connection refused>
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 111] Connection refused>
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/urllib/request.py", line 1344, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+  File "/usr/lib/python3.12/http/client.py", line 1365, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1411, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1360, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.12/http/client.py", line 1120, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.12/http/client.py", line 1064, in send
+    self.connect()
+  File "/usr/lib/python3.12/http/client.py", line 1030, in connect
+    self.sock = self._create_connection(
+                ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/socket.py", line 852, in create_connection
+    raise exceptions[0]
+  File "/usr/lib/python3.12/socket.py", line 837, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 96, in <module>
+    main()
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 58, in main
+    json.dump(fetch(), f)
+              ^^^^^^^
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 33, in fetch
+    with urllib.request.urlopen(f"{BASE}/metrics", timeout=20) as r:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 515, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 532, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1373, in http_open
+    return self.do_open(http.client.HTTPConnection, req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/urllib/request.py", line 1347, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 111] Connection refused>
+-- level 6
+Traceback (most recent call last):
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 96, in <module>
+    main()
+  File "/home/maci/vllm-spark-0731/.scratch/stepmeter.py", line 64, in main
+    before = json.load(open(sys.argv[2]))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+== wrote /home/maci/vllm-spark-0731/outputs/driver/hum-k5-rc2-5.meter.txt
+== hum-k5-rc2-5 metered done 2026-09-21T14:29:02+08:00
+tag hum-k5-rc2, 5 passes
+ level   n  median agg tok/s    spread   values
+     1   5              29.7     30.6%   36.0 31.3 29.7 28.9 26.9
+     3   5              76.5     50.3%   80.3 77.1 41.8 75.0 76.5
+     5   5              75.4     83.3%   70.8 73.8 84.9 75.4 133.6
+     6   5              93.5     33.9%   80.2 93.5 109.9 111.9 82.5
+== hum-k5-rc2 done 2026-09-21T14:29:02+08:00

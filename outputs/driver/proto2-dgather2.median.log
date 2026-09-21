@@ -1,0 +1,155 @@
+== proto2-dgather2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-17T20:12:28+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: v0.2.1.dev0+gf37c550bf
+-- pass 1 at 2026-09-17T20:12:28+08:00
+== proto2-dgather2-1 metered start 2026-09-17T20:12:28+08:00
+== health=200 after 1 polls at 2026-09-17T20:12:28+08:00
+== tag proto2-dgather2-1
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.9 tok/s  agg=   55.9  wall=  9.2s  toks=512
+-- level 1
+wall_s                  9.20
+drafts_per_req           106      11.52 /s
+gen_tokens               512      55.66 tok/s
+tokens_per_step        4.830
+accept_rate             54.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.6  77.4  67.0  55.7  45.3  28.3  19.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.9 tok/s  agg=   98.6  wall= 15.6s  toks=1536
+-- level 3
+wall_s                 15.62
+drafts_per_req           335      21.45 /s
+gen_tokens              1536      98.34 tok/s
+tokens_per_step        4.585
+accept_rate             51.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.7  76.1  59.4  50.4  39.4  29.0  17.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.1 tok/s  agg=  130.7  wall= 19.6s  toks=2560
+-- level 5
+wall_s                 19.63
+drafts_per_req           554      28.22 /s
+gen_tokens              2560     130.43 tok/s
+tokens_per_step        4.621
+accept_rate             52.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.7  74.9  57.0  48.7  40.4  31.6  22.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.8 tok/s  agg=  142.9  wall= 21.5s  toks=3072
+-- level 6
+wall_s                 21.54
+drafts_per_req           668      31.01 /s
+gen_tokens              3072     142.62 tok/s
+tokens_per_step        4.599
+accept_rate             51.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.4  73.4  60.6  49.9  40.0  28.7  18.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/proto2-dgather2-1.meter.txt
+== proto2-dgather2-1 metered done 2026-09-17T20:13:39+08:00
+-- pass 2 at 2026-09-17T20:13:39+08:00
+== proto2-dgather2-2 metered start 2026-09-17T20:13:39+08:00
+== health=200 after 1 polls at 2026-09-17T20:13:39+08:00
+== tag proto2-dgather2-2
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.1 tok/s  agg=   55.1  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.34
+drafts_per_req           107      11.45 /s
+gen_tokens               512      54.81 tok/s
+tokens_per_step        4.785
+accept_rate             54.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.9  75.7  65.4  53.3  41.1  32.7  25.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.7 tok/s  agg=   98.1  wall= 15.7s  toks=1536
+-- level 3
+wall_s                 15.71
+drafts_per_req           330      21.01 /s
+gen_tokens              1536      97.78 tok/s
+tokens_per_step        4.655
+accept_rate             52.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.6  76.4  61.2  49.7  40.0  28.2  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.4 tok/s  agg=  126.8  wall= 20.2s  toks=2560
+-- level 5
+wall_s                 20.25
+drafts_per_req           555      27.41 /s
+gen_tokens              2560     126.43 tok/s
+tokens_per_step        4.613
+accept_rate             51.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.4  76.0  60.0  49.5  38.9  29.0  16.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.3 tok/s  agg=  139.6  wall= 22.0s  toks=3072
+-- level 6
+wall_s                 22.06
+drafts_per_req           664      30.10 /s
+gen_tokens              3072     139.24 tok/s
+tokens_per_step        4.627
+accept_rate             52.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.1  73.9  62.0  51.1  39.8  29.8  20.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/proto2-dgather2-2.meter.txt
+== proto2-dgather2-2 metered done 2026-09-17T20:14:51+08:00
+-- pass 3 at 2026-09-17T20:14:51+08:00
+== proto2-dgather2-3 metered start 2026-09-17T20:14:51+08:00
+== health=200 after 1 polls at 2026-09-17T20:14:51+08:00
+== tag proto2-dgather2-3
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  53.5 tok/s  agg=   53.5  wall=  9.6s  toks=512
+-- level 1
+wall_s                  9.63
+drafts_per_req           111      11.52 /s
+gen_tokens               512      53.15 tok/s
+tokens_per_step        4.613
+accept_rate             51.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.3  78.4  61.3  46.8  41.4  28.8  18.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.7 tok/s  agg=   98.2  wall= 15.6s  toks=1536
+-- level 3
+wall_s                 15.70
+drafts_per_req           330      21.02 /s
+gen_tokens              1536      97.82 tok/s
+tokens_per_step        4.655
+accept_rate             52.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.9  73.9  59.4  49.7  40.9  33.0  22.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.9 tok/s  agg=  129.7  wall= 19.7s  toks=2560
+-- level 5
+wall_s                 19.79
+drafts_per_req           541      27.33 /s
+gen_tokens              2560     129.33 tok/s
+tokens_per_step        4.732
+accept_rate             53.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.3  78.6  62.5  51.0  40.9  31.4  19.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.0 tok/s  agg=  137.8  wall= 22.3s  toks=3072
+-- level 6
+wall_s                 22.34
+drafts_per_req           677      30.30 /s
+gen_tokens              3072     137.50 tok/s
+tokens_per_step        4.538
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.0  72.8  58.6  47.7  39.7  30.4  19.5
+== wrote /home/maci/vllm-spark-0731/outputs/driver/proto2-dgather2-3.meter.txt
+== proto2-dgather2-3 metered done 2026-09-17T20:16:03+08:00
+tag proto2-dgather2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              55.1      4.4%   55.9 55.1 53.5
+     3   3              98.2      0.5%   98.6 98.1 98.2
+     5   3             129.7      3.0%   130.7 126.8 129.7
+     6   3             139.6      3.7%   142.9 139.6 137.8
+== proto2-dgather2 done 2026-09-17T20:16:03+08:00

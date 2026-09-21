@@ -1,0 +1,39 @@
+(Worker_TP0 pid=308) b12x step execute_model tok=2: wall=5421.0ms gpu=5487.8ms gap=-1.0ms
+(Worker_TP0 pid=308) b12x step sample: wall=69.1ms gpu=28.5ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=2932.3ms gpu=2865.4ms gap=-69.1ms
+(Worker_TP0 pid=308) b12x step execute_model tok=16: wall=2260.2ms gpu=2301.8ms gap=0.6ms
+(Worker_TP0 pid=308) b12x step sample: wall=0.6ms gpu=2.4ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=2267.3ms gpu=2248.6ms gap=-0.7ms
+(Worker_TP0 pid=308) b12x step execute_model tok=0: wall=0.2ms gpu=0.0ms gap=0.9ms
+(Worker_TP0 pid=308) b12x step execute_model tok=54: wall=907.2ms gpu=912.8ms gap=8897.6ms
+(Worker_TP0 pid=308) b12x step sample: wall=136.5ms gpu=131.0ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=170.3ms gpu=170.2ms gap=-136.5ms
+(Worker_TP0 pid=308) b12x step execute_model tok=48: wall=168.3ms gpu=177.4ms gap=1.8ms
+(Worker_TP0 pid=308) b12x step sample: wall=79.4ms gpu=66.9ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=99.1ms gpu=92.0ms gap=-79.5ms
+(Worker_TP0 pid=308) b12x step execute_model tok=9: wall=1541.8ms gpu=1563.2ms gap=1.6ms
+(Worker_TP0 pid=308) b12x step sample: wall=47.4ms gpu=22.0ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=488.5ms gpu=480.0ms gap=-47.4ms
+(Worker_TP0 pid=308) b12x step execute_model tok=2: wall=111.8ms gpu=116.6ms gap=1.1ms
+(Worker_TP0 pid=308) b12x step sample: wall=1.2ms gpu=2.9ms gap=0.0ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=39.4ms gpu=34.9ms gap=-1.2ms
+(Worker_TP0 pid=308) b12x step execute_model tok=8: wall=1032.6ms gpu=1049.7ms gap=0.7ms
+(Worker_TP0 pid=308) b12x step sample: wall=1.4ms gpu=4.5ms gap=0.0ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=445.1ms gpu=446.3ms gap=-1.4ms
+(Worker_TP0 pid=308) b12x step execute_model tok=1: wall=1107.8ms gpu=1107.6ms gap=0.8ms
+(Worker_TP0 pid=308) b12x step sample: wall=1.3ms gpu=3.5ms gap=0.0ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=381.2ms gpu=391.5ms gap=-1.3ms
+(Worker_TP0 pid=308) b12x step execute_model tok=0: wall=0.1ms gpu=0.0ms gap=0.7ms
+(Worker_TP0 pid=308) b12x step execute_model tok=5: wall=590.9ms gpu=610.0ms gap=11022.6ms
+(Worker_TP0 pid=308) b12x step sample: wall=1.0ms gpu=3.1ms gap=0.1ms
+(Worker_TP0 pid=308) b12x step sample_tokens: wall=25.5ms gpu=16.4ms gap=-1.0ms
+(Worker_TP0 pid=308) b12x step execute_model tok=8: wall=142.4ms gpu=150.6ms gap=0.8ms
+(Worker_TP0 pid=308) b12x profile window: steps=9 wall/step=761.0ms fwd_gpu/step=1123.1ms samp_gpu/step=29.4ms gap_before_fwd/step=1660.8ms
+(Worker_TP0 pid=308) b12x region allreduce: n=87 gpu_sum=81.3ms gpu_min=0.08ms gpu_avg=0.93ms gpu_max=1.66ms wall_sum=5.4ms
+(Worker_TP0 pid=308) b12x region attn: n=43 gpu_sum=67.8ms gpu_min=0.50ms gpu_avg=1.58ms gpu_max=2.24ms wall_sum=67.9ms
+(Worker_TP0 pid=308) b12x region ffn: n=43 gpu_sum=80.3ms gpu_min=1.45ms gpu_avg=1.87ms gpu_max=2.74ms wall_sum=57.7ms
+(Worker_TP0 pid=308) b12x region indexer: n=21 gpu_sum=1.4ms gpu_min=0.06ms gpu_avg=0.06ms gpu_max=0.07ms wall_sum=7.5ms
+(Worker_TP0 pid=308) b12x region mla: n=43 gpu_sum=0.9ms gpu_min=0.02ms gpu_avg=0.02ms gpu_max=0.03ms wall_sum=22.9ms
+(Worker_TP0 pid=308) b12x region wo: n=43 gpu_sum=57.4ms gpu_min=0.36ms gpu_avg=1.34ms gpu_max=1.94ms wall_sum=14.8ms
+(Worker_TP0 pid=308) b12x region wo_b12x: n=43 gpu_sum=57.3ms gpu_min=0.36ms gpu_avg=1.33ms gpu_max=1.94ms wall_sum=14.2ms
+(Worker_TP0 pid=308) b12x layers: n=43 sum=150.2ms avg=3.49ms top: L0=4.36 L2=4.20 L30=3.91 L10=3.86 L38=3.85 L4=3.83 L16=3.83 L8=3.81 L42=3.73 L6=3.73 L14=3.71 L40=3.70

@@ -1,0 +1,155 @@
+== prof6b: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-13T07:44:02+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: v0.1.1.dev0+g69db1c26b
+-- pass 1 at 2026-09-13T07:44:02+08:00
+== prof6b-1 metered start 2026-09-13T07:44:02+08:00
+== health=200 after 1 polls at 2026-09-13T07:44:02+08:00
+== tag prof6b-1
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  36.3 tok/s  agg=   36.3  wall= 14.1s  toks=512
+-- level 1
+wall_s                 14.16
+drafts_per_req           109       7.70 /s
+gen_tokens               512      36.16 tok/s
+tokens_per_step        4.697
+accept_rate             52.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    83.5  71.6  61.5  49.5  41.3  35.8  26.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  25.0 tok/s  agg=   75.0  wall= 20.5s  toks=1536
+-- level 3
+wall_s                 20.53
+drafts_per_req           343      16.70 /s
+gen_tokens              1536      74.80 tok/s
+tokens_per_step        4.478
+accept_rate             49.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.2  73.2  58.6  45.5  35.3  28.0  19.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  22.6 tok/s  agg=  112.8  wall= 22.7s  toks=2560
+-- level 5
+wall_s                 22.75
+drafts_per_req           524      23.03 /s
+gen_tokens              2560     112.51 tok/s
+tokens_per_step        4.885
+accept_rate             55.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.1  76.3  64.7  54.4  44.3  36.3  25.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  19.5 tok/s  agg=  117.2  wall= 26.2s  toks=3072
+-- level 6
+wall_s                 26.25
+drafts_per_req           667      25.41 /s
+gen_tokens              3072     117.03 tok/s
+tokens_per_step        4.606
+accept_rate             51.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.0  75.3  58.3  48.6  38.5  29.4  20.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/prof6b-1.meter.txt
+== prof6b-1 metered done 2026-09-13T07:45:33+08:00
+-- pass 2 at 2026-09-13T07:45:33+08:00
+== prof6b-2 metered start 2026-09-13T07:45:33+08:00
+== health=200 after 1 polls at 2026-09-13T07:45:33+08:00
+== tag prof6b-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  36.5 tok/s  agg=   36.5  wall= 14.0s  toks=512
+-- level 1
+wall_s                 14.06
+drafts_per_req           108       7.68 /s
+gen_tokens               512      36.41 tok/s
+tokens_per_step        4.741
+accept_rate             53.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  77.8  63.0  51.9  41.7  33.3  20.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  24.7 tok/s  agg=   74.0  wall= 20.7s  toks=1536
+-- level 3
+wall_s                 20.80
+drafts_per_req           348      16.73 /s
+gen_tokens              1536      73.84 tok/s
+tokens_per_step        4.414
+accept_rate             48.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.2  73.0  56.6  44.8  35.3  25.9  17.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  21.3 tok/s  agg=  106.5  wall= 24.0s  toks=2560
+-- level 5
+wall_s                 24.08
+drafts_per_req           551      22.88 /s
+gen_tokens              2560     106.30 tok/s
+tokens_per_step        4.646
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    92.6  74.4  59.7  50.1  39.2  29.4  20.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  19.7 tok/s  agg=  118.1  wall= 26.0s  toks=3072
+-- level 6
+wall_s                 26.07
+drafts_per_req           661      25.35 /s
+gen_tokens              3072     117.83 tok/s
+tokens_per_step        4.648
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.1  75.6  61.6  50.2  39.0  30.6  20.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/prof6b-2.meter.txt
+== prof6b-2 metered done 2026-09-13T07:47:04+08:00
+-- pass 3 at 2026-09-13T07:47:04+08:00
+== prof6b-3 metered start 2026-09-13T07:47:04+08:00
+== health=200 after 1 polls at 2026-09-13T07:47:04+08:00
+== tag prof6b-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  33.3 tok/s  agg=   33.3  wall= 15.4s  toks=512
+-- level 1
+wall_s                 15.42
+drafts_per_req           120       7.78 /s
+gen_tokens               512      33.21 tok/s
+tokens_per_step        4.267
+accept_rate             46.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.3  70.0  57.5  44.2  29.2  23.3  13.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  24.1 tok/s  agg=   72.4  wall= 21.2s  toks=1536
+-- level 3
+wall_s                 21.26
+drafts_per_req           352      16.56 /s
+gen_tokens              1536      72.25 tok/s
+tokens_per_step        4.364
+accept_rate             48.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.8  69.0  55.7  45.5  36.4  28.7  15.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  21.6 tok/s  agg=  107.8  wall= 23.7s  toks=2560
+-- level 5
+wall_s                 23.81
+drafts_per_req           539      22.63 /s
+gen_tokens              2560     107.50 tok/s
+tokens_per_step        4.750
+accept_rate             53.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.6  75.7  62.3  52.5  40.6  31.7  23.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  19.7 tok/s  agg=  118.2  wall= 26.0s  toks=3072
+-- level 6
+wall_s                 26.04
+drafts_per_req           670      25.73 /s
+gen_tokens              3072     117.99 tok/s
+tokens_per_step        4.585
+accept_rate             51.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.6  76.9  60.4  48.7  38.7  28.1  18.2
+== wrote /home/maci/vllm-spark-0731/outputs/driver/prof6b-3.meter.txt
+== prof6b-3 metered done 2026-09-13T07:48:37+08:00
+tag prof6b, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              36.3      8.8%   36.3 36.5 33.3
+     3   3              74.0      3.5%   75.0 74.0 72.4
+     5   3             107.8      5.8%   112.8 106.5 107.8
+     6   3             118.1      0.8%   117.2 118.1 118.2
+== prof6b done 2026-09-13T07:48:37+08:00

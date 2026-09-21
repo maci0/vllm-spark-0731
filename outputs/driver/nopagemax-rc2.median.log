@@ -1,0 +1,155 @@
+== nopagemax-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T02:27:24+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: 
+-- pass 1 at 2026-09-20T02:27:24+08:00
+== nopagemax-rc2-1 metered start 2026-09-20T02:27:24+08:00
+== health=200 after 1 polls at 2026-09-20T02:27:24+08:00
+== tag nopagemax-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  51.3 tok/s  agg=   51.3  wall= 10.0s  toks=512
+-- level 1
+wall_s                 10.02
+drafts_per_req           116      11.58 /s
+gen_tokens               512      51.11 tok/s
+tokens_per_step        4.414
+accept_rate             48.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.2  67.2  52.6  45.7  37.9  28.4  23.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.6 tok/s  agg=   97.7  wall= 15.7s  toks=1536
+-- level 3
+wall_s                 15.79
+drafts_per_req           322      20.40 /s
+gen_tokens              1536      97.30 tok/s
+tokens_per_step        4.770
+accept_rate             53.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.2  74.5  62.7  51.9  43.2  34.2  22.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.7 tok/s  agg=  128.7  wall= 19.9s  toks=2560
+-- level 5
+wall_s                 19.93
+drafts_per_req           558      27.99 /s
+gen_tokens              2560     128.43 tok/s
+tokens_per_step        4.588
+accept_rate             51.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.8  73.7  60.2  49.6  39.1  31.0  19.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.7 tok/s  agg=  142.4  wall= 21.6s  toks=3072
+-- level 6
+wall_s                 21.62
+drafts_per_req           663      30.67 /s
+gen_tokens              3072     142.10 tok/s
+tokens_per_step        4.633
+accept_rate             52.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.8  76.0  60.9  50.4  40.7  29.1  19.0
+== wrote /home/maci/vllm-spark-0731/outputs/driver/nopagemax-rc2-1.meter.txt
+== nopagemax-rc2-1 metered done 2026-09-20T02:28:36+08:00
+-- pass 2 at 2026-09-20T02:28:36+08:00
+== nopagemax-rc2-2 metered start 2026-09-20T02:28:36+08:00
+== health=200 after 1 polls at 2026-09-20T02:28:36+08:00
+== tag nopagemax-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.6 tok/s  agg=   54.6  wall=  9.4s  toks=512
+-- level 1
+wall_s                  9.43
+drafts_per_req           108      11.46 /s
+gen_tokens               512      54.32 tok/s
+tokens_per_step        4.741
+accept_rate             53.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  80.6  63.9  50.0  41.7  32.4  18.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  35.4 tok/s  agg=  106.2  wall= 14.5s  toks=1536
+-- level 3
+wall_s                 14.53
+drafts_per_req           311      21.41 /s
+gen_tokens              1536     105.75 tok/s
+tokens_per_step        4.939
+accept_rate             56.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.7  78.8  64.6  54.3  44.1  35.7  25.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.5 tok/s  agg=  127.4  wall= 20.1s  toks=2560
+-- level 5
+wall_s                 20.16
+drafts_per_req           564      27.98 /s
+gen_tokens              2560     126.99 tok/s
+tokens_per_step        4.539
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.3  73.9  58.7  47.5  39.7  28.9  18.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.6 tok/s  agg=  141.8  wall= 21.7s  toks=3072
+-- level 6
+wall_s                 21.73
+drafts_per_req           676      31.12 /s
+gen_tokens              3072     141.40 tok/s
+tokens_per_step        4.544
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.2  72.0  58.6  48.5  38.5  29.9  19.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/nopagemax-rc2-2.meter.txt
+== nopagemax-rc2-2 metered done 2026-09-20T02:29:46+08:00
+-- pass 3 at 2026-09-20T02:29:46+08:00
+== nopagemax-rc2-3 metered start 2026-09-20T02:29:46+08:00
+== health=200 after 1 polls at 2026-09-20T02:29:46+08:00
+== tag nopagemax-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.0 tok/s  agg=   54.0  wall=  9.5s  toks=512
+-- level 1
+wall_s                  9.53
+drafts_per_req           109      11.44 /s
+gen_tokens               512      53.73 tok/s
+tokens_per_step        4.697
+accept_rate             52.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.1  74.3  63.3  54.1  40.4  31.2  19.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  31.7 tok/s  agg=   95.0  wall= 16.2s  toks=1536
+-- level 3
+wall_s                 16.21
+drafts_per_req           342      21.10 /s
+gen_tokens              1536      94.77 tok/s
+tokens_per_step        4.491
+accept_rate             50.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.9  74.6  60.2  46.5  36.8  26.3  17.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.1 tok/s  agg=  135.3  wall= 18.9s  toks=2560
+-- level 5
+wall_s                 18.98
+drafts_per_req           537      28.29 /s
+gen_tokens              2560     134.88 tok/s
+tokens_per_step        4.767
+accept_rate             53.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.2  76.5  63.3  51.2  42.5  33.1  21.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.5 tok/s  agg=  141.3  wall= 21.7s  toks=3072
+-- level 6
+wall_s                 21.80
+drafts_per_req           674      30.91 /s
+gen_tokens              3072     140.91 tok/s
+tokens_per_step        4.558
+accept_rate             51.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.1  74.2  61.3  47.6  39.2  28.6  18.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/nopagemax-rc2-3.meter.txt
+== nopagemax-rc2-3 metered done 2026-09-20T02:30:57+08:00
+tag nopagemax-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              54.0      6.1%   51.3 54.6 54.0
+     3   3              97.7     11.5%   97.7 106.2 95.0
+     5   3             128.7      6.1%   128.7 127.4 135.3
+     6   3             141.8      0.8%   142.4 141.8 141.3
+== nopagemax-rc2 done 2026-09-20T02:30:57+08:00

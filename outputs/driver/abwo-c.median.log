@@ -1,0 +1,155 @@
+== abwo-c: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-21T18:43:59+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 2 minutes
+== engine: v0.30.1.dev0+g9ed533eb4
+-- pass 1 at 2026-09-21T18:43:59+08:00
+== abwo-c-1 metered start 2026-09-21T18:43:59+08:00
+== health=200 after 1 polls at 2026-09-21T18:43:59+08:00
+== tag abwo-c-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  59.4 tok/s  agg=   59.4  wall=  8.6s  toks=512
+-- level 1
+wall_s                  8.66
+drafts_per_req           104      12.02 /s
+gen_tokens               512      59.15 tok/s
+tokens_per_step        4.923
+accept_rate             65.9 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    88.5  82.7  69.2  61.5  50.0  43.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  36.0 tok/s  agg=  107.9  wall= 14.2s  toks=1536
+-- level 3
+wall_s                 14.30
+drafts_per_req           329      23.01 /s
+gen_tokens              1536     107.43 tok/s
+tokens_per_step        4.669
+accept_rate             61.4 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.0  77.8  65.0  52.6  45.6  37.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.8 tok/s  agg=  138.8  wall= 18.4s  toks=2560
+-- level 5
+wall_s                 18.51
+drafts_per_req           530      28.63 /s
+gen_tokens              2560     138.28 tok/s
+tokens_per_step        4.830
+accept_rate             63.9 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.9  79.1  67.0  58.1  47.9  39.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  25.1 tok/s  agg=  150.5  wall= 20.4s  toks=3072
+-- level 6
+wall_s                 20.47
+drafts_per_req           663      32.38 /s
+gen_tokens              3072     150.05 tok/s
+tokens_per_step        4.633
+accept_rate             60.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.5  78.4  64.6  52.8  42.8  34.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/abwo-c-1.meter.txt
+== abwo-c-1 metered done 2026-09-21T18:45:05+08:00
+-- pass 2 at 2026-09-21T18:45:05+08:00
+== abwo-c-2 metered start 2026-09-21T18:45:05+08:00
+== health=200 after 1 polls at 2026-09-21T18:45:05+08:00
+== tag abwo-c-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.1 tok/s  agg=   55.1  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.35
+drafts_per_req           112      11.98 /s
+gen_tokens               512      54.76 tok/s
+tokens_per_step        4.571
+accept_rate             59.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    85.7  75.9  62.5  55.4  45.5  33.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  33.8 tok/s  agg=  101.3  wall= 15.2s  toks=1536
+-- level 3
+wall_s                 15.21
+drafts_per_req           331      21.77 /s
+gen_tokens              1536     101.00 tok/s
+tokens_per_step        4.640
+accept_rate             60.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    88.8  77.0  64.0  54.4  43.5  36.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.8 tok/s  agg=  138.9  wall= 18.4s  toks=2560
+-- level 5
+wall_s                 18.49
+drafts_per_req           542      29.32 /s
+gen_tokens              2560     138.47 tok/s
+tokens_per_step        4.723
+accept_rate             62.3 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    91.0  77.9  65.7  56.1  45.6  37.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  25.9 tok/s  agg=  155.6  wall= 19.7s  toks=3072
+-- level 6
+wall_s                 19.78
+drafts_per_req           643      32.50 /s
+gen_tokens              3072     155.28 tok/s
+tokens_per_step        4.778
+accept_rate             63.1 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    90.8  79.5  65.8  57.1  46.7  38.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/abwo-c-2.meter.txt
+== abwo-c-2 metered done 2026-09-21T18:46:12+08:00
+-- pass 3 at 2026-09-21T18:46:12+08:00
+== abwo-c-3 metered start 2026-09-21T18:46:12+08:00
+== health=200 after 1 polls at 2026-09-21T18:46:12+08:00
+== tag abwo-c-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  53.6 tok/s  agg=   53.6  wall=  9.5s  toks=512
+-- level 1
+wall_s                  9.60
+drafts_per_req           115      11.98 /s
+gen_tokens               512      53.32 tok/s
+tokens_per_step        4.452
+accept_rate             57.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    84.3  72.2  60.0  51.3  45.2  33.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  36.2 tok/s  agg=  108.7  wall= 14.1s  toks=1536
+-- level 3
+wall_s                 14.19
+drafts_per_req           319      22.48 /s
+gen_tokens              1536     108.24 tok/s
+tokens_per_step        4.815
+accept_rate             63.7 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    92.2  79.0  67.4  57.4  47.0  39.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.5 tok/s  agg=  132.7  wall= 19.3s  toks=2560
+-- level 5
+wall_s                 19.35
+drafts_per_req           566      29.25 /s
+gen_tokens              2560     132.30 tok/s
+tokens_per_step        4.523
+accept_rate             59.2 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    89.6  75.4  62.4  50.7  42.9  33.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  25.2 tok/s  agg=  151.3  wall= 20.3s  toks=3072
+-- level 6
+wall_s                 20.35
+drafts_per_req           665      32.67 /s
+gen_tokens              3072     150.92 tok/s
+tokens_per_step        4.620
+accept_rate             60.5 %
+per_position      p0  p1  p2  p3  p4  p5
+  acceptance %    88.9  77.4  65.4  52.9  43.9  34.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/abwo-c-3.meter.txt
+== abwo-c-3 metered done 2026-09-21T18:47:19+08:00
+tag abwo-c, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              55.1     10.5%   59.4 55.1 53.6
+     3   3             107.9      6.9%   107.9 101.3 108.7
+     5   3             138.8      4.5%   138.8 138.9 132.7
+     6   3             151.3      3.4%   150.5 155.6 151.3
+== abwo-c done 2026-09-21T18:47:19+08:00

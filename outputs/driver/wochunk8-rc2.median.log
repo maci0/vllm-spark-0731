@@ -1,0 +1,155 @@
+== wochunk8-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T13:26:04+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: 
+-- pass 1 at 2026-09-20T13:26:04+08:00
+== wochunk8-rc2-1 metered start 2026-09-20T13:26:04+08:00
+== health=200 after 1 polls at 2026-09-20T13:26:04+08:00
+== tag wochunk8-rc2-1
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  52.1 tok/s  agg=   52.1  wall=  9.8s  toks=512
+-- level 1
+wall_s                  9.89
+drafts_per_req           114      11.53 /s
+gen_tokens               512      51.79 tok/s
+tokens_per_step        4.491
+accept_rate             50.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.6  71.1  56.1  50.0  36.0  29.8  19.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  32.2 tok/s  agg=   96.6  wall= 15.9s  toks=1536
+-- level 3
+wall_s                 15.95
+drafts_per_req           337      21.13 /s
+gen_tokens              1536      96.29 tok/s
+tokens_per_step        4.558
+accept_rate             51.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.8  73.0  58.2  49.0  38.0  30.3  21.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.6 tok/s  agg=  133.2  wall= 19.2s  toks=2560
+-- level 5
+wall_s                 19.28
+drafts_per_req           544      28.22 /s
+gen_tokens              2560     132.81 tok/s
+tokens_per_step        4.706
+accept_rate             53.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.3  74.4  60.3  50.6  40.8  33.6  22.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.7 tok/s  agg=  142.4  wall= 21.6s  toks=3072
+-- level 6
+wall_s                 21.64
+drafts_per_req           660      30.50 /s
+gen_tokens              3072     141.95 tok/s
+tokens_per_step        4.655
+accept_rate             52.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  73.5  59.8  49.7  40.6  31.2  22.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/wochunk8-rc2-1.meter.txt
+== wochunk8-rc2-1 metered done 2026-09-20T13:27:16+08:00
+-- pass 2 at 2026-09-20T13:27:16+08:00
+== wochunk8-rc2-2 metered start 2026-09-20T13:27:16+08:00
+== health=200 after 1 polls at 2026-09-20T13:27:16+08:00
+== tag wochunk8-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.5 tok/s  agg=   54.5  wall=  9.4s  toks=512
+-- level 1
+wall_s                  9.45
+drafts_per_req           109      11.53 /s
+gen_tokens               512      54.17 tok/s
+tokens_per_step        4.697
+accept_rate             53.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.7  81.7  61.5  46.8  39.4  29.4  22.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  31.8 tok/s  agg=   95.5  wall= 16.1s  toks=1536
+-- level 3
+wall_s                 16.15
+drafts_per_req           344      21.30 /s
+gen_tokens              1536      95.11 tok/s
+tokens_per_step        4.465
+accept_rate             49.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.5  73.3  58.4  46.5  36.6  27.6  18.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.0 tok/s  agg=  129.9  wall= 19.7s  toks=2560
+-- level 5
+wall_s                 19.76
+drafts_per_req           555      28.09 /s
+gen_tokens              2560     129.55 tok/s
+tokens_per_step        4.613
+accept_rate             51.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  75.7  60.0  48.1  38.7  29.9  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.9 tok/s  agg=  143.1  wall= 21.5s  toks=3072
+-- level 6
+wall_s                 21.51
+drafts_per_req           669      31.10 /s
+gen_tokens              3072     142.80 tok/s
+tokens_per_step        4.592
+accept_rate             51.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.7  73.8  59.9  48.7  39.5  29.6  19.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/wochunk8-rc2-2.meter.txt
+== wochunk8-rc2-2 metered done 2026-09-20T13:28:27+08:00
+-- pass 3 at 2026-09-20T13:28:27+08:00
+== wochunk8-rc2-3 metered start 2026-09-20T13:28:27+08:00
+== health=200 after 1 polls at 2026-09-20T13:28:27+08:00
+== tag wochunk8-rc2-3
+== gate_france ' Paris. The capital of Italy'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  55.5 tok/s  agg=   55.5  wall=  9.2s  toks=512
+-- level 1
+wall_s                  9.29
+drafts_per_req           107      11.52 /s
+gen_tokens               512      55.12 tok/s
+tokens_per_step        4.785
+accept_rate             54.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.8  77.6  63.6  54.2  39.3  29.9  26.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  36.2 tok/s  agg=  108.5  wall= 14.2s  toks=1536
+-- level 3
+wall_s                 14.20
+drafts_per_req           302      21.26 /s
+gen_tokens              1536     108.13 tok/s
+tokens_per_step        5.086
+accept_rate             58.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    91.1  80.8  65.2  57.0  47.0  39.1  29.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.7 tok/s  agg=  128.6  wall= 19.9s  toks=2560
+-- level 5
+wall_s                 19.97
+drafts_per_req           567      28.39 /s
+gen_tokens              2560     128.16 tok/s
+tokens_per_step        4.515
+accept_rate             50.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.5  72.7  58.9  46.7  38.3  29.5  19.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  24.0 tok/s  agg=  144.1  wall= 21.3s  toks=3072
+-- level 6
+wall_s                 21.36
+drafts_per_req           652      30.52 /s
+gen_tokens              3072     143.80 tok/s
+tokens_per_step        4.712
+accept_rate             53.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.5  75.8  62.1  50.6  40.2  32.7  22.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/wochunk8-rc2-3.meter.txt
+== wochunk8-rc2-3 metered done 2026-09-20T13:29:36+08:00
+tag wochunk8-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              54.5      6.2%   52.1 54.5 55.5
+     3   3              96.6     13.5%   96.6 95.5 108.5
+     5   3             129.9      3.5%   133.2 129.9 128.6
+     6   3             143.1      1.2%   142.4 143.1 144.1
+== wochunk8-rc2 done 2026-09-20T13:29:36+08:00

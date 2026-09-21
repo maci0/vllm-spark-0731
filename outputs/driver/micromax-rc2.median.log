@@ -1,0 +1,155 @@
+== micromax-rc2: 3 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-20T12:10:30+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 3 minutes
+== engine: 
+-- pass 1 at 2026-09-20T12:10:30+08:00
+== micromax-rc2-1 metered start 2026-09-20T12:10:30+08:00
+== health=200 after 1 polls at 2026-09-20T12:10:30+08:00
+== tag micromax-rc2-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.8 tok/s  agg=   54.8  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.39
+drafts_per_req           108      11.50 /s
+gen_tokens               512      54.50 tok/s
+tokens_per_step        4.741
+accept_rate             53.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  77.8  62.0  50.9  44.4  32.4  21.3
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  33.3 tok/s  agg=   99.9  wall= 15.4s  toks=1536
+-- level 3
+wall_s                 15.42
+drafts_per_req           335      21.73 /s
+gen_tokens              1536      99.62 tok/s
+tokens_per_step        4.585
+accept_rate             51.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.9  74.3  62.1  49.6  38.8  28.7  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  27.0 tok/s  agg=  135.1  wall= 18.9s  toks=2560
+-- level 5
+wall_s                 19.01
+drafts_per_req           535      28.14 /s
+gen_tokens              2560     134.67 tok/s
+tokens_per_step        4.785
+accept_rate             54.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    92.7  79.4  63.7  51.6  40.9  31.6  20.9
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.5 tok/s  agg=  141.1  wall= 21.8s  toks=3072
+-- level 6
+wall_s                 21.81
+drafts_per_req           660      30.26 /s
+gen_tokens              3072     140.83 tok/s
+tokens_per_step        4.655
+accept_rate             52.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.8  74.4  60.3  50.3  40.0  32.1  21.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/micromax-rc2-1.meter.txt
+== micromax-rc2-1 metered done 2026-09-20T12:11:41+08:00
+-- pass 2 at 2026-09-20T12:11:41+08:00
+== micromax-rc2-2 metered start 2026-09-20T12:11:41+08:00
+== health=200 after 1 polls at 2026-09-20T12:11:41+08:00
+== tag micromax-rc2-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  53.9 tok/s  agg=   53.9  wall=  9.5s  toks=512
+-- level 1
+wall_s                  9.55
+drafts_per_req           110      11.51 /s
+gen_tokens               512      53.59 tok/s
+tokens_per_step        4.655
+accept_rate             52.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.3  77.3  61.8  48.2  41.8  29.1  20.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  30.7 tok/s  agg=   92.1  wall= 16.7s  toks=1536
+-- level 3
+wall_s                 16.73
+drafts_per_req           349      20.86 /s
+gen_tokens              1536      91.81 tok/s
+tokens_per_step        4.401
+accept_rate             48.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  72.5  57.6  45.8  36.1  25.8  15.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  25.6 tok/s  agg=  127.9  wall= 20.0s  toks=2560
+-- level 5
+wall_s                 20.06
+drafts_per_req           559      27.87 /s
+gen_tokens              2560     127.61 tok/s
+tokens_per_step        4.580
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.3  76.0  61.0  47.8  37.9  28.3  18.2
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.7 tok/s  agg=  142.4  wall= 21.6s  toks=3072
+-- level 6
+wall_s                 21.62
+drafts_per_req           671      31.04 /s
+gen_tokens              3072     142.09 tok/s
+tokens_per_step        4.578
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.8  72.7  59.2  49.0  41.0  30.7  19.7
+== wrote /home/maci/vllm-spark-0731/outputs/driver/micromax-rc2-2.meter.txt
+== micromax-rc2-2 metered done 2026-09-20T12:12:53+08:00
+-- pass 3 at 2026-09-20T12:12:53+08:00
+== micromax-rc2-3 metered start 2026-09-20T12:12:53+08:00
+== health=200 after 1 polls at 2026-09-20T12:12:53+08:00
+== tag micromax-rc2-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  54.8 tok/s  agg=   54.8  wall=  9.3s  toks=512
+-- level 1
+wall_s                  9.40
+drafts_per_req           108      11.49 /s
+gen_tokens               512      54.47 tok/s
+tokens_per_step        4.741
+accept_rate             53.6 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  75.9  61.1  49.1  41.7  34.3  25.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.2 tok/s  agg=  102.7  wall= 15.0s  toks=1536
+-- level 3
+wall_s                 15.00
+drafts_per_req           329      21.93 /s
+gen_tokens              1536     102.37 tok/s
+tokens_per_step        4.669
+accept_rate             52.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.6  74.8  62.0  52.9  41.3  32.2  19.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  26.8 tok/s  agg=  133.9  wall= 19.1s  toks=2560
+-- level 5
+wall_s                 19.18
+drafts_per_req           523      27.27 /s
+gen_tokens              2560     133.50 tok/s
+tokens_per_step        4.895
+accept_rate             56.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    92.2  79.0  65.0  54.7  44.9  33.3  23.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  23.9 tok/s  agg=  143.3  wall= 21.4s  toks=3072
+-- level 6
+wall_s                 21.50
+drafts_per_req           654      30.42 /s
+gen_tokens              3072     142.91 tok/s
+tokens_per_step        4.697
+accept_rate             53.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.8  76.5  63.1  50.8  40.8  31.0  20.8
+== wrote /home/maci/vllm-spark-0731/outputs/driver/micromax-rc2-3.meter.txt
+== micromax-rc2-3 metered done 2026-09-20T12:14:02+08:00
+tag micromax-rc2, 3 passes
+ level   n  median agg tok/s    spread   values
+     1   3              54.8      1.6%   54.8 53.9 54.8
+     3   3              99.9     10.6%   99.9 92.1 102.7
+     5   3             133.9      5.4%   135.1 127.9 133.9
+     6   3             142.4      1.5%   141.1 142.4 143.3
+== micromax-rc2 done 2026-09-20T12:14:02+08:00
