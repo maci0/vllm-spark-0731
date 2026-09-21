@@ -1,0 +1,251 @@
+== qR-c: 5 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-22T03:34:53+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:(("vllm",pid=693697,fd=23))            
+== container: sparkrun_bccefe990c7aefab_a68824c38ed1_node_0 Up 6 minutes
+== engine: 
+-- pass 1 at 2026-09-22T03:34:53+08:00
+== qR-c-1 metered start 2026-09-22T03:34:53+08:00
+== health=200 after 1 polls at 2026-09-22T03:34:53+08:00
+== tag qR-c-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  58.4 tok/s  agg=   58.4  wall=  8.8s  toks=512
+-- level 1
+wall_s                  8.80
+drafts_per_req           118      13.40 /s
+gen_tokens               512      58.15 tok/s
+tokens_per_step        4.339
+accept_rate             48.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.1  69.5  56.8  44.9  37.3  26.3  16.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  34.4 tok/s  agg=  103.1  wall= 14.9s  toks=1536
+-- level 3
+wall_s                 14.94
+drafts_per_req           345      23.09 /s
+gen_tokens              1536     102.80 tok/s
+tokens_per_step        4.452
+accept_rate             49.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.5  71.3  57.1  47.5  38.3  27.5  19.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  23.8 tok/s  agg=  118.9  wall= 21.5s  toks=2560
+-- level 5
+wall_s                 21.59
+drafts_per_req           529      24.51 /s
+gen_tokens              2560     118.60 tok/s
+tokens_per_step        4.839
+accept_rate             55.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    90.9  81.3  66.7  52.7  41.4  31.9  20.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  26.6 tok/s  agg=  159.4  wall= 19.3s  toks=3072
+-- level 6
+wall_s                 19.32
+drafts_per_req           658      34.06 /s
+gen_tokens              3072     159.01 tok/s
+tokens_per_step        4.669
+accept_rate             52.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  73.9  60.3  50.9  40.9  31.0  22.3
+== wrote /home/maci/vllm-spark-0731/outputs/driver/qR-c-1.meter.txt
+== qR-c-1 metered done 2026-09-22T03:36:02+08:00
+-- pass 2 at 2026-09-22T03:36:02+08:00
+== qR-c-2 metered start 2026-09-22T03:36:02+08:00
+== health=200 after 1 polls at 2026-09-22T03:36:02+08:00
+== tag qR-c-2
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  61.2 tok/s  agg=   61.2  wall=  8.4s  toks=512
+-- level 1
+wall_s                  8.42
+drafts_per_req           112      13.30 /s
+gen_tokens               512      60.79 tok/s
+tokens_per_step        4.571
+accept_rate             51.0 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.6  73.2  59.8  50.0  38.4  29.5  19.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  38.1 tok/s  agg=  114.3  wall= 13.4s  toks=1536
+-- level 3
+wall_s                 13.50
+drafts_per_req           324      24.01 /s
+gen_tokens              1536     113.82 tok/s
+tokens_per_step        4.741
+accept_rate             53.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  74.7  60.8  50.9  41.7  33.0  24.7
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  28.4 tok/s  agg=  142.2  wall= 18.0s  toks=2560
+-- level 5
+wall_s                 18.07
+drafts_per_req           553      30.61 /s
+gen_tokens              2560     141.71 tok/s
+tokens_per_step        4.629
+accept_rate             52.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.6  75.8  60.8  49.2  39.6  30.4  20.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  27.2 tok/s  agg=  162.9  wall= 18.9s  toks=3072
+-- level 6
+wall_s                 18.90
+drafts_per_req           654      34.60 /s
+gen_tokens              3072     162.53 tok/s
+tokens_per_step        4.697
+accept_rate             52.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.0  76.6  61.5  49.4  39.9  32.0  22.3
+== wrote /home/maci/vllm-spark-0731/outputs/driver/qR-c-2.meter.txt
+== qR-c-2 metered done 2026-09-22T03:37:04+08:00
+-- pass 3 at 2026-09-22T03:37:04+08:00
+== qR-c-3 metered start 2026-09-22T03:37:04+08:00
+== health=200 after 1 polls at 2026-09-22T03:37:04+08:00
+== tag qR-c-3
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  60.9 tok/s  agg=   60.9  wall=  8.4s  toks=512
+-- level 1
+wall_s                  8.44
+drafts_per_req           112      13.27 /s
+gen_tokens               512      60.65 tok/s
+tokens_per_step        4.571
+accept_rate             51.3 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    85.7  74.1  59.8  49.1  40.2  28.6  21.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  38.3 tok/s  agg=  115.0  wall= 13.4s  toks=1536
+-- level 3
+wall_s                 13.42
+drafts_per_req           327      24.38 /s
+gen_tokens              1536     114.50 tok/s
+tokens_per_step        4.697
+accept_rate             53.1 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.6  77.4  64.5  49.5  40.4  29.7  20.5
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  28.7 tok/s  agg=  143.7  wall= 17.8s  toks=2560
+-- level 5
+wall_s                 17.86
+drafts_per_req           566      31.68 /s
+gen_tokens              2560     143.31 tok/s
+tokens_per_step        4.523
+accept_rate             50.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.5  71.7  58.7  48.2  38.9  29.7  21.0
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  26.2 tok/s  agg=  157.0  wall= 19.6s  toks=3072
+-- level 6
+wall_s                 19.62
+drafts_per_req           668      34.04 /s
+gen_tokens              3072     156.57 tok/s
+tokens_per_step        4.599
+accept_rate             51.5 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.9  74.7  60.0  49.4  40.4  28.6  18.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/qR-c-3.meter.txt
+== qR-c-3 metered done 2026-09-22T03:38:08+08:00
+-- pass 4 at 2026-09-22T03:38:08+08:00
+== qR-c-4 metered start 2026-09-22T03:38:08+08:00
+== health=200 after 1 polls at 2026-09-22T03:38:08+08:00
+== tag qR-c-4
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  64.8 tok/s  agg=   64.8  wall=  7.9s  toks=512
+-- level 1
+wall_s                  7.95
+drafts_per_req           105      13.21 /s
+gen_tokens               512      64.44 tok/s
+tokens_per_step        4.876
+accept_rate             55.8 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.7  78.1  63.8  52.4  42.9  39.0  27.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  37.0 tok/s  agg=  111.0  wall= 13.8s  toks=1536
+-- level 3
+wall_s                 13.90
+drafts_per_req           325      23.38 /s
+gen_tokens              1536     110.49 tok/s
+tokens_per_step        4.726
+accept_rate             53.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.0  75.4  61.2  51.1  40.9  32.3  24.6
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  28.1 tok/s  agg=  140.3  wall= 18.3s  toks=2560
+-- level 5
+wall_s                 18.32
+drafts_per_req           578      31.55 /s
+gen_tokens              2560     139.72 tok/s
+tokens_per_step        4.429
+accept_rate             49.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.8  72.7  56.1  45.2  36.0  27.0  17.8
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  27.1 tok/s  agg=  162.6  wall= 18.9s  toks=3072
+-- level 6
+wall_s                 18.95
+drafts_per_req           667      35.19 /s
+gen_tokens              3072     162.08 tok/s
+tokens_per_step        4.606
+accept_rate             51.7 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.4  73.6  59.2  48.6  39.4  32.1  21.6
+== wrote /home/maci/vllm-spark-0731/outputs/driver/qR-c-4.meter.txt
+== qR-c-4 metered done 2026-09-22T03:39:11+08:00
+-- pass 5 at 2026-09-22T03:39:11+08:00
+== qR-c-5 metered start 2026-09-22T03:39:11+08:00
+== health=200 after 1 polls at 2026-09-22T03:39:11+08:00
+== tag qR-c-5
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=  64.0 tok/s  agg=   64.0  wall=  8.0s  toks=512
+-- level 1
+wall_s                  8.04
+drafts_per_req           107      13.31 /s
+gen_tokens               512      63.67 tok/s
+tokens_per_step        4.785
+accept_rate             53.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    86.0  74.8  61.7  51.4  42.1  34.6  27.1
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=  38.7 tok/s  agg=  116.2  wall= 13.2s  toks=1536
+-- level 3
+wall_s                 13.28
+drafts_per_req           317      23.87 /s
+gen_tokens              1536     115.66 tok/s
+tokens_per_step        4.845
+accept_rate             55.2 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    89.9  80.1  65.3  52.4  43.5  32.8  22.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=  28.7 tok/s  agg=  143.5  wall= 17.8s  toks=2560
+-- level 5
+wall_s                 17.90
+drafts_per_req           559      31.23 /s
+gen_tokens              2560     143.03 tok/s
+tokens_per_step        4.580
+accept_rate             51.4 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    88.7  74.2  61.4  48.5  38.1  30.4  18.4
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=  26.5 tok/s  agg=  159.0  wall= 19.3s  toks=3072
+-- level 6
+wall_s                 19.39
+drafts_per_req           675      34.81 /s
+gen_tokens              3072     158.44 tok/s
+tokens_per_step        4.551
+accept_rate             50.9 %
+per_position      p0  p1  p2  p3  p4  p5  p6
+  acceptance %    87.0  71.7  59.4  48.3  39.0  30.8  20.1
+== wrote /home/maci/vllm-spark-0731/outputs/driver/qR-c-5.meter.txt
+== qR-c-5 metered done 2026-09-22T03:40:13+08:00
+tag qR-c, 5 passes
+ level   n  median agg tok/s    spread   values
+     1   5              61.2     10.5%   58.4 61.2 60.9 64.8 64.0
+     3   5             114.3     11.5%   103.1 114.3 115.0 111.0 116.2
+     5   5             142.2     17.4%   118.9 142.2 143.7 140.3 143.5
+     6   5             159.4      3.7%   159.4 162.9 157.0 162.6 159.0
+== qR-c done 2026-09-22T03:40:13+08:00

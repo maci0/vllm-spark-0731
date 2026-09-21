@@ -11545,6 +11545,300 @@
       }
     },
     {
+      "tag": "qO-a",
+      "levels": {
+        "1": {
+          "n": 5,
+          "median": 63.6,
+          "spread": 13.1,
+          "values": [
+            59.0,
+            63.6,
+            65.6,
+            67.2,
+            58.9
+          ]
+        },
+        "3": {
+          "n": 5,
+          "median": 114.3,
+          "spread": 15.8,
+          "values": [
+            114.2,
+            107.6,
+            114.3,
+            125.7,
+            117.8
+          ]
+        },
+        "5": {
+          "n": 5,
+          "median": 145.3,
+          "spread": 8.4,
+          "values": [
+            145.3,
+            156.2,
+            144.4,
+            147.0,
+            144.0
+          ]
+        },
+        "6": {
+          "n": 5,
+          "median": 164.9,
+          "spread": 4.1,
+          "values": [
+            165.1,
+            162.1,
+            165.4,
+            164.9,
+            158.7
+          ]
+        }
+      },
+      "passes": 5,
+      "max_tokens": 512,
+      "start": "2026-09-22T03:11:36+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 2 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 488.1,
+      "worst_spread": 15.8,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "qO-d",
+      "levels": {
+        "1": {
+          "n": 5,
+          "median": 62.2,
+          "spread": 11.4,
+          "values": [
+            64.3,
+            62.2,
+            65.0,
+            61.6,
+            57.9
+          ]
+        },
+        "3": {
+          "n": 5,
+          "median": 111.5,
+          "spread": 11.7,
+          "values": [
+            111.5,
+            119.8,
+            110.4,
+            108.5,
+            121.6
+          ]
+        },
+        "5": {
+          "n": 5,
+          "median": 148.3,
+          "spread": 3.0,
+          "values": [
+            148.7,
+            148.5,
+            148.3,
+            146.2,
+            144.2
+          ]
+        },
+        "6": {
+          "n": 5,
+          "median": 161.7,
+          "spread": 6.7,
+          "values": [
+            163.5,
+            161.7,
+            168.4,
+            157.6,
+            161.1
+          ]
+        }
+      },
+      "passes": 5,
+      "max_tokens": 512,
+      "start": "2026-09-22T03:45:02+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 3 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 483.7,
+      "worst_spread": 11.7,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "qR-b",
+      "levels": {
+        "1": {
+          "n": 5,
+          "median": 60.9,
+          "spread": 9.9,
+          "values": [
+            61.8,
+            58.6,
+            64.6,
+            60.9,
+            60.0
+          ]
+        },
+        "3": {
+          "n": 5,
+          "median": 111.7,
+          "spread": 10.9,
+          "values": [
+            108.0,
+            113.0,
+            110.5,
+            111.7,
+            120.2
+          ]
+        },
+        "5": {
+          "n": 5,
+          "median": 136.6,
+          "spread": 19.5,
+          "values": [
+            117.3,
+            136.6,
+            136.5,
+            143.0,
+            144.0
+          ]
+        },
+        "6": {
+          "n": 5,
+          "median": 159.2,
+          "spread": 4.8,
+          "values": [
+            156.0,
+            159.2,
+            155.2,
+            161.0,
+            162.8
+          ]
+        }
+      },
+      "passes": 5,
+      "max_tokens": 512,
+      "start": "2026-09-22T03:23:01+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:((\"vllm\",pid=686789,fd=23))",
+        "container": "sparkrun_bccefe990c7aefab_fd25f95ab3fb_node_0 Up 5 minutes",
+        "engine": ""
+      },
+      "guarded": true,
+      "sum": 468.4,
+      "worst_spread": 19.5,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "qR-c",
+      "levels": {
+        "1": {
+          "n": 5,
+          "median": 61.2,
+          "spread": 10.5,
+          "values": [
+            58.4,
+            61.2,
+            60.9,
+            64.8,
+            64.0
+          ]
+        },
+        "3": {
+          "n": 5,
+          "median": 114.3,
+          "spread": 11.5,
+          "values": [
+            103.1,
+            114.3,
+            115.0,
+            111.0,
+            116.2
+          ]
+        },
+        "5": {
+          "n": 5,
+          "median": 142.2,
+          "spread": 17.4,
+          "values": [
+            118.9,
+            142.2,
+            143.7,
+            140.3,
+            143.5
+          ]
+        },
+        "6": {
+          "n": 5,
+          "median": 159.4,
+          "spread": 3.7,
+          "values": [
+            159.4,
+            162.9,
+            157.0,
+            162.6,
+            159.0
+          ]
+        }
+      },
+      "passes": 5,
+      "max_tokens": 512,
+      "start": "2026-09-22T03:34:53+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*    users:((\"vllm\",pid=693697,fd=23))",
+        "container": "sparkrun_bccefe990c7aefab_a68824c38ed1_node_0 Up 6 minutes",
+        "engine": ""
+      },
+      "guarded": true,
+      "sum": 477.1,
+      "worst_spread": 17.4,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
       "tag": "rc2back-rc2",
       "levels": {
         "1": {

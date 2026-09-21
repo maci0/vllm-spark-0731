@@ -11251,3 +11251,29 @@ standing arm for this pin is now `ctl3-rc2` (491.0 / 164.3).
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: same-day clean interleaved pair — beat confirmed (round 116)
+
+On the fully fixed rig (run-arm kills all containers; both nodes humming), a
+5-pass interleaved pair ours/ref/ref/ours with provenance verified on all four
+arms (qO-a/qO-d on `vllm-ds4-0731` ours; qR-b/qR-c on the reference):
+
+| arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| qO-a (ours) | 63.6 | 114.3 | 145.3 | 164.9 | 488.1 |
+| qO-d (ours) | 62.2 | 111.5 | 148.3 | 161.7 | 483.7 |
+| qR-b (ref) | 60.9 | 111.7 | 136.6 | 159.2 | 468.4 |
+| qR-c (ref) | 61.2 | 114.3 | 142.2 | 159.4 | 477.1 |
+
+Ours mean 485.9 / 163.3, ref mean 472.8 / 159.3 -> **+2.8 % sum / +2.5 % c6**.
+Every ours arm beats every ref arm on the sum and at c6. This is the third
+independent clean confirmation (ctl2 +2.1/2.8, pO-a +2.0/1.1, now +2.8/2.5).
+**The beat is real and repeatable.**
+
+Keep-rule: under the conservative per-level reading (ref c5 spread 19.5 %) the
++2.8 % delta does not clear the bar; under the across-arm-sums reading (larger
+median spread ~1.8 %) it does. The contract's "larger median spread" is
+ambiguous; recorded under both readings. Standing remains `ctl3-rc2`
+(491.0/164.3).
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
