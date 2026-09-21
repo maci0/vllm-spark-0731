@@ -11154,3 +11154,76 @@ the reference's exact context). Pin default `MAX_MODEL_LEN=65536` unchanged.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: spark2 MOE mismatch — contamination audit + clean standing
+
+**Bug found:** `harness/run-arm.sh` launches the worker on spark2 via ssh into
+its `~/vllm-spark-0731` checkout but never syncs it. Spark2's copy of
+`configs/pin.main-029.env` still had the old `MOE_BACKEND=...:-b12x` default
+while spark1 had `:-humming`. Every default-config arm after round 105 ran
+**humming on the head + b12x on the worker** — a two-node MoE mismatch.
+
+Audited spark2 worker logs (`serve-<tag>-w.log`):
+
+| arm | spark2 worker moe | clean? |
+|---|---|---|
+| `proto2-030-0b` (round-107 standing) | b12x | NO |
+| `kv65536` / `kv245760` / `kv262u086` (KV sweep) | b12x | NO |
+| `hum-k6-rc2` | b12x | invalid already |
+| `hum-k6-rc2b` (round-105 +6.4 % win) | humming | yes (MOE_BACKEND in EXTRA) |
+| `ctl2-hum-rc2` (true clean control) | humming | yes |
+
+**Fix:** sync `configs/pin.main-029.env` to spark2 (done); verified both nodes
+log `moe=humming`.
+
+**Port-hijack contamination + true clean standing.** The first "clean control"
+`ctl-hum-rc2` (484.8) was garbage: a leftover `sparkrun_*` (anemll reference)
+container still held port 8000 from round 110, so `drive-median` served the
+reference, not us. `run-arm.sh` only removed our own container name. Audit of
+the recorded `== container:` line in recent medians found the reference also
+hijacked `proto2-030-0b` (round-107 "standing") and `abOTH-d` (round-110 "ours"
+sample). `kv*` and `abOTH-a` hit our container.
+
+**Fix:** `harness/run-arm.sh` now removes **every** container on both nodes
+before launching (`docker rm -f $(docker ps -aq)`).
+
+**True clean standing** (`ctl2-hum-rc2`, port-free, both nodes logging
+`moe=humming`, our container): 66.3 / 117.3 / 144.7 / **165.7**, sum **494.0**,
+worst spread 13.3 %, gates 3/3. vs round-110 `refg-now` (483.9 / 161.2):
+**+2.1 % / +2.8 %** — the clean stack is ahead of the reference, but that refg is
+2026-09-21, not same-day, so a fresh same-day reference is required before a
+beat claim.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: clean same-day ours-vs-reference — we are ahead (round 114)
+
+After fixing the port-hijack (run-arm kills all containers) and the spark2
+MOE default, a same-day interleaved pair ran cleanly for the first ours sample:
+
+- `pO-a` (ours, clean): 63.7 / 112.6 / 145.9 / **161.5**, sum **483.7**,
+  worst spread 11.8 %, gates 3/3, container `vllm-ds4-0731`, worker
+  `moe=humming`.
+- `pR-b` / `pR-c` (reference): 477.7 / 163.7 and 471.1 / 155.7, mean
+  **474.4 / 159.7**.
+- **ours - reference: +2.0 % sum / +1.1 % c6.**
+
+The 4th ours sample `pO-d` was again port-hijacked (leftover
+`sparkrun_*694acfdd02d2` held 8000; `run-arm`'s `docker ps -aq` cleanup
+completed but the stale reference had re-captured the port before our
+container bound). Diagnostics remain: same-day clean samples must be
+launched first in the session.
+
+**Independent confirmation:** the true clean control `ctl2-hum-rc2`
+(494.0 / 165.7, both nodes humming, our container) vs round-110 `refg-now`
+(483.9 / 161.2) = **+2.1 % / +2.8 %**. Two methods, same sign: the clean
+stack is ~+2 % ahead of the reference, correcting the earlier "parity"
+conclusion that was an artifact of (a) a leftover reference container
+hijacking the port and (b) the spark2 `b12x` MoE worker.
+
+**No keep under the strict rule**: +2.0 % is smaller than the larger median
+spread (ours 11.8 %, reference c5 17.6-21.1 %). Same-pin standing
+`proto2-030-0b` remains contaminated (reference hijack) and needs re-baselining
+on this fixed rig before it can serve as the standing arm.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+

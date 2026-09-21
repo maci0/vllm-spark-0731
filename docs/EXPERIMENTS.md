@@ -26,10 +26,12 @@ generations, levels 1 3 5 6, three passes, median reported per level. Both arms 
 |---|---|---|---|---|---|---|---|
 | `refg-now` | 63.7 | 117.0 | 142.0 | 161.2 | 483.9 | 26.6 % | pass |
 | `refg` | 65.3 | 110.1 | 138.6 | 159.1 | 473.1 | 16.1 % | pass |
+| `ctl2-hum-rc2` | 66.3 | 117.3 | 144.7 | 165.7 | 494.0 | 13.3 % | pass |
 | `abOTH-d` | 67.6 | 116.0 | 146.6 | 160.3 | 490.5 | 14.5 % | pass |
 | `proto2-030-0b` | 64.1 | 117.8 | 145.1 | 158.9 | 485.9 | 10.8 % | pass |
 | `refg-rc2b` | 63.0 | 114.6 | 146.1 | 162.2 | 485.9 | 20.7 % | pass |
 | `capsz-030-0` | 62.3 | 117.6 | 145.6 | 159.5 | 485.0 | 11.6 % | pass |
+| `ctl-hum-rc2` | 61.0 | 116.3 | 146.3 | 161.2 | 484.8 | 7.1 % | pass |
 | `refg030` | 64.0 | 114.2 | 143.4 | 162.1 | 483.7 | 18.5 % | pass |
 | `abREF-b` | 61.8 | 114.9 | 145.0 | 159.0 | 480.7 | 26.2 % | pass |
 | `hum-k6-rc2b` | 58.5 | 111.6 | 146.8 | 160.6 | 477.5 | 11.8 % | pass |
@@ -263,6 +265,21 @@ Container `sparkrun_bccefe990c7aefab_35b594a4b47e_node_0 Up 6 minutes`, engine `
 | 5 | 116.9 / 138.6 / 139.2 | 138.6 | 16.1 % | - | - | - |
 | 6 | 158.1 / 161.5 / 159.1 | 159.1 | 2.1 % | - | - | - |
 
+### `ctl2-hum-rc2`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 3 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 3 passes at 512 tokens, started 2026-09-22T02:08:28+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 66.3 / 60.4 / 68.0 | 66.3 | 11.5 % | - | - | - |
+| 3 | 101.9 / 117.5 / 117.3 | 117.3 | 13.3 % | - | - | - |
+| 5 | 148.6 / 144.5 / 144.7 | 144.7 | 2.8 % | - | - | - |
+| 6 | 167.5 / 165.7 / 161.3 | 165.7 | 3.7 % | - | - | - |
+
 ### `abOTH-d`
 
 **Changed.** (unannotated)
@@ -322,6 +339,21 @@ Container `sparkrun_bccefe990c7aefab_a1d74a94a9ec_node_0 Up 19 minutes`, engine 
 | 3 | 117.6 / 118.7 / 114.1 / 121.8 / 113.1 | 117.6 | 7.4 % | - | - | - |
 | 5 | 145.0 / 152.0 / 143.3 / 145.6 / 146.6 | 145.6 | 6.0 % | - | - | - |
 | 6 | 158.0 / 158.1 / 162.8 / 159.5 / 160.1 | 159.5 | 3.0 % | - | - | - |
+
+### `ctl-hum-rc2`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `sparkrun_bccefe990c7aefab_694acfdd02d2_node_0 Up 20 minutes`, engine `(not in the log)`, 3 passes at 512 tokens, started 2026-09-22T01:54:53+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 61.0 / 62.2 / 59.6 | 61.0 | 4.3 % | - | - | - |
+| 3 | 116.3 / 118.8 / 110.5 | 116.3 | 7.1 % | - | - | - |
+| 5 | 147.3 / 146.3 / 145.3 | 146.3 | 1.4 % | - | - | - |
+| 6 | 164.3 / 161.2 / 160.1 | 161.2 | 2.6 % | - | - | - |
 
 ### `refg030`
 
@@ -4073,5 +4105,5 @@ python3 scripts/experiment-ledger.py
 ```
 
 Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in `superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered `*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`.
-As of the last run: 197 guarded arms, 0 superseded, 70 failed.
+As of the last run: 199 guarded arms, 0 superseded, 70 failed.
 

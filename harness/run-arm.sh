@@ -21,7 +21,11 @@ SERVE_ARGS="--async-scheduling${ARM_EXTRA_ARGS:+ $ARM_EXTRA_ARGS}"
 K="${NUM_SPECULATIVE_TOKENS:-6}"
 CAP="${MAX_CUDAGRAPH_CAPTURE_SIZE:-48}"
 
-docker rm -f vllm-ds4-0731 >/dev/null 2>&1
+# Remove every container on both nodes before launching. A leftover reference
+# (`sparkrun_*`) or prior container holds port 8000 and hijacks the measurement
+# (round 114: `ctl-hum`, `proto2-030-0b`, `abOTH-d` were silently served by the
+# anemll reference this way). `docker rm -f` all, not just our own name.
+docker rm -f $(docker ps -aq) >/dev/null 2>&1
 # InstantTensor sizes its I/O buffer from free device memory, so a full page cache
 # starves it: `buffer_size (1059061760 B) exceeds device memory budget (925720576 B)`
 # and the worker dies before health. Drop caches on both nodes first. See HANDOFF.md
@@ -30,7 +34,7 @@ ssh spark2 "sudo -n sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'" >/dev/null 
   echo "warn: could not drop spark2 page cache"
 sudo -n sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches' >/dev/null 2>&1 || \
   echo "warn: could not drop spark1 page cache"
-ssh spark2 "docker rm -f vllm-ds4-0731 >/dev/null 2>&1; find /dev/shm -maxdepth 1 \( -name 'psm_*' -o -name 'nccl-*' -o -name 'sem.mp-*' -o -name 'mp-*' \) -delete 2>/dev/null; cd ~/vllm-spark-0731 && env NUM_SPECULATIVE_TOKENS=${K} MAX_CUDAGRAPH_CAPTURE_SIZE=${CAP} GPU_MEMORY_UTILIZATION=0.8389 SERVE_EXTRA_ARGS='${SERVE_ARGS}' ${EXTRA} nohup bash scripts/05-serve.sh main-029 > ~/serve-${TAG}-w.log 2>&1 </dev/null &"
+ssh spark2 "docker rm -f \$(docker ps -aq) >/dev/null 2>&1; find /dev/shm -maxdepth 1 \( -name 'psm_*' -o -name 'nccl-*' -o -name 'sem.mp-*' -o -name 'mp-*' \) -delete 2>/dev/null; cd ~/vllm-spark-0731 && env NUM_SPECULATIVE_TOKENS=${K} MAX_CUDAGRAPH_CAPTURE_SIZE=${CAP} GPU_MEMORY_UTILIZATION=0.8389 SERVE_EXTRA_ARGS='${SERVE_ARGS}' ${EXTRA} nohup bash scripts/05-serve.sh main-029 > ~/serve-${TAG}-w.log 2>&1 </dev/null &"
 find /dev/shm -maxdepth 1 \( -name 'psm_*' -o -name 'nccl-*' -o -name 'sem.mp-*' -o -name 'mp-*' \) -delete 2>/dev/null || true
 sleep 85
 env NUM_SPECULATIVE_TOKENS=${K} MAX_CUDAGRAPH_CAPTURE_SIZE=${CAP} GPU_MEMORY_UTILIZATION=0.8389 \
