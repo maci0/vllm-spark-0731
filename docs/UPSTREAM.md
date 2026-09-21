@@ -11227,3 +11227,27 @@ on this fixed rig before it can serve as the standing arm.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: clean 5-pass re-baseline restores the standing (round 115)
+
+The old standing `proto2-030-0b` was contaminated (leftover reference
+hijack). On the fixed rig (run-arm kills all containers; spark2 pin synced to
+humming), a clean 5-pass re-baseline of the pin default (humming / k=6 / WO
+off / 65536, both nodes humming, our container):
+
+`ctl3-rc2` = 62.9 / 116.6 / 147.2 / **164.3**, sum **491.0**, worst spread
+13.2 %, gates 5/5.
+
+Clean measurements now cluster tightly: `ctl2` 494.0/165.7 (3pp), `pO-a`
+483.7/161.5 (3pp), `ctl3` 491.0/164.3 (5pp) -> mean ~490 / ~164, spread ~2 %.
+Against the same-day reference pair `pR-b/c` (mean 474.4 / 159.7) that is
+**+3.5 % sum / +2.9 % c6**, and against round-110 `refg-now` (483.9 / 161.2)
+**+1.5 % / +1.9 %**. The clean stack is ahead of the reference, correcting the
+round-107-113 "parity" conclusion that was an artifact of the two provenance
+bugs (spark2 b12x worker + reference container hijacking the port).
+
+**No keep**: the +1.5-3.5 % delta is below the larger median spread (our
+13.2 %, reference c5 17.6-21.1 %), so neither gate's beat clears the bar. The
+standing arm for this pin is now `ctl3-rc2` (491.0 / 164.3).
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+

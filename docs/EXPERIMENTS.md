@@ -27,14 +27,18 @@ generations, levels 1 3 5 6, three passes, median reported per level. Both arms 
 | `refg-now` | 63.7 | 117.0 | 142.0 | 161.2 | 483.9 | 26.6 % | pass |
 | `refg` | 65.3 | 110.1 | 138.6 | 159.1 | 473.1 | 16.1 % | pass |
 | `ctl2-hum-rc2` | 66.3 | 117.3 | 144.7 | 165.7 | 494.0 | 13.3 % | pass |
+| `ctl3-rc2` | 62.9 | 116.6 | 147.2 | 164.3 | 491.0 | 13.2 % | pass |
 | `abOTH-d` | 67.6 | 116.0 | 146.6 | 160.3 | 490.5 | 14.5 % | pass |
 | `proto2-030-0b` | 64.1 | 117.8 | 145.1 | 158.9 | 485.9 | 10.8 % | pass |
 | `refg-rc2b` | 63.0 | 114.6 | 146.1 | 162.2 | 485.9 | 20.7 % | pass |
 | `capsz-030-0` | 62.3 | 117.6 | 145.6 | 159.5 | 485.0 | 11.6 % | pass |
 | `ctl-hum-rc2` | 61.0 | 116.3 | 146.3 | 161.2 | 484.8 | 7.1 % | pass |
+| `pO-a` | 63.7 | 112.6 | 145.9 | 161.5 | 483.7 | 11.8 % | pass |
 | `refg030` | 64.0 | 114.2 | 143.4 | 162.1 | 483.7 | 18.5 % | pass |
 | `abREF-b` | 61.8 | 114.9 | 145.0 | 159.0 | 480.7 | 26.2 % | pass |
+| `pR-b` | 62.9 | 112.0 | 139.1 | 163.7 | 477.7 | 17.6 % | pass |
 | `hum-k6-rc2b` | 58.5 | 111.6 | 146.8 | 160.6 | 477.5 | 11.8 % | pass |
+| `pR-c` | 59.8 | 107.8 | 147.8 | 155.7 | 471.1 | 25.0 % | pass |
 | `abREF-c` | 63.1 | 111.9 | 139.6 | 155.7 | 470.3 | 24.4 % | pass |
 | `refg-rc2` | 58.6 | 113.4 | 138.8 | 157.1 | 467.9 | 21.9 % | pass |
 | `kv98304` | 59.8 | 109.7 | 136.2 | 157.6 | 463.3 | 9.9 % | pass |
@@ -280,6 +284,21 @@ Container `vllm-ds4-0731 Up 3 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 3 pass
 | 5 | 148.6 / 144.5 / 144.7 | 144.7 | 2.8 % | - | - | - |
 | 6 | 167.5 / 165.7 / 161.3 | 165.7 | 3.7 % | - | - | - |
 
+### `ctl3-rc2`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 2 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 5 passes at 512 tokens, started 2026-09-22T03:00:55+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 69.0 / 62.9 / 60.7 / 62.7 / 64.1 | 62.9 | 13.2 % | - | - | - |
+| 3 | 117.2 / 118.3 / 116.6 / 110.7 / 115.9 | 116.6 | 6.5 % | - | - | - |
+| 5 | 147.2 / 149.4 / 143.4 / 152.1 / 146.8 | 147.2 | 5.9 % | - | - | - |
+| 6 | 164.3 / 159.0 / 167.3 / 164.7 / 164.2 | 164.3 | 5.1 % | - | - | - |
+
 ### `abOTH-d`
 
 **Changed.** (unannotated)
@@ -355,6 +374,21 @@ Container `sparkrun_bccefe990c7aefab_694acfdd02d2_node_0 Up 20 minutes`, engine 
 | 5 | 147.3 / 146.3 / 145.3 | 146.3 | 1.4 % | - | - | - |
 | 6 | 164.3 / 161.2 / 160.1 | 161.2 | 2.6 % | - | - | - |
 
+### `pO-a`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 2 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 3 passes at 512 tokens, started 2026-09-22T02:16:18+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 63.7 / 65.1 / 59.3 | 63.7 | 9.1 % | - | - | - |
+| 3 | 112.6 / 111.2 / 124.5 | 112.6 | 11.8 % | - | - | - |
+| 5 | 146.8 / 142.3 / 145.9 | 145.9 | 3.1 % | - | - | - |
+| 6 | 162.3 / 161.5 / 158.4 | 161.5 | 2.4 % | - | - | - |
+
 ### `refg030`
 
 **Changed.** same-day reference arm: anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the base checkpoint, launched by `~/goal/launch-refbase.sh` on 2026-09-18 after `proto2-030`
@@ -385,6 +419,21 @@ Container `sparkrun_bccefe990c7aefab_7eedc6a565a2_node_0 Up 6 minutes`, engine `
 | 5 | 112.5 / 145.0 / 150.5 | 145.0 | 26.2 % | - | - | - |
 | 6 | 158.3 / 159.0 / 170.3 | 159.0 | 7.5 % | - | - | - |
 
+### `pR-b`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `sparkrun_bccefe990c7aefab_f78197a6339f_node_0 Up 5 minutes`, engine `(not in the log)`, 3 passes at 512 tokens, started 2026-09-22T02:25:43+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 63.3 / 62.9 / 60.0 | 62.9 | 5.2 % | - | - | - |
+| 3 | 112.0 / 115.8 / 110.8 | 112.0 | 4.5 % | - | - | - |
+| 5 | 116.8 / 139.1 / 141.3 | 139.1 | 17.6 % | - | - | - |
+| 6 | 157.9 / 164.9 / 163.7 | 163.7 | 4.3 % | - | - | - |
+
 ### `hum-k6-rc2b`
 
 **Changed.** `wooff-rc2` + k=6 plus `MOE_BACKEND=humming` passed through the **launcher** channel (`harness/run-arm.sh <tag> "MOE_BACKEND=humming"`), five passes. One variable against the standing default: the MoE backend (humming MXFP4 kernels vs b12x). Confirmed `moe_backend='humming'` in the resolved engine config. This is the correct-channel re-run of `hum-k6-rc2`, which was invalid.
@@ -399,6 +448,21 @@ Container `vllm-ds4-0731 Up 2 minutes`, engine `(not in the log)`, 5 passes at 5
 | 3 | 114.2 / 114.7 / 111.6 / 105.1 / 110.9 | 111.6 | 8.6 % | - | - | - |
 | 5 | 148.1 / 140.1 / 139.9 / 146.8 / 147.7 | 146.8 | 5.6 % | - | - | - |
 | 6 | 158.2 / 165.0 / 164.8 / 160.6 / 153.1 | 160.6 | 7.4 % | - | - | - |
+
+### `pR-c`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `sparkrun_bccefe990c7aefab_fe743c385aa4_node_0 Up 6 minutes`, engine `(not in the log)`, 3 passes at 512 tokens, started 2026-09-22T02:35:24+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 59.1 / 59.8 / 67.6 | 59.8 | 14.2 % | - | - | - |
+| 3 | 85.4 / 112.3 / 107.8 | 107.8 | 25.0 % | - | - | - |
+| 5 | 148.6 / 147.8 / 138.1 | 147.8 | 7.1 % | - | - | - |
+| 6 | 152.7 / 156.9 / 155.7 | 155.7 | 2.7 % | - | - | - |
 
 ### `abREF-c`
 
@@ -4105,5 +4169,5 @@ python3 scripts/experiment-ledger.py
 ```
 
 Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in `superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered `*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`.
-As of the last run: 199 guarded arms, 0 superseded, 70 failed.
+As of the last run: 203 guarded arms, 0 superseded, 70 failed.
 
