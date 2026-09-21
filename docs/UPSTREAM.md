@@ -11105,3 +11105,32 @@ lever. The decisive interleaved comparison measured parity: -0.3 % sum /
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+
+## 2026-09-22: KV-capacity sweep on the clean v0.30.0 build
+
+`MAX_MODEL_LEN` probed upward from the pin's 65536 toward the reference's
+262144, one variable per arm (protocol 3x512, levels 1 3 5 6), on
+`vllm-spark-0731:main-030-0` with the validated default (humming, k=6, WO off).
+
+| max_model_len | c1 | c3 | c5 | c6 | sum | spread | gates |
+|---|---|---|---|---|---|---|---|
+| 65536 (pin) | 57.8 | 107.9 | 135.2 | 153.5 | 454.4 | 8.7 % | pass |
+| 98304 | 59.8 | 109.7 | 136.2 | 157.6 | **463.3** | 9.9 % | pass |
+| 131072 | 59.1 | 103.5 | 133.3 | 150.9 | 446.8 | 6.1 % | pass |
+| 196608 | 56.6 | 107.1 | 133.9 | 148.9 | 446.5 | 9.9 % | pass |
+| 229376 | 55.0 | 106.9 | 139.5 | 152.8 | 454.2 | 10.0 % | pass |
+| 245760 | 57.1 | 107.2 | 137.4 | 147.6 | 449.3 | 5.6 % | pass |
+| 262144 | die | die | die | die | — | — | — |
+
+**Finding: the serving frontier tops out at `MAX_MODEL_LEN=245760` (KV cache
+11.32 GiB, from the worker report); `262144` dies at the KV/memory floor, same
+as round 111, so the reference's max_model_len (262144) is not reproducible
+on this rig at our util/layout.** Across 65536-245760 the sums sit in a
+446-463 band whose spread overlaps the +-9 % session drift, so KV depth is
+performance-neutral up to the frontier; the best single-arm sum (98304,
+463.3) is not distinguishable from the pin default within noise. No reason to
+change the pin default; the capacity gain is 4x (65536 -> 245760) at no
+measured throughput cost. The reference's KV pool is unreachable.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+

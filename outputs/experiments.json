@@ -12,156 +12,6 @@
   },
   "arms": [
     {
-      "tag": "ab2-off-a",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 39.0,
-          "spread": 3.1,
-          "values": [
-            39.7,
-            38.8,
-            39.0,
-            38.5,
-            39.0
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 123.6,
-          "spread": 7.1,
-          "values": [
-            123.6,
-            128.1,
-            119.3,
-            123.0,
-            126.9
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-12T14:06:58+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 162.6,
-      "worst_spread": 7.1,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "ab2-off-b",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 39.7,
-          "spread": 7.8,
-          "values": [
-            40.9,
-            40.0,
-            39.6,
-            37.8,
-            39.7
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 125.0,
-          "spread": 8.8,
-          "values": [
-            122.9,
-            129.0,
-            118.7,
-            125.0,
-            129.7
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-12T14:14:07+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 164.7,
-      "worst_spread": 8.8,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "ab2-on",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 40.6,
-          "spread": 12.1,
-          "values": [
-            41.3,
-            38.5,
-            40.6,
-            39.4,
-            43.4
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 124.3,
-          "spread": 2.7,
-          "values": [
-            123.3,
-            126.6,
-            124.1,
-            125.7,
-            124.3
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-12T14:10:34+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 164.9,
-      "worst_spread": 12.1,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
       "tag": "abOTH-a",
       "levels": {
         "1": {
@@ -216,7 +66,6 @@
       "guarded": true,
       "sum": 457.4,
       "worst_spread": 8.9,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -283,7 +132,6 @@
       "guarded": true,
       "sum": 490.5,
       "worst_spread": 14.5,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -349,7 +197,6 @@
       "guarded": true,
       "sum": 480.7,
       "worst_spread": 26.2,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -415,7 +262,6 @@
       "guarded": true,
       "sum": 470.3,
       "worst_spread": 24.4,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -677,204 +523,6 @@
       "guarded": true,
       "sum": 421.9,
       "worst_spread": 8.7,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "abreshape-off-a",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 39.8,
-          "spread": 4.8,
-          "values": [
-            39.8,
-            39.0,
-            40.9
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 83.7,
-          "spread": 10.9,
-          "values": [
-            88.8,
-            83.7,
-            79.7
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 110.6,
-          "spread": 6.8,
-          "values": [
-            106.6,
-            110.6,
-            114.1
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 124.6,
-          "spread": 5.3,
-          "values": [
-            127.7,
-            121.1,
-            124.6
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T13:53:36+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 358.7,
-      "worst_spread": 10.9,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "abreshape-off-b",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 39.7,
-          "spread": 1.0,
-          "values": [
-            39.8,
-            39.7,
-            39.4
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 84.3,
-          "spread": 8.5,
-          "values": [
-            84.3,
-            77.8,
-            85.0
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 109.4,
-          "spread": 3.7,
-          "values": [
-            108.6,
-            109.4,
-            112.7
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 123.7,
-          "spread": 6.5,
-          "values": [
-            122.1,
-            123.7,
-            130.1
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T14:02:05+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 357.1,
-      "worst_spread": 8.5,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "abreshape-on",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 42.1,
-          "spread": 10.5,
-          "values": [
-            42.1,
-            43.4,
-            39.0
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 79.9,
-          "spread": 2.8,
-          "values": [
-            79.9,
-            78.5,
-            80.7
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 109.7,
-          "spread": 6.4,
-          "values": [
-            106.4,
-            109.7,
-            113.4
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 126.4,
-          "spread": 5.5,
-          "values": [
-            127.9,
-            121.0,
-            126.4
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T13:57:50+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 358.1,
-      "worst_spread": 10.5,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -1202,7 +850,6 @@
       "guarded": true,
       "sum": 426.0,
       "worst_spread": 9.7,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DENSE_ATOM_24=1`. One variable: experimental 24-atom MMA in b12x dense GEMM (default 0). Changes generated code and is keyed into the persistent compile cache. Hits `B12xFp8BlockScaledMMKernel` via `mm_block_fp8` -> `dense_gemm`. Confirmed in container env (`B12X_DENSE_ATOM_24=1`); linear selection stayed `B12xFp8BlockScaledMMKernel`.",
       "gates": {
         "gate_france": [
@@ -1269,7 +916,6 @@
       "guarded": true,
       "sum": 424.0,
       "worst_spread": 15.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DENSE_ATOM_24=1`. One variable: experimental 24-atom MMA in b12x dense GEMM (default 0). Changes generated code and is keyed into the persistent compile cache. Confirmed `B12X_DENSE_ATOM_24=1`. Re-measure of rc1 `atom24` (426.0) on this pin.",
       "gates": {
         "gate_france": [
@@ -1335,7 +981,6 @@
       "guarded": true,
       "sum": 340.7,
       "worst_spread": 5.4,
-      "detail_pass": 3,
       "change": "`ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` = `FLASHINFER_MLA_SPARSE_DSV4`, which is also the only configuration that passes the sparse-MLA autotune gate",
       "gates": {
         "gate_france": [
@@ -1401,7 +1046,6 @@
       "guarded": true,
       "sum": 424.4,
       "worst_spread": 5.7,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` = `FLASHINFER_MLA_SPARSE_DSV4`. One family: FlashInfer sparse MLA DSV4 on tagged FlashInfer `v0.7.0rc3` (rc1 used floating `main`). Confirmed in non-default args. Re-measure of rc1 `attnfi030` (431.4) on this pin.",
       "gates": {
         "gate_france": [
@@ -1468,7 +1112,6 @@
       "guarded": true,
       "sum": 431.4,
       "worst_spread": 10.6,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` = `FLASHINFER_MLA_SPARSE_DSV4`. One family: FlashInfer sparse MLA DSV4, the SM12x auto-pick on the reference fork. Never re-measured on `main-030-rc1`. SM120 DSV4 specialization is present (`has_flashinfer_sparse_mla_sm120_config` True). Boot logged `No FlashInfer SM120 sparse MLA DSv4 decode autotune cache entries found. Falling back to FlashInfer's default tactic heuristic.` \u2014 cold-cache path, same as `proto2-attnfi` on the old pin.",
       "gates": {
         "gate_france": [
@@ -1477,134 +1120,6 @@
         ],
         "gate_9x8": [
           "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "b12x13long",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 38.1,
-          "spread": 2.9,
-          "values": [
-            37.1,
-            38.1,
-            38.2
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 77.9,
-          "spread": 4.9,
-          "values": [
-            77.9,
-            81.1,
-            77.3
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 104.7,
-          "spread": 3.9,
-          "values": [
-            104.7,
-            108.5,
-            104.4
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 123.5,
-          "spread": 0.7,
-          "values": [
-            123.9,
-            123.0,
-            123.5
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T04:17:48+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 344.2,
-      "worst_spread": 4.9,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "bf16x3m",
-      "levels": {
-        "1": {
-          "n": 2,
-          "median": 37.2,
-          "spread": 9.4,
-          "values": [
-            39.0,
-            35.5
-          ]
-        },
-        "3": {
-          "n": 2,
-          "median": 71.3,
-          "spread": 0.1,
-          "values": [
-            71.4,
-            71.3
-          ]
-        },
-        "5": {
-          "n": 1,
-          "median": 75.3,
-          "spread": 0.0,
-          "values": [
-            75.3
-          ]
-        },
-        "6": {
-          "n": 1,
-          "median": 88.8,
-          "spread": 0.0,
-          "values": [
-            88.8
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T11:29:43+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 272.6,
-      "worst_spread": 9.4,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9",
-          "72package%2Fsrc"
         ]
       }
     },
@@ -1671,7 +1186,6 @@
       "guarded": true,
       "sum": 485.0,
       "worst_spread": 11.6,
-      "detail_pass": 5,
       "change": "`proto2-030-0` plus `CUDAGRAPH_CAPTURE_SIZES=[7,21,35,42,48]`, five passes, run immediately after the control `proto2-030-0b`. One variable against the control: the CUDA-graph capture sizes. With k=6 the per-level target batch is 7/21/35/42 tokens while the list still held the k=7 sizes [1,2,4,8,16,24,32,40,48], so every level padded up to the next size (7->8, 21->24, 35->40, 42->48), ~14 % wasted rows; this arm matched the graphs to the real sizes.",
       "gates": {
         "gate_france": [
@@ -1737,7 +1251,6 @@
       "guarded": true,
       "sum": 428.6,
       "worst_spread": 7.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `CUDAGRAPH_COPY_INPUTS=true`. One variable: copy CUDA-graph inputs on replay (standing False). Confirmed `cudagraph_copy_inputs': True`.",
       "gates": {
         "gate_france": [
@@ -1803,7 +1316,6 @@
       "guarded": true,
       "sum": 311.8,
       "worst_spread": 74.0,
-      "detail_pass": 3,
       "change": "`CUDAGRAPH_MODE=FULL`",
       "gates": {
         "gate_france": [
@@ -1877,7 +1389,6 @@
       "guarded": true,
       "sum": 420.6,
       "worst_spread": 8.9,
-      "detail_pass": 5,
       "change": "`wooff-rc2` + k=6 plus `CUDAGRAPH_MODE=PIECEWISE`, five passes. One variable against the standing default: piecewise-only CUDA graphs vs FULL_AND_PIECEWISE, re-measured on the new default after `cgpiece-rc2` had shown +7.2 % against the old one at three passes with a 17.8 % spread.",
       "gates": {
         "gate_france": [
@@ -1944,7 +1455,6 @@
       "guarded": true,
       "sum": 447.5,
       "worst_spread": 17.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `CUDAGRAPH_MODE=PIECEWISE`. One variable: piecewise-only CUDA graphs vs standing FULL_AND_PIECEWISE. FULL-only was a large negative on earlier pins. Confirmed `cudagraph_mode': <CUDAGraphMode.PIECEWISE: 1>`.",
       "gates": {
         "gate_france": [
@@ -2010,7 +1520,6 @@
       "guarded": true,
       "sum": 428.1,
       "worst_spread": 9.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `CUDAGRAPH_CAPTURE_SIZES=[8,24,40,48]`. One variable: explicit CUDA-graph capture sizes for protocol tokens c1=8, c3=24, c5=40, c6=48. Pin `max_cudagraph_capture_size=48`, capture_sizes unset. Confirmed `cudagraph_capture_sizes': [8, 24, 40, 48]`.",
       "gates": {
         "gate_france": [
@@ -2077,74 +1586,7 @@
       "guarded": true,
       "sum": 429.3,
       "worst_spread": 9.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `CUDAGRAPH_NUM_OF_WARMUPS=3`. One variable: CUDA-graph warmups before capture (standing 0). Confirmed `cudagraph_num_of_warmups': 3` on the APIServer compilation config (EngineCore later logs 1). Plumbing added in `scripts/05-serve.sh`.",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "chatmodelong",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 40.0,
-          "spread": 7.5,
-          "values": [
-            37.8,
-            40.8,
-            40.0
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 81.7,
-          "spread": 3.3,
-          "values": [
-            81.8,
-            81.7,
-            79.1
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 108.8,
-          "spread": 1.9,
-          "values": [
-            107.3,
-            109.4,
-            108.8
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 120.1,
-          "spread": 1.2,
-          "values": [
-            119.1,
-            120.1,
-            120.6
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T03:51:10+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 350.6,
-      "worst_spread": 7.5,
-      "detail_pass": 3,
-      "change": "",
       "gates": {
         "gate_france": [
           " Paris. The capital of Spain"
@@ -2209,7 +1651,6 @@
       "guarded": true,
       "sum": 422.6,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `CUDA_DEVICE_MAX_CONNECTIONS=8`. One variable: CUDA default instead of `env.spark.sh`'s 1. The anemll recipe does not set this. `05-serve.sh` already `-e` the name, so EXTRA overrides. Confirmed in container env (`CUDA_DEVICE_MAX_CONNECTIONS=8`).",
       "gates": {
         "gate_france": [
@@ -2276,178 +1717,10 @@
       "guarded": true,
       "sum": 424.6,
       "worst_spread": 3.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `CUDA_DEVICE_MAX_CONNECTIONS=8`. One variable: CUDA default instead of `env.spark.sh`'s 1. The anemll recipe does not set this. Confirmed `CUDA_DEVICE_MAX_CONNECTIONS=8`. Re-measure of rc1 `conn8` (422.6) on this pin.",
       "gates": {
         "gate_france": [
           " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "control",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 39.4,
-          "spread": 6.3,
-          "values": [
-            41.6,
-            39.1,
-            39.4
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 82.8,
-          "spread": 11.8,
-          "values": [
-            88.1,
-            82.8,
-            78.3
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 110.9,
-          "spread": 2.3,
-          "values": [
-            108.6,
-            111.2,
-            110.9
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 120.2,
-          "spread": 7.1,
-          "values": [
-            119.6,
-            120.2,
-            128.1
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T12:41:49+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 353.3,
-      "worst_spread": 11.8,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "dcopym",
-      "levels": {
-        "6": {
-          "n": 2,
-          "median": 122.5,
-          "spread": 0.1,
-          "values": [
-            122.5,
-            122.4
-          ]
-        }
-      },
-      "passes": 2,
-      "max_tokens": 512,
-      "start": "2026-09-12T11:58:52+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 122.5,
-      "worst_spread": 0.1,
-      "detail_pass": 2,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "dgeom7m",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 37.6,
-          "spread": 1.3,
-          "values": [
-            37.6,
-            37.9,
-            37.4
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 74.9,
-          "spread": 3.1,
-          "values": [
-            74.8,
-            77.1,
-            74.9
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 103.2,
-          "spread": 8.0,
-          "values": [
-            98.9,
-            107.2,
-            103.2
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 117.9,
-          "spread": 3.5,
-          "values": [
-            119.2,
-            117.9,
-            115.1
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T08:54:39+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 333.6,
-      "worst_spread": 8.0,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
           " Paris. The capital of Spain"
         ],
         "gate_9x8": [
@@ -2469,7 +1742,6 @@
       "guarded": true,
       "sum": 0,
       "worst_spread": 0.0,
-      "detail_pass": 3,
       "change": "`LINEAR_BACKEND=auto`, which selects `DeepGemmFp8BlockScaledMMKernel`, the kernel the reference uses for its fp8 linears",
       "gates": {
         "gate_france": [
@@ -2535,7 +1807,6 @@
       "guarded": true,
       "sum": 422.5,
       "worst_spread": 5.0,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_ENABLE_DYNAMIC_DOWN_SCALE=1`. One variable: dynamic MoE down-scale on (default False). Applied as `_dynamic_down_scale_enabled() and not is_w4a8`. DSV4 MXFP4 experts map to `quant_mode=w4a8_mx`, so this is a no-op on this pin. Confirmed in container env (`B12X_ENABLE_DYNAMIC_DOWN_SCALE=1`).",
       "gates": {
         "gate_france": [
@@ -2602,74 +1873,7 @@
       "guarded": true,
       "sum": 423.3,
       "worst_spread": 6.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `nvidia-cutlass-dsl[cu13]==4.7.1` (and `libs-base` / `libs-cu13` 4.7.1) committed as `vllm-spark-0731:main-030-rc2-dsl471`. One variable: latest tagged cutlass-dsl vs pin 4.7.0. Confirmed `nvidia-cutlass-dsl==4.7.1`.",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "fixreshape",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 39.1,
-          "spread": 2.3,
-          "values": [
-            39.1,
-            39.6,
-            38.7
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 76.4,
-          "spread": 5.2,
-          "values": [
-            74.4,
-            78.4,
-            76.4
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 82.2,
-          "spread": 32.8,
-          "values": [
-            82.2,
-            80.8,
-            107.8
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 104.6,
-          "spread": 14.9,
-          "values": [
-            97.1,
-            112.7,
-            104.6
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T12:28:58+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 302.3,
-      "worst_spread": 32.8,
-      "detail_pass": 3,
-      "change": "",
       "gates": {
         "gate_france": [
           " Paris. The capital of Spain"
@@ -2734,7 +1938,6 @@
       "guarded": true,
       "sum": 426.8,
       "worst_spread": 6.8,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--generation-config vllm` via `ARM_EXTRA_ARGS`. One variable: match the anemll recipe. Ours default `auto` loads checkpoint `generation_config.json` (`do_sample` true, temp 1.0, top_p 1.0). Protocol requests send temperature explicitly, so this may be a no-op. Confirmed in non-default args (`generation_config: vllm`).",
       "gates": {
         "gate_france": [
@@ -2800,7 +2003,6 @@
       "guarded": true,
       "sum": 427.8,
       "worst_spread": 7.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--generation-config vllm` via `ARM_EXTRA_ARGS`. One variable: match the anemll recipe. Ours default `auto` loads checkpoint `generation_config.json`. Protocol requests send temperature. Confirmed `generation_config: vllm`. Re-measure of rc1 `gencvllm` (426.8) on this pin.",
       "gates": {
         "gate_france": [
@@ -2875,7 +2077,6 @@
       "guarded": true,
       "sum": 445.1,
       "worst_spread": 7.6,
-      "detail_pass": 5,
       "change": "`hum-k6-rc2b` (humming, WO off, k=6) plus `SERVE_EXTRA_ENV=VLLM_B12X_MOE_FP4_FORCE_A16=1`, five passes. One variable against the standing default: force W4A16 on the MoE now that the backend is humming \u2014 the format anemll's `flashinfer_b12x` alias resolves to, and the lever that measured best under b12x.",
       "gates": {
         "gate_france": [
@@ -2949,7 +2150,6 @@
       "guarded": true,
       "sum": 275.1,
       "worst_spread": 83.3,
-      "detail_pass": 5,
       "change": "",
       "gates": {
         "gate_france": [
@@ -3024,7 +2224,6 @@
       "guarded": true,
       "sum": 448.9,
       "worst_spread": 13.0,
-      "detail_pass": 5,
       "change": "`wooff-rc2` + k=6 with `SERVE_EXTRA_ENV=MOE_BACKEND=humming`, five passes. **Invalid channel**: `MOE_BACKEND` is read by `scripts/05-serve.sh` on the launcher to build `--moe-backend`, so setting it as container env (`-e`) is too late and the flag still said b12x. Confirmed `moe_backend='b12x'` and zero humming lines in the engine log.",
       "gates": {
         "gate_france": [
@@ -3099,7 +2298,6 @@
       "guarded": true,
       "sum": 477.5,
       "worst_spread": 11.8,
-      "detail_pass": 5,
       "change": "`wooff-rc2` + k=6 plus `MOE_BACKEND=humming` passed through the **launcher** channel (`harness/run-arm.sh <tag> \"MOE_BACKEND=humming\"`), five passes. One variable against the standing default: the MoE backend (humming MXFP4 kernels vs b12x). Confirmed `moe_backend='humming'` in the resolved engine config. This is the correct-channel re-run of `hum-k6-rc2`, which was invalid.",
       "gates": {
         "gate_france": [
@@ -3166,7 +2364,6 @@
       "guarded": true,
       "sum": 419.4,
       "worst_spread": 12.2,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--sparse-indexer-topk-backend flashinfer` via `ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent (topk 512, our k) -> per_row; flashinfer is opt-in. Overlay scores logits in fp32, which `top_k_ragged_transform` requires. Confirmed in non-default args. First `run-arm` health window expired at 450s (FlashInfer init); protocol then ran against the live healthy container.",
       "gates": {
         "gate_france": [
@@ -3232,7 +2429,6 @@
       "guarded": true,
       "sum": 422.3,
       "worst_spread": 11.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--sparse-indexer-topk-backend flashinfer` via `ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent (topk 512) -> per_row; flashinfer is opt-in. Confirmed `sparse_indexer_topk_backend': 'flashinfer'`. First `run-arm` health window expired at 450s (CUDA-graph capture); protocol then ran against the live healthy container. Re-measure of rc1 `idxfi` (419.4) on this pin.",
       "gates": {
         "gate_france": [
@@ -3299,7 +2495,6 @@
       "guarded": true,
       "sum": 423.4,
       "worst_spread": 9.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--sparse-indexer-topk-backend per_row` via `ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent (topk 512, our k) -> per_row. `idxfi` already measured flashinfer (pin noise). deep_select needs SM100. Overlay scores logits in fp32. Confirmed in non-default args (`sparse_indexer_topk_backend: per_row`).",
       "gates": {
         "gate_france": [
@@ -3365,7 +2560,6 @@
       "guarded": true,
       "sum": 424.2,
       "worst_spread": 5.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--sparse-indexer-topk-backend per_row` via `ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent (topk 512) -> per_row. Confirmed `sparse_indexer_topk_backend': 'per_row'`. Re-measure of rc1 `idxpr` (423.4) on this pin.",
       "gates": {
         "gate_france": [
@@ -3432,7 +2626,6 @@
       "guarded": true,
       "sum": 422.8,
       "worst_spread": 4.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `USE_INDUCTOR_GRAPH_PARTITION=true`. One variable: inductor graph partition around piecewise CUDA-graph breaks (standing None/False). Confirmed `use_inductor_graph_partition': True`. Plumbing added in `scripts/05-serve.sh`.",
       "gates": {
         "gate_france": [
@@ -3499,7 +2692,6 @@
       "guarded": true,
       "sum": 433.4,
       "worst_spread": 10.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `NUM_SPECULATIVE_TOKENS=5`. One variable: DSpark k=5, the checkpoint's native block size. Protocol pin uses k=7. `proto5` on the old pin was rejected because capture missed 5x6=30; this pin captures 48, which covers 6*(5+1)=36. EXTRA overrides `run-arm.sh`'s hardcoded k=7. Confirmed `num_speculative_tokens: 5`.",
       "gates": {
         "gate_france": [
@@ -3567,7 +2759,6 @@
       "guarded": true,
       "sum": 444.0,
       "worst_spread": 6.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `NUM_SPECULATIVE_TOKENS=5`. One variable: DSpark k=5 (checkpoint block size; pin is k=7). Capture 48 covers 6*(5+1)=36. Confirmed `num_speculative_tokens': 5`. Re-measure of rc1 `k5` (c6 163.2, tokens/step fail) on this pin.",
       "gates": {
         "gate_france": [
@@ -3634,7 +2825,6 @@
       "guarded": true,
       "sum": 449.5,
       "worst_spread": 9.6,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `NUM_SPECULATIVE_TOKENS=6`. One variable: DSpark k=6, between checkpoint-native k=5 and the pin's k=7. Capture 48 covers 6*(6+1)=42. EXTRA overrides `run-arm.sh`'s hardcoded k=7. Confirmed `num_speculative_tokens: 6`. `k5` won c6 but lost tokens/step; this checks the midpoint.",
       "gates": {
         "gate_france": [
@@ -3701,7 +2891,6 @@
       "guarded": true,
       "sum": 445.6,
       "worst_spread": 10.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `NUM_SPECULATIVE_TOKENS=6`. One variable: DSpark k=6 (pin is k=7). Capture 48 covers 6*(6+1)=42. Confirmed `num_speculative_tokens: 6` in engine args. Re-measure of rc1 `k6` (449.5) on this pin.",
       "gates": {
         "gate_france": [
@@ -3713,61 +2902,389 @@
       }
     },
     {
-      "tag": "k6trustedm",
+      "tag": "kv131072",
       "levels": {
         "1": {
           "n": 3,
-          "median": 35.5,
-          "spread": 36.9,
+          "median": 59.1,
+          "spread": 5.9,
           "values": [
-            39.4,
-            26.3,
-            35.5
+            59.1,
+            56.6,
+            60.1
           ]
         },
         "3": {
           "n": 3,
-          "median": 73.6,
-          "spread": 19.3,
+          "median": 103.5,
+          "spread": 1.3,
           "values": [
-            87.2,
-            73.6,
-            73.0
+            103.0,
+            103.5,
+            104.3
           ]
         },
         "5": {
           "n": 3,
-          "median": 79.2,
-          "spread": 12.1,
+          "median": 133.3,
+          "spread": 6.1,
           "values": [
-            79.2,
-            78.0,
-            87.6
+            133.3,
+            129.6,
+            137.7
           ]
         },
         "6": {
           "n": 3,
-          "median": 88.3,
-          "spread": 22.4,
+          "median": 150.9,
+          "spread": 1.3,
           "values": [
-            88.3,
-            103.8,
-            84.0
+            150.9,
+            149.2,
+            151.2
           ]
         }
       },
       "passes": 3,
       "max_tokens": 512,
-      "start": "2026-09-12T10:51:27+08:00",
+      "start": "2026-09-22T00:25:15+08:00",
       "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 2 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
       },
-      "guarded": false,
-      "sum": 276.6,
-      "worst_spread": 36.9,
-      "detail_pass": 3,
+      "guarded": true,
+      "sum": 446.8,
+      "worst_spread": 6.1,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "kv196608",
+      "levels": {
+        "1": {
+          "n": 3,
+          "median": 56.6,
+          "spread": 9.9,
+          "values": [
+            61.3,
+            55.7,
+            56.6
+          ]
+        },
+        "3": {
+          "n": 3,
+          "median": 107.1,
+          "spread": 8.0,
+          "values": [
+            103.4,
+            112.0,
+            107.1
+          ]
+        },
+        "5": {
+          "n": 3,
+          "median": 133.9,
+          "spread": 1.7,
+          "values": [
+            133.9,
+            133.6,
+            135.9
+          ]
+        },
+        "6": {
+          "n": 3,
+          "median": 148.9,
+          "spread": 4.0,
+          "values": [
+            148.7,
+            148.9,
+            154.7
+          ]
+        }
+      },
+      "passes": 3,
+      "max_tokens": 512,
+      "start": "2026-09-22T00:33:14+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 3 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 446.5,
+      "worst_spread": 9.9,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "kv229376",
+      "levels": {
+        "1": {
+          "n": 3,
+          "median": 55.0,
+          "spread": 8.0,
+          "values": [
+            57.0,
+            55.0,
+            52.6
+          ]
+        },
+        "3": {
+          "n": 3,
+          "median": 106.9,
+          "spread": 10.0,
+          "values": [
+            102.5,
+            113.2,
+            106.9
+          ]
+        },
+        "5": {
+          "n": 3,
+          "median": 139.5,
+          "spread": 6.4,
+          "values": [
+            143.8,
+            134.9,
+            139.5
+          ]
+        },
+        "6": {
+          "n": 3,
+          "median": 152.8,
+          "spread": 5.6,
+          "values": [
+            152.4,
+            161.0,
+            152.8
+          ]
+        }
+      },
+      "passes": 3,
+      "max_tokens": 512,
+      "start": "2026-09-22T00:49:00+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 2 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 454.2,
+      "worst_spread": 10.0,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "kv245760",
+      "levels": {
+        "1": {
+          "n": 3,
+          "median": 57.1,
+          "spread": 5.6,
+          "values": [
+            59.6,
+            56.4,
+            57.1
+          ]
+        },
+        "3": {
+          "n": 3,
+          "median": 107.2,
+          "spread": 2.3,
+          "values": [
+            107.7,
+            107.2,
+            105.2
+          ]
+        },
+        "5": {
+          "n": 3,
+          "median": 137.4,
+          "spread": 2.2,
+          "values": [
+            137.4,
+            137.1,
+            140.1
+          ]
+        },
+        "6": {
+          "n": 3,
+          "median": 147.6,
+          "spread": 4.3,
+          "values": [
+            152.7,
+            147.6,
+            146.4
+          ]
+        }
+      },
+      "passes": 3,
+      "max_tokens": 512,
+      "start": "2026-09-22T00:56:26+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 2 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 449.3,
+      "worst_spread": 5.6,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "kv65536",
+      "levels": {
+        "1": {
+          "n": 3,
+          "median": 57.8,
+          "spread": 8.7,
+          "values": [
+            55.4,
+            60.4,
+            57.8
+          ]
+        },
+        "3": {
+          "n": 3,
+          "median": 107.9,
+          "spread": 2.5,
+          "values": [
+            109.0,
+            107.9,
+            106.3
+          ]
+        },
+        "5": {
+          "n": 3,
+          "median": 135.2,
+          "spread": 1.4,
+          "values": [
+            136.3,
+            134.4,
+            135.2
+          ]
+        },
+        "6": {
+          "n": 3,
+          "median": 153.5,
+          "spread": 6.3,
+          "values": [
+            157.0,
+            153.5,
+            147.4
+          ]
+        }
+      },
+      "passes": 3,
+      "max_tokens": 512,
+      "start": "2026-09-22T00:10:07+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 3 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 454.4,
+      "worst_spread": 8.7,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Italy",
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
+      "tag": "kv98304",
+      "levels": {
+        "1": {
+          "n": 3,
+          "median": 59.8,
+          "spread": 9.9,
+          "values": [
+            59.8,
+            55.8,
+            61.7
+          ]
+        },
+        "3": {
+          "n": 3,
+          "median": 109.7,
+          "spread": 4.1,
+          "values": [
+            107.0,
+            109.7,
+            111.5
+          ]
+        },
+        "5": {
+          "n": 3,
+          "median": 136.2,
+          "spread": 0.8,
+          "values": [
+            136.2,
+            136.4,
+            135.3
+          ]
+        },
+        "6": {
+          "n": 3,
+          "median": 157.6,
+          "spread": 4.9,
+          "values": [
+            157.6,
+            161.6,
+            153.9
+          ]
+        }
+      },
+      "passes": 3,
+      "max_tokens": 512,
+      "start": "2026-09-22T00:17:53+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 2 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 463.3,
+      "worst_spread": 9.9,
       "change": "",
       "gates": {
         "gate_france": [
@@ -3834,7 +3351,6 @@
       "guarded": true,
       "sum": 433.2,
       "worst_spread": 5.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_KV_CACHE_LAYOUT=BLNHC`. One variable: the other legal layout vs standing auto BLHNC. `kvlbnhc-rc2` died: LBNHC is illegal; valid layouts are `['BLHNC', 'BLNHC']`. Confirmed `VLLM_KV_CACHE_LAYOUT=BLNHC`.",
       "gates": {
         "gate_france": [
@@ -3859,7 +3375,6 @@
       "guarded": true,
       "sum": 0,
       "worst_spread": 0.0,
-      "detail_pass": 2,
       "change": "`LINEAR_BACKEND=flashinfer_cutedsl`, which logs `has no kernel for this linear layer type` and falls back to automatic selection, i.e. to the same DeepGEMM path",
       "gates": {
         "gate_france": [
@@ -3925,7 +3440,6 @@
       "guarded": true,
       "sum": 416.4,
       "worst_spread": 10.2,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `LINEAR_BACKEND=triton`. One variable: FP8 linear via `TritonFp8BlockScaledMMKernel` (`is_supported` returns True on CUDA). MoE stays b12x. Linear family so far: b12x works, deep_gemm worse/unstable, humming/marlin die on O-proj, torch block-scaled is Hopper-only, flashinfer_b12x is NVFP4-only. Engine log: `Selected TritonFp8BlockScaledMMKernel for Fp8LinearMethod`.",
       "gates": {
         "gate_france": [
@@ -3991,7 +3505,6 @@
       "guarded": true,
       "sum": 415.6,
       "worst_spread": 5.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `LINEAR_BACKEND=triton`. One variable: FP8 linear via `TritonFp8BlockScaledMMKernel`. MoE stays b12x. Confirmed `linear_backend: triton`. Re-measure of rc1 `lintri` (416.4) on this pin.",
       "gates": {
         "gate_france": [
@@ -4058,7 +3571,6 @@
       "guarded": true,
       "sum": 424.1,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--load-format safetensors` via `ARM_EXTRA_ARGS`. One variable: pin `LOAD_FORMAT=instanttensor` is sourced after EXTRA, so env override cannot win. Anemll uses `load_format=auto`. InstantTensor env knobs already closed. Confirmed `load_format': 'safetensors'`.",
       "gates": {
         "gate_france": [
@@ -4124,7 +3636,6 @@
       "guarded": true,
       "sum": 425.5,
       "worst_spread": 14.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--long-prefill-token-threshold 1024` via `ARM_EXTRA_ARGS`. One variable: the pin already names `LONG_PREFILL_TOKEN_THRESHOLD=1024` and the reference recipe passes the flag, but `05-serve.sh` never forwarded it. vLLM default is 0. Confirmed in non-default args (`long_prefill_token_threshold: 1024`).",
       "gates": {
         "gate_france": [
@@ -4191,7 +3702,6 @@
       "guarded": true,
       "sum": 425.5,
       "worst_spread": 7.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--long-prefill-token-threshold 1024` via `ARM_EXTRA_ARGS`. One variable: pin already names `LONG_PREFILL_TOKEN_THRESHOLD=1024` and the anemll recipe passes the flag, but `05-serve.sh` never forwards it. vLLM default is 0. Confirmed `long_prefill_token_threshold': 1024`. Re-measure of rc1 `lpf1024` (425.5) on this pin.",
       "gates": {
         "gate_france": [
@@ -4257,7 +3767,6 @@
       "guarded": true,
       "sum": 424.9,
       "worst_spread": 6.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `MAX_MODEL_LEN=32768`. One variable: manager max seq len. Pin is 65536; anemll uses 262144. Protocol gens 512, so 32k is plenty. Smaller page table for overlay sparse indexer. Confirmed `max_model_len': 32768`.",
       "gates": {
         "gate_france": [
@@ -4324,7 +3833,6 @@
       "guarded": true,
       "sum": 425.2,
       "worst_spread": 9.1,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. One variable: disable v0.30's CUDA-graph memory profiler (default on; maps 0.8389 to effective 0.8115). `util8663` compensated by raising the util number; this turns the profiler off at the standing 0.8389. Env confirmed; Available KV 13.36 GiB vs 9.39 GiB with the profiler on.",
       "gates": {
         "gate_france": [
@@ -4390,7 +3898,6 @@
       "guarded": true,
       "sum": 419.6,
       "worst_spread": 10.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. One variable: disable v0.30 CUDA-graph memory profiler (default on; maps 0.8389 to effective 0.8115). `util8663-rc2` raised the util number; this turns the profiler off at standing 0.8389. Confirmed `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. Re-measure of rc1 `memprof0` (425.2) on this pin.",
       "gates": {
         "gate_france": [
@@ -4456,7 +3963,6 @@
       "guarded": true,
       "sum": 431.0,
       "worst_spread": 10.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus bind-mount of patched `b12x/moe/fused_moe/_impl.py`: `_MICRO_MAX_TOKENS` 8\u219248 and `_MICRO_DYNAMIC_CUTOVER_PAIRS_DEFAULT` 64\u2192320. One variable: extend native micro MoE so protocol c6 (48 tok \u00d7 topk 6 = 288) stays micro. Native b12x has no static kernel; FlashInfer static IMA'd on live MXFP4. Confirmed overlay `_MICRO_MAX_TOKENS = 48`.",
       "gates": {
         "gate_france": [
@@ -4522,7 +4028,6 @@
       "guarded": true,
       "sum": 353.2,
       "worst_spread": 7.5,
-      "detail_pass": 3,
       "change": "`MOE_BACKEND=humming`",
       "gates": {
         "gate_france": [
@@ -4589,7 +4094,6 @@
       "guarded": true,
       "sum": 446.3,
       "worst_spread": 10.2,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable: select `B12X_MXFP4_BF16` instead of the pin's `B12X_MXFP4_MXFP8`. Reference (anemll 0.1.1, b12x 0.15.3) logs `Using 'B12X_MXFP4'` with activation_key None (BF16). Older library is banned; this is the analogue on 1.2.6. `proto2-a16` was a wash on the old pin. Engine log: `Using 'B12X_MXFP4_BF16' Mxfp4 MoE backend`.",
       "gates": {
         "gate_france": [
@@ -4655,7 +4159,6 @@
       "guarded": true,
       "sum": 453.7,
       "worst_spread": 7.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable: b12x MXFP4 with BF16 activations (`B12X_MXFP4_BF16`). Confirmed in the engine log. Re-measure of rc1 `moea16` (446.3) on this pin.",
       "gates": {
         "gate_france": [
@@ -4721,7 +4224,6 @@
       "guarded": true,
       "sum": 424.3,
       "worst_spread": 9.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. One variable: the b12x dynamic MoE cluster cap. Offline sweep priced 175 at 0.941x the flat-188 time at 288 routed rows; 175 is also the reference's static cap at c6. First boot died at `_check_enough_kv_cache_memory` (9.39 GiB available vs 9.48 GiB needed); retry served.",
       "gates": {
         "gate_france": [
@@ -4787,7 +4289,6 @@
       "guarded": true,
       "sum": 422.4,
       "worst_spread": 8.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. One variable: match the reference static kernel's 175-cluster cap at the c6 band (288 routed rows). Pin decode policy is a flat 188 up to 640. Confirmed `B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. Re-measure of rc1 `moecap175` on this pin.",
       "gates": {
         "gate_france": [
@@ -4853,7 +4354,6 @@
       "guarded": true,
       "sum": 425.9,
       "worst_spread": 5.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_DYNAMIC_CUTOVER_PAIRS=32`. One variable: micro vs dynamic routed-row cutover (default 64). Dispatch is `num_tokens<=8` and `routed_rows < cutover`. Protocol c1 is 8 tok x topk 6 = 48 pairs, so only c1 is micro at default. Cutover 32 sends c1 to dynamic. Confirmed `B12X_MICRO_DYNAMIC_CUTOVER_PAIRS=32`.",
       "gates": {
         "gate_france": [
@@ -4919,7 +4419,6 @@
       "guarded": true,
       "sum": 448.3,
       "worst_spread": 8.8,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `MOE_BACKEND=humming`. One variable: the MXFP4 oracle's humming expert path (`HUMMING` / indexed gemm). Device gate is SM75+; `has_humming()` is true in this image. Prior `moe_humming` (353.2) was on the old protog pin, never re-measured on `main-030-rc1`. Engine log: `Using 'HUMMING' Mxfp4 MoE backend`.",
       "gates": {
         "gate_france": [
@@ -4985,7 +4484,6 @@
       "guarded": true,
       "sum": 445.5,
       "worst_spread": 4.7,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `MOE_BACKEND=humming`. One variable: humming MXFP4 MoE (image humming-kernels 0.1.15). Confirmed humming GEMM config override in the engine log. Re-measure of rc1 `moehum` (448.3) on this pin.",
       "gates": {
         "gate_france": [
@@ -5051,7 +4549,6 @@
       "guarded": true,
       "sum": 455.3,
       "worst_spread": 4.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `MOE_BACKEND=marlin`. One variable: the MXFP4 oracle's Marlin expert path (`MARLIN` / `MarlinExperts`, SM75+). Never measured on this pin. Engine log: `Using 'MARLIN' Mxfp4 MoE backend`.",
       "gates": {
         "gate_france": [
@@ -5118,7 +4615,6 @@
       "guarded": true,
       "sum": 420.8,
       "worst_spread": 4.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. One variable: force the W4A8 shared-input producer on. Default is on only when dense or decode candidate is true; decode candidate requires routed_rows <= 64, so only c1. c3-c6 (144-288 rows) default off. Env confirmed in the container.",
       "gates": {
         "gate_france": [
@@ -5185,7 +4681,6 @@
       "guarded": true,
       "sum": 422.8,
       "worst_spread": 13.5,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. One variable: force the W4A8 shared-input producer on. Default is on only when dense or decode candidate is true; decode candidate requires routed_rows <= 64, so only c1. Confirmed `B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. Re-measure of rc1 `moeshare` (420.8) on this pin.",
       "gates": {
         "gate_france": [
@@ -5251,7 +4746,6 @@
       "guarded": true,
       "sum": 424.2,
       "worst_spread": 3.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=32x128`. One variable: the b12x dynamic MoE tile. Auto planner returns (16, 128) for the whole protocol band (48-288 routed rows). `64x128` was already a wash (`proto2-moetile`); M32 is the W4A8 ladder's next tactic. Env confirmed in the container.",
       "gates": {
         "gate_france": [
@@ -5317,7 +4811,6 @@
       "guarded": true,
       "sum": 422.0,
       "worst_spread": 8.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=32x128`. One variable: remaining W4A8 tile after auto (16, 128), 64x128, and 128x128. Confirmed `B12X_DYNAMIC_TILE_MN=32x128`. Re-measure of rc1 `moetile32` (424.2) on this pin.",
       "gates": {
         "gate_france": [
@@ -5384,7 +4877,6 @@
       "guarded": true,
       "sum": 430.6,
       "worst_spread": 12.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=64x128`. One variable: force W4A8 dynamic tile M64 vs auto M16/M32 on GB10. 32x128 and 128x128 already measured on this pin. Confirmed `B12X_DYNAMIC_TILE_MN=64x128`.",
       "gates": {
         "gate_france": [
@@ -5451,7 +4943,6 @@
       "guarded": true,
       "sum": 424.2,
       "worst_spread": 6.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_TILE_MN=16x128`. One variable: micro MoE tile. Default is 64x128; 32x128 was pin noise; 128x128 died at KV floor. Confirmed `B12X_MOE_TILE_MN=16x128`.",
       "gates": {
         "gate_france": [
@@ -5518,7 +5009,6 @@
       "guarded": true,
       "sum": 427.5,
       "worst_spread": 17.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_TILE_MN=32x128`. One variable: micro MoE tile. `B12X_MOE_TILE_MN` gates `_select_micro_mma_tiler_mn` (c1, below the 64-row cutover). Default is 64x128; 128x128 died at KV floor. Confirmed `B12X_MOE_TILE_MN=32x128`.",
       "gates": {
         "gate_france": [
@@ -5585,7 +5075,6 @@
       "guarded": true,
       "sum": 432.7,
       "worst_spread": 11.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_WARM_MS=8,24,40,48`. One variable: MoE warm-run sizes for protocol tokens c1=8, c3=24, c5=40, c6=48 (default 1,2,3,4,5,8 plus inferred capture sizes). Confirmed `B12X_MOE_WARM_MS=8,24,40,48`.",
       "gates": {
         "gate_france": [
@@ -5652,7 +5141,6 @@
       "guarded": true,
       "sum": 426.8,
       "worst_spread": 6.6,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. One variable: the b12x dynamic MoE work source. Library default is `materialized_queue`; `persistent_grid` is documented as arithmetic striding for A/B. Env confirmed in the container.",
       "gates": {
         "gate_france": [
@@ -5719,7 +5207,6 @@
       "guarded": true,
       "sum": 431.2,
       "worst_spread": 10.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. One variable: b12x dynamic MoE work source. Library default is `materialized_queue`; `persistent_grid` is arithmetic striding. Confirmed `B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. Re-measure of rc1 `moework` (426.8) on this pin.",
       "gates": {
         "gate_france": [
@@ -5785,7 +5272,6 @@
       "guarded": true,
       "sum": 428.8,
       "worst_spread": 10.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_AR_ALGORITHM=1`. One variable: IB adaptive routing. Distinct from `ncclring-rc2` (`NCCL_ALGO=Ring`, worse at c6). Confirmed `NCCL_IB_AR_ALGORITHM=1`.",
       "gates": {
         "gate_france": [
@@ -5852,7 +5338,6 @@
       "guarded": true,
       "sum": 432.7,
       "worst_spread": 9.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_BUFFSIZE=1048576`. One variable: NCCL buffer 1 MiB vs default 4 MiB. Standing TP2 all-reduce is PYNCCL. SYMM_MEM needs world_size>=4 so TP2 skips. Confirmed `NCCL_BUFFSIZE=1048576`.",
       "gates": {
         "gate_france": [
@@ -5919,7 +5404,6 @@
       "guarded": true,
       "sum": 423.9,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_MAX_NCHANNELS=1`. One variable: NCCL channel count. Standing TP2 all-reduce is PYNCCL. `NCCL_PROTO=LL` was a large cost; one channel is a different lever for 87 small all-reduce calls. Confirmed `NCCL_MAX_NCHANNELS=1`.",
       "gates": {
         "gate_france": [
@@ -5985,7 +5469,6 @@
       "guarded": true,
       "sum": 420.0,
       "worst_spread": 18.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CHECKS_DISABLE=1`. One variable: disable NCCL argument checks on every collective. Standing TP2 all-reduce is PYNCCL. Confirmed `NCCL_CHECKS_DISABLE=1`.",
       "gates": {
         "gate_france": [
@@ -6052,7 +5535,6 @@
       "guarded": true,
       "sum": 421.6,
       "worst_spread": 7.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_COLLNET_ENABLE=0`. One variable: disable NCCL CollNet in-network collectives. Standing TP2 all-reduce is PYNCCL over two-host RoCE. Confirmed `NCCL_COLLNET_ENABLE=0`.",
       "gates": {
         "gate_france": [
@@ -6118,7 +5600,6 @@
       "guarded": true,
       "sum": 420.9,
       "worst_spread": 5.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CUMEM_ENABLE=0`. One variable: disable NCCL cuMemMap allocations. GB10 is UMA; default cuMem can fragment host-device unified memory. Standing TP2 all-reduce is PYNCCL. Confirmed `NCCL_CUMEM_ENABLE=0`.",
       "gates": {
         "gate_france": [
@@ -6184,7 +5665,6 @@
       "guarded": true,
       "sum": 418.2,
       "worst_spread": 8.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_LAUNCH_MODE=GROUP`. One variable: NCCL CUDA launch mode GROUP vs default PARALLEL. Standing TP2 all-reduce is PYNCCL. Eager profile priced 87 all-reduce calls at 81.3 ms gpu_sum on live c1. Confirmed `NCCL_LAUNCH_MODE=GROUP`.",
       "gates": {
         "gate_france": [
@@ -6251,7 +5731,6 @@
       "guarded": true,
       "sum": 426.5,
       "worst_spread": 11.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1`. One variable: name both ACTIVE RoCE HCAs. Standing `NCCL_IB_HCA` is empty (auto). Confirmed `NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1`.",
       "gates": {
         "gate_france": [
@@ -6317,7 +5796,6 @@
       "guarded": true,
       "sum": 420.9,
       "worst_spread": 6.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PROTO=LL,Simple`. One variable: enable LL as an option, keep Simple for large messages. Exclusive `NCCL_PROTO=LL` (`nccpll-rc2`) was a large cost. Anemll nsys landed on RING_LL; exclusive LL is not that. Confirmed `NCCL_PROTO=LL,Simple`.",
       "gates": {
         "gate_france": [
@@ -6384,7 +5862,6 @@
       "guarded": true,
       "sum": 415.4,
       "worst_spread": 8.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_MIN_NCHANNELS=2`. One variable: raise NCCL channel floor. Complementary to `ncclch1-rc2` (`NCCL_MAX_NCHANNELS=1`, pin noise). Confirmed `NCCL_MIN_NCHANNELS=2`.",
       "gates": {
         "gate_france": [
@@ -6451,7 +5928,6 @@
       "guarded": true,
       "sum": 416.7,
       "worst_spread": 12.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NET=IB`. One variable: force NCCL NET=IB vs auto. Complementary to `ncclplug0-rc2` (NET_PLUGIN=none, pin noise). Confirmed `NCCL_NET=IB`.",
       "gates": {
         "gate_france": [
@@ -6518,7 +5994,6 @@
       "guarded": true,
       "sum": 422.1,
       "worst_spread": 12.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NSOCKS_PERTHREAD=4`. One variable: NCCL sockets per helper thread. Complementary to `ncclsock4-rc2` (`NCCL_SOCKET_NTHREADS=4`, a c6 cost). Confirmed `NCCL_NSOCKS_PERTHREAD=4`.",
       "gates": {
         "gate_france": [
@@ -6584,7 +6059,6 @@
       "guarded": true,
       "sum": 425.6,
       "worst_spread": 6.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NTHREADS=64`. One variable: NCCL thread count. Standing TP2 all-reduce is PYNCCL. Exclusive LL was a large cost; LL,Simple / MAX_NCHANNELS=1 / ALGO=Ring were pin noise or worse at c6. Confirmed `NCCL_NTHREADS=64`.",
       "gates": {
         "gate_france": [
@@ -6650,7 +6124,6 @@
       "guarded": true,
       "sum": 440.6,
       "worst_spread": 13.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_P2P_DISABLE=1`. One variable: disable NCCL CUDA P2P. Standing TP2 all-reduce is PYNCCL across two hosts; CUDA-IPC does not work across nodes. Confirmed `NCCL_P2P_DISABLE=1`.",
       "gates": {
         "gate_france": [
@@ -6717,7 +6190,6 @@
       "guarded": true,
       "sum": 420.0,
       "worst_spread": 4.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NCHANNELS_PER_NET_PEER=2`. One variable: NCCL channels per net peer. Complementary to `ncclch1-rc2` / `ncclmin2-rc2`. Confirmed `NCCL_NCHANNELS_PER_NET_PEER=2`.",
       "gates": {
         "gate_france": [
@@ -6784,7 +6256,6 @@
       "guarded": true,
       "sum": 429.4,
       "worst_spread": 10.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NET_PLUGIN=none`. One variable: disable external NCCL NET plugins. Complementary to `ncclcnet0-rc2` (CollNet off, pin noise). Confirmed `NCCL_NET_PLUGIN=none`.",
       "gates": {
         "gate_france": [
@@ -6851,7 +6322,6 @@
       "guarded": true,
       "sum": 427.9,
       "worst_spread": 7.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PXN_DISABLE=1`. One variable: disable NCCL PXN (proxy NIC). Standing TP2 all-reduce is PYNCCL over two-host RoCE. Confirmed `NCCL_PXN_DISABLE=1`.",
       "gates": {
         "gate_france": [
@@ -6918,7 +6388,6 @@
       "guarded": true,
       "sum": 438.7,
       "worst_spread": 8.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_QPS_PER_CONNECTION=4`. One variable: IB queue pairs per connection (default 1). Standing TP2 all-reduce is PYNCCL over RoCE. Confirmed `NCCL_IB_QPS_PER_CONNECTION=4`.",
       "gates": {
         "gate_france": [
@@ -6985,7 +6454,6 @@
       "guarded": true,
       "sum": 421.8,
       "worst_spread": 9.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_RETRY_CNT=1`. One variable: IB retry count 1 vs default 7. Standing TP2 all-reduce is PYNCCL over RoCE. Confirmed `NCCL_IB_RETRY_CNT=1`.",
       "gates": {
         "gate_france": [
@@ -7051,7 +6519,6 @@
       "guarded": true,
       "sum": 421.5,
       "worst_spread": 12.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_ALGO=Ring`. One variable: NCCL algorithm Ring vs auto (Tree for small). Anemll nsys landed on RING_LL. Exclusive `NCCL_PROTO=LL` was a large cost; LL,Simple and MAX_NCHANNELS=1 were pin noise. Confirmed `NCCL_ALGO=Ring`.",
       "gates": {
         "gate_france": [
@@ -7117,7 +6584,6 @@
       "guarded": true,
       "sum": 416.5,
       "worst_spread": 11.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_SHM_DISABLE=1`. One variable: disable NCCL shared-memory / CUDA-IPC path. Standing TP2 all-reduce is PYNCCL across two hosts; SHM is intra-node. Confirmed `NCCL_SHM_DISABLE=1`.",
       "gates": {
         "gate_france": [
@@ -7183,7 +6649,6 @@
       "guarded": true,
       "sum": 425.9,
       "worst_spread": 10.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_SL=0`. One variable: IB service level 0. Complementary to `nccltc106-rc2` (TC 106, pin noise). Confirmed `NCCL_IB_SL=0`.",
       "gates": {
         "gate_france": [
@@ -7250,7 +6715,6 @@
       "guarded": true,
       "sum": 417.4,
       "worst_spread": 7.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_SOCKET_NTHREADS=4`. One variable: NCCL socket helper threads (default 1). Standing TP2 all-reduce is PYNCCL over RoCE. Confirmed `NCCL_SOCKET_NTHREADS=4`.",
       "gates": {
         "gate_france": [
@@ -7316,7 +6780,6 @@
       "guarded": true,
       "sum": 424.0,
       "worst_spread": 6.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_TC=106`. One variable: IB traffic class 106 (DSCP 26). Standing TP2 all-reduce is PYNCCL over RoCE. Confirmed `NCCL_IB_TC=106`.",
       "gates": {
         "gate_france": [
@@ -7383,7 +6846,6 @@
       "guarded": true,
       "sum": 429.5,
       "worst_spread": 11.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_TIMEOUT=22`. One variable: IB timeout 22 vs default 18. Standing TP2 all-reduce is PYNCCL over RoCE. Confirmed `NCCL_IB_TIMEOUT=22`.",
       "gates": {
         "gate_france": [
@@ -7450,7 +6912,6 @@
       "guarded": true,
       "sum": 431.1,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CROSSNIC=1`. One variable: NCCL CrossNIC across both UP RoCE ports. Standing `SPARK_IFACES` is `enp1s0f1np1` only; both sparks also have `enP2p1s0f1np1` UP. Confirmed `NCCL_CROSSNIC=1`.",
       "gates": {
         "gate_france": [
@@ -7516,75 +6977,7 @@
       "guarded": true,
       "sum": 352.3,
       "worst_spread": 8.8,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PROTO=LL`. One variable: NCCL low-latency protocol. Standing TP2 all-reduce is PYNCCL (FlashInfer MNNVL needs NVSwitch; FLASHINFER_PCIE_IPC is same-node CUDA-IPC). Eager profile priced 87 all-reduce calls at 81.3 ms gpu_sum on live c1. Confirmed `NCCL_PROTO=LL`.",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "noa16m",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 41.2,
-          "spread": 17.5,
-          "values": [
-            41.2,
-            44.8,
-            37.6
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 74.1,
-          "spread": 11.9,
-          "values": [
-            66.7,
-            75.5,
-            74.1
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 90.7,
-          "spread": 25.1,
-          "values": [
-            68.5,
-            90.7,
-            91.3
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 86.9,
-          "spread": 18.1,
-          "values": [
-            100.4,
-            84.7,
-            86.9
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-12T09:23:21+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 292.9,
-      "worst_spread": 25.1,
-      "detail_pass": 3,
-      "change": "",
       "gates": {
         "gate_france": [
           " Paris. The capital of Italy",
@@ -7650,7 +7043,6 @@
       "guarded": true,
       "sum": 417.5,
       "worst_spread": 9.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `VLLM_USE_AOT_COMPILE=0`. One variable: AOT compile cache off (pin defaults it on). `proto2-compile` tried this on an earlier pin and still resolved `CompilationMode.NONE`. Confirmed `VLLM_USE_AOT_COMPILE=0` in the container; resolved config still `CompilationMode.NONE`.",
       "gates": {
         "gate_france": [
@@ -7716,7 +7108,6 @@
       "guarded": true,
       "sum": 423.1,
       "worst_spread": 11.8,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--no-async-scheduling` via `ARM_EXTRA_ARGS`. One variable: drop async scheduling. `run-arm.sh` always prepends `--async-scheduling`; the BooleanOptionalAction last-flag wins (`async_scheduling: False`). The anemll recipe also enables async scheduling. Never isolated off on `main-030-rc1`.",
       "gates": {
         "gate_france": [
@@ -7783,7 +7174,6 @@
       "guarded": true,
       "sum": 418.5,
       "worst_spread": 12.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--no-async-scheduling` via `ARM_EXTRA_ARGS`. One variable: drop async scheduling. `run-arm.sh` always prepends `--async-scheduling`; BooleanOptionalAction last-flag wins. The anemll recipe also enables async scheduling. Confirmed `async_scheduling': False`. Re-measure of rc1 `noasync` (423.1) on this pin.",
       "gates": {
         "gate_france": [
@@ -7850,7 +7240,6 @@
       "guarded": true,
       "sum": 424.0,
       "worst_spread": 12.0,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--disable-custom-all-reduce` via `ARM_EXTRA_ARGS`. One variable: match anemll `disable_custom_all_reduce=True`. Eager profile priced 87 all-reduce calls at 81.3 ms gpu_sum on live c1. Confirmed `disable_custom_all_reduce': True`. Re-measure of `proto2-dg-nocar` (negative) on this pin.",
       "gates": {
         "gate_france": [
@@ -7916,7 +7305,6 @@
       "guarded": true,
       "sum": 424.4,
       "worst_spread": 16.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_FAST_MATH=0`. One variable: disable b12x MoE fast-math (default True). Keyed into the dynamic W4A8 kernel cache. Confirmed in container env (`B12X_FAST_MATH=0`); linear stayed `B12xFp8BlockScaledMMKernel`, MoE stayed `B12X_MXFP4_MXFP8`. Warm FLASHINFER MLA autotune was skipped this round: the 0.7.0 cache JSON is metadata-only (499 B, no tactic entries), so a rerun would still hit the default heuristic.",
       "gates": {
         "gate_france": [
@@ -7983,7 +7371,6 @@
       "guarded": true,
       "sum": 423.4,
       "worst_spread": 5.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_FAST_MATH=0`. One variable: disable b12x MoE fast-math (default True). Keyed into the dynamic W4A8 kernel cache. Confirmed `B12X_FAST_MATH=0`. Re-measure of rc1 `nofast` (424.4) on this pin.",
       "gates": {
         "gate_france": [
@@ -8050,7 +7437,6 @@
       "guarded": true,
       "sum": 340.3,
       "worst_spread": 3.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `VLLM_B12X_INDEXER_DIRECT_GATHER=0`. One variable: packed-indexer direct gather off. Default 1 in `05-serve.sh`. Proto-era +27 % win. Never isolated off on `main-030-rc1`. Overlay still scores logits via `logits_paged`. Confirmed in container env (`VLLM_B12X_INDEXER_DIRECT_GATHER=0`).",
       "gates": {
         "gate_france": [
@@ -8116,7 +7502,6 @@
       "guarded": true,
       "sum": 423.0,
       "worst_spread": 7.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DISABLE_BF16_GEMV=1`. One variable: BF16 small-N GEMV off (default on). Path covers N<=1024, K>=1024; DSV4 O-proj is o_lora_rank 1024. Confirmed `B12X_DISABLE_BF16_GEMV=1`.",
       "gates": {
         "gate_france": [
@@ -8182,7 +7567,6 @@
       "guarded": true,
       "sum": 423.4,
       "worst_spread": 9.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_PAGED_GQA6_COMPACT_SYNC=0`. One variable: GQA6 compact-sync decode fastpath off (default 1). DSV4 is GQA 6; overlay `B12X_MLA_SPARSE` decode goes through the paged indexer. Confirmed `B12X_PAGED_GQA6_COMPACT_SYNC=0`.",
       "gates": {
         "gate_france": [
@@ -8248,7 +7632,6 @@
       "guarded": true,
       "sum": 427.3,
       "worst_spread": 8.0,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_DSV4_H16_NATIVE=0`. One variable: force DSV4 H16 native decode off. Unset is auto; on Spark (48 SMs) auto turns H16 on for many-chunk / batched-row decode. Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Confirmed in container env (`B12X_MLA_SM120_DSV4_H16_NATIVE=0`).",
       "gates": {
         "gate_france": [
@@ -8314,7 +7697,6 @@
       "guarded": true,
       "sum": 424.7,
       "worst_spread": 7.7,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_INDEXER_DIRECT_K=0`. One variable: fused-indexer direct-K score off (default 1). Kill-switch restores the staged pipeline. Distinct from closed `VLLM_B12X_INDEXER_DIRECT_GATHER`. Confirmed `B12X_INDEXER_DIRECT_K=0`.",
       "gates": {
         "gate_france": [
@@ -8381,7 +7763,6 @@
       "guarded": true,
       "sum": 67.3,
       "worst_spread": 9.1,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_ENABLE_MULTICTA=0`. One variable: disable dynamic MoE multi-CTA (default 1). Off forces `effective_mac=1`. On, DSV4F TP2 decode (E=256, k=6144, n=1024, 24-48 routed rows) caps at 24 resident CTAs and may double occupancy for compact tile_m<=32. Confirmed in container env (`B12X_DYNAMIC_ENABLE_MULTICTA=0`). Linear stayed `B12xFp8BlockScaledMMKernel`.",
       "gates": {
         "gate_france": [
@@ -8447,7 +7828,6 @@
       "guarded": true,
       "sum": 422.2,
       "worst_spread": 11.5,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MSA_DECODE_PAGEMAX=0`. One variable: MSA scheduled page-max decode off (default 1). Overlay scores DSA indexer logits via `logits_paged`. Confirmed `B12X_MSA_DECODE_PAGEMAX=0`.",
       "gates": {
         "gate_france": [
@@ -8513,7 +7893,6 @@
       "guarded": true,
       "sum": 418.3,
       "worst_spread": 8.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `--no-enable-prefix-caching` via `ARM_EXTRA_ARGS`. One variable: prefix cache off. Pin sets `ENABLE_PREFIX_CACHING=1`; vLLM default is already True. BooleanOptionalAction last-flag wins over `05-serve.sh`'s `--enable-prefix-caching`. Protocol reuses one prompt across levels. Confirmed `enable_prefix_caching: False`.",
       "gates": {
         "gate_france": [
@@ -8580,7 +7959,6 @@
       "guarded": true,
       "sum": 423.1,
       "worst_spread": 6.6,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `--no-enable-prefix-caching` via `ARM_EXTRA_ARGS`. One variable: prefix cache off. Pin sets `ENABLE_PREFIX_CACHING=1`; vLLM default is already True. Protocol reuses one prompt across levels. Confirmed `enable_prefix_caching': False`. Re-measure of rc1 `nopfx` (418.3) on this pin.",
       "gates": {
         "gate_france": [
@@ -8646,7 +8024,6 @@
       "guarded": true,
       "sum": 420.7,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DENSE_PER_ROW_IN_KERNEL=0`. One variable: dense per-row GS host chain instead of in-kernel (default 1). Bit-identical by construction. Confirmed `B12X_DENSE_PER_ROW_IN_KERNEL=0`.",
       "gates": {
         "gate_france": [
@@ -8712,7 +8089,6 @@
       "guarded": true,
       "sum": 426.0,
       "worst_spread": 5.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_REUSE_COMPILED=0`. One variable: micro MoE compiled-kernel reuse off (default 1). Micro owns the tiny tail below the 64 routed-row cutover (protocol c1). Confirmed `B12X_MICRO_REUSE_COMPILED=0`.",
       "gates": {
         "gate_france": [
@@ -8778,7 +8154,6 @@
       "guarded": true,
       "sum": 424.8,
       "worst_spread": 11.6,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. One variable: disable micro MoE shared-input across experts (default 1). Fires on W4A8 micro when activation is silu/relu2, m==1, and a1_gscale is a scalar (protocol c1 is m=1 decode). Confirmed in container env. Linear stayed `B12xFp8BlockScaledMMKernel`.",
       "gates": {
         "gate_france": [
@@ -8845,7 +8220,6 @@
       "guarded": true,
       "sum": 423.6,
       "worst_spread": 7.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. One variable: disable micro MoE shared-input across experts (default 1). Fires on W4A8 micro at m=1 (protocol c1). Confirmed `B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. Re-measure of rc1 `noshare` (424.8) on this pin.",
       "gates": {
         "gate_france": [
@@ -8911,7 +8285,6 @@
       "guarded": true,
       "sum": 427.7,
       "worst_spread": 9.7,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_INDEXER_STREAM_SCORER=0`. One variable: indexer stream scorer off (unset defaults True). Overlay scores DSA indexer logits via `logits_paged` -> `run_paged_logits_kernel`; the tiled/supertile path gates stream-scorer on this env. Confirmed in container env (`B12X_INDEXER_STREAM_SCORER=0`).",
       "gates": {
         "gate_france": [
@@ -8977,7 +8350,6 @@
       "guarded": true,
       "sum": 427.7,
       "worst_spread": 7.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_INDEXER_STREAM_SCORER=0`. One variable: indexer stream scorer off (default True). Overlay scores DSA indexer logits via `logits_paged`. Confirmed `B12X_INDEXER_STREAM_SCORER=0`. Re-measure of rc1 `nostream` on this pin.",
       "gates": {
         "gate_france": [
@@ -9043,7 +8415,6 @@
       "guarded": true,
       "sum": 426.1,
       "worst_spread": 8.9,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_W4A8_TINY_DECODE=0`. One variable: W4A8 tiny-decode off (default 1). On SM121 DSV4F (k=6144, n=1024) the tiny path is excluded for `num_tokens>=3`, so it only owns c1 (m=1). Confirmed in container env (`B12X_W4A8_TINY_DECODE=0`).",
       "gates": {
         "gate_france": [
@@ -9110,7 +8481,6 @@
       "guarded": true,
       "sum": 426.2,
       "worst_spread": 7.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_W4A8_TINY_DECODE=0`. One variable: W4A8 tiny-decode off (default 1). On SM121 DSV4F the tiny path is excluded for `num_tokens>=3`, so it only owns c1 (m=1). Confirmed `B12X_W4A8_TINY_DECODE=0`. Re-measure of rc1 `notiny` (426.1) on this pin.",
       "gates": {
         "gate_france": [
@@ -9176,7 +8546,6 @@
       "guarded": true,
       "sum": 423.1,
       "worst_spread": 8.9,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DENSE_SPLITK_TURBO=0`. One variable: disable atomic-BF16 reduction on dense GEMM split-K (default 1). Decode policy picks 2-way split-K for m in 2..6 and k >= 4096 (our FP8 linear decode band). Confirmed in container env (`B12X_DENSE_SPLITK_TURBO=0`); linear stayed `B12xFp8BlockScaledMMKernel`.",
       "gates": {
         "gate_france": [
@@ -9244,7 +8613,6 @@
       "guarded": true,
       "sum": 419.8,
       "worst_spread": 15.7,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_MATERIALIZED=0`. One variable: W4A8 materialized-queue off (default on when dense candidate is true). Distinct from closed work-source `persistent_grid`. Confirmed `B12X_DYNAMIC_W4A8_MATERIALIZED=0`.",
       "gates": {
         "gate_france": [
@@ -9310,7 +8678,6 @@
       "guarded": true,
       "sum": 420.1,
       "worst_spread": 8.3,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. One variable: W4A8 shared-input producer off. DSV4 MXFP4 experts map to `quant_mode=w4a8_mx`. Share-input default is on when dense or decode candidate is true (`moeshare` forced it on). Confirmed in container env (`B12X_DYNAMIC_W4A8_SHARE_INPUT=0`).",
       "gates": {
         "gate_france": [
@@ -9376,7 +8743,6 @@
       "guarded": true,
       "sum": 429.4,
       "worst_spread": 6.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. One variable: W4A8 shared-input producer off. DSV4 MXFP4 experts map to `quant_mode=w4a8_mx`. Share-input default is on when dense or decode candidate is true (`moeshare-rc2` forced it on). Confirmed `B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. Re-measure of rc1 `now4sh` (420.1) on this pin.",
       "gates": {
         "gate_france": [
@@ -9442,7 +8808,6 @@
       "guarded": true,
       "sum": 448.0,
       "worst_spread": 5.4,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `VLLM_USE_B12X_WO_PROJECTION=0`. One variable: overlay fused inv-RoPE FP8 + bmm O-proj off; layer falls back to einsum. `stockops2` mixed this with sparse-indexer-off. Never isolated on `main-030-rc1`. Confirmed in container env (`VLLM_USE_B12X_WO_PROJECTION=0`).",
       "gates": {
         "gate_france": [
@@ -9508,75 +8873,7 @@
       "guarded": true,
       "sum": 442.2,
       "worst_spread": 5.7,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `VLLM_USE_B12X_WO_PROJECTION=0`. One variable: stock O-proj einsum instead of overlay b12x WO. Confirmed `WO=0` in the container. Re-measure of rc1 `nowo` (448.0) on this pin.",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "old029-k7",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 36.9,
-          "spread": 1.9,
-          "values": [
-            37.3,
-            36.6,
-            36.9
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 76.5,
-          "spread": 3.8,
-          "values": [
-            76.3,
-            76.5,
-            79.2
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 106.9,
-          "spread": 10.5,
-          "values": [
-            102.6,
-            106.9,
-            113.8
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 133.7,
-          "spread": 0.6,
-          "values": [
-            133.7,
-            133.2,
-            134.0
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-13T00:41:40+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 354.0,
-      "worst_spread": 10.5,
-      "detail_pass": 3,
-      "change": "",
       "gates": {
         "gate_france": [
           " Paris. The capital of Italy",
@@ -9642,7 +8939,6 @@
       "guarded": true,
       "sum": 424.6,
       "worst_spread": 13.6,
-      "detail_pass": 3,
       "change": "same pin as `proto2-030-rc2` (`main-030-rc2`, no extra env), new tag so the log does not append. Same-day re-baseline after later same-image arms clustered at 442-453 while the first sample was 417.5.",
       "gates": {
         "gate_france": [
@@ -9709,7 +9005,6 @@
       "guarded": true,
       "sum": 420.3,
       "worst_spread": 11.0,
-      "detail_pass": 3,
       "change": "same pin as `proto2-030` (`main-030-rc1`, no extra env), new tag so the log does not append. Same-day re-baseline after later same-image arms clustered at 421-429 while the first sample was 412.1.",
       "gates": {
         "gate_france": [
@@ -9776,7 +9071,6 @@
       "guarded": true,
       "sum": 339.5,
       "worst_spread": 7.2,
-      "detail_pass": 3,
       "change": "the profiler with both settings passed through `SERVE_EXTRA_ENV`, so the 1250-step window actually applied",
       "gates": {
         "gate_france": [
@@ -9842,7 +9136,6 @@
       "guarded": true,
       "sum": 336.9,
       "worst_spread": 15.4,
-      "detail_pass": 3,
       "change": "decode profiler armed, default 12-step window (`VLLM_PROFILE_DECODE=1 VLLM_PROFILE_CAPTURE=1`)",
       "gates": {
         "gate_france": [
@@ -9909,7 +9202,6 @@
       "guarded": true,
       "sum": 337.3,
       "worst_spread": 9.4,
-      "detail_pass": 3,
       "change": "same profiler with `VLLM_PROFILE_DECODE_STEPS=900`, still defeated by capture mode",
       "gates": {
         "gate_france": [
@@ -9976,7 +9268,6 @@
       "guarded": true,
       "sum": 335.2,
       "worst_spread": 8.8,
-      "detail_pass": 3,
       "change": "same profiler, region and per-layer marks read",
       "gates": {
         "gate_france": [
@@ -10043,7 +9334,6 @@
       "guarded": true,
       "sum": 340.3,
       "worst_spread": 7.9,
-      "detail_pass": 3,
       "change": "same profiler with `VLLM_PROFILE_DECODE_STEPS=1250`",
       "gates": {
         "gate_france": [
@@ -10110,722 +9400,7 @@
       "guarded": true,
       "sum": 336.2,
       "worst_spread": 8.8,
-      "detail_pass": 3,
       "change": "same profiler with capture mode off and `VLLM_PROFILE_DECODE_STEPS=1250`",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-a16",
-      "levels": {
-        "1": {
-          "n": 4,
-          "median": 63.6,
-          "spread": 7.7,
-          "values": [
-            64.3,
-            63.0,
-            61.9,
-            66.8
-          ]
-        },
-        "3": {
-          "n": 4,
-          "median": 117.3,
-          "spread": 8.4,
-          "values": [
-            120.1,
-            119.6,
-            110.3,
-            115.0
-          ]
-        },
-        "5": {
-          "n": 4,
-          "median": 141.3,
-          "spread": 7.4,
-          "values": [
-            142.2,
-            150.9,
-            140.5,
-            140.5
-          ]
-        },
-        "6": {
-          "n": 4,
-          "median": 160.3,
-          "spread": 8.3,
-          "values": [
-            165.3,
-            156.2,
-            152.0,
-            164.4
-          ]
-        }
-      },
-      "passes": 4,
-      "max_tokens": 512,
-      "start": "2026-09-13T02:33:26+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 482.5,
-      "worst_spread": 8.4,
-      "detail_pass": 4,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-async",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 37.6,
-          "spread": 14.4,
-          "values": [
-            37.6,
-            38.0,
-            36.9,
-            40.7,
-            35.3
-          ]
-        },
-        "3": {
-          "n": 5,
-          "median": 80.6,
-          "spread": 9.9,
-          "values": [
-            81.4,
-            77.6,
-            82.1,
-            80.6,
-            74.1
-          ]
-        },
-        "5": {
-          "n": 5,
-          "median": 110.8,
-          "spread": 2.8,
-          "values": [
-            111.0,
-            111.0,
-            108.9,
-            107.9,
-            110.8
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 135.0,
-          "spread": 4.6,
-          "values": [
-            131.0,
-            132.0,
-            136.2,
-            135.0,
-            137.2
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-13T01:37:36+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 364.0,
-      "worst_spread": 14.4,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-cap36",
-      "levels": {
-        "1": {
-          "n": 4,
-          "median": 62.2,
-          "spread": 1.4,
-          "values": [
-            61.9,
-            61.9,
-            62.6,
-            62.8
-          ]
-        },
-        "3": {
-          "n": 4,
-          "median": 112.9,
-          "spread": 4.2,
-          "values": [
-            112.0,
-            110.5,
-            113.8,
-            115.2
-          ]
-        },
-        "5": {
-          "n": 4,
-          "median": 151.2,
-          "spread": 7.3,
-          "values": [
-            151.8,
-            144.6,
-            155.7,
-            150.5
-          ]
-        },
-        "6": {
-          "n": 4,
-          "median": 160.2,
-          "spread": 4.9,
-          "values": [
-            161.4,
-            159.0,
-            162.9,
-            155.1
-          ]
-        }
-      },
-      "passes": 4,
-      "max_tokens": 512,
-      "start": "2026-09-13T02:20:10+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 486.5,
-      "worst_spread": 7.3,
-      "detail_pass": 4,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-compile",
-      "levels": {
-        "1": {
-          "n": 4,
-          "median": 61.8,
-          "spread": 10.5,
-          "values": [
-            60.1,
-            64.4,
-            63.4,
-            57.9
-          ]
-        },
-        "3": {
-          "n": 4,
-          "median": 113.4,
-          "spread": 7.1,
-          "values": [
-            116.3,
-            111.1,
-            115.8,
-            108.3
-          ]
-        },
-        "5": {
-          "n": 4,
-          "median": 156.4,
-          "spread": 7.5,
-          "values": [
-            158.5,
-            146.7,
-            154.5,
-            158.3
-          ]
-        },
-        "6": {
-          "n": 4,
-          "median": 159.7,
-          "spread": 4.0,
-          "values": [
-            161.2,
-            160.3,
-            159.0,
-            154.8
-          ]
-        }
-      },
-      "passes": 4,
-      "max_tokens": 512,
-      "start": "2026-09-13T02:14:19+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 491.3,
-      "worst_spread": 10.5,
-      "detail_pass": 4,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-fullcg",
-      "levels": {
-        "1": {
-          "n": 4,
-          "median": 26.1,
-          "spread": 98.3,
-          "values": [
-            16.5,
-            29.1,
-            42.2,
-            23.2
-          ]
-        },
-        "3": {
-          "n": 4,
-          "median": 67.4,
-          "spread": 17.8,
-          "values": [
-            68.1,
-            67.1,
-            67.8,
-            56.1
-          ]
-        },
-        "5": {
-          "n": 4,
-          "median": 91.8,
-          "spread": 18.0,
-          "values": [
-            94.9,
-            101.5,
-            85.0,
-            88.6
-          ]
-        },
-        "6": {
-          "n": 4,
-          "median": 109.5,
-          "spread": 34.8,
-          "values": [
-            114.9,
-            106.5,
-            76.8,
-            112.6
-          ]
-        }
-      },
-      "passes": 4,
-      "max_tokens": 512,
-      "start": "2026-09-13T03:07:28+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 294.8,
-      "worst_spread": 98.3,
-      "detail_pass": 4,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-k7",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 37.8,
-          "spread": 5.8,
-          "values": [
-            37.8,
-            39.5,
-            37.3
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 77.6,
-          "spread": 5.7,
-          "values": [
-            74.1,
-            78.5,
-            77.6
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 105.0,
-          "spread": 6.1,
-          "values": [
-            103.0,
-            105.0,
-            109.4
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 130.8,
-          "spread": 3.1,
-          "values": [
-            132.0,
-            130.8,
-            128.0
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-13T00:32:09+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 351.2,
-      "worst_spread": 6.1,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-k7b",
-      "levels": {
-        "1": {
-          "n": 3,
-          "median": 30.0,
-          "spread": 43.0,
-          "values": [
-            30.0,
-            25.7,
-            38.6
-          ]
-        },
-        "3": {
-          "n": 3,
-          "median": 60.4,
-          "spread": 36.3,
-          "values": [
-            59.1,
-            60.4,
-            81.0
-          ]
-        },
-        "5": {
-          "n": 3,
-          "median": 51.5,
-          "spread": 110.1,
-          "values": [
-            51.5,
-            50.1,
-            106.8
-          ]
-        },
-        "6": {
-          "n": 3,
-          "median": 72.4,
-          "spread": 85.1,
-          "values": [
-            62.7,
-            72.4,
-            124.3
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-13T01:13:10+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 214.3,
-      "worst_spread": 110.1,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-k7warm",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 38.9,
-          "spread": 15.2,
-          "values": [
-            41.7,
-            38.1,
-            35.8,
-            39.2,
-            38.9
-          ]
-        },
-        "3": {
-          "n": 5,
-          "median": 80.1,
-          "spread": 12.7,
-          "values": [
-            81.1,
-            80.1,
-            84.1,
-            73.9,
-            78.9
-          ]
-        },
-        "5": {
-          "n": 5,
-          "median": 106.9,
-          "spread": 1.5,
-          "values": [
-            106.9,
-            107.2,
-            106.1,
-            105.7,
-            107.3
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 120.7,
-          "spread": 5.0,
-          "values": [
-            118.8,
-            120.3,
-            120.7,
-            124.8,
-            123.3
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-13T01:22:16+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 346.6,
-      "worst_spread": 15.2,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Italy",
-          " Paris. The capital of Spain",
-          " Paris.\",\\n    \"label\":"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-nb-k7",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 64.5,
-          "spread": 12.4,
-          "values": [
-            59.3,
-            64.5,
-            61.6,
-            64.9,
-            67.3
-          ]
-        },
-        "3": {
-          "n": 5,
-          "median": 114.7,
-          "spread": 15.4,
-          "values": [
-            115.4,
-            110.2,
-            109.0,
-            126.7,
-            114.7
-          ]
-        },
-        "5": {
-          "n": 5,
-          "median": 144.8,
-          "spread": 6.0,
-          "values": [
-            144.8,
-            148.9,
-            145.2,
-            140.2,
-            141.3
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 159.9,
-          "spread": 4.3,
-          "values": [
-            159.4,
-            162.1,
-            162.6,
-            159.9,
-            155.7
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-13T02:07:20+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 483.9,
-      "worst_spread": 15.4,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "proto-nobreak",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 64.2,
-          "spread": 7.0,
-          "values": [
-            63.6,
-            64.2,
-            65.6,
-            61.1,
-            64.3
-          ]
-        },
-        "3": {
-          "n": 5,
-          "median": 115.8,
-          "spread": 13.3,
-          "values": [
-            113.6,
-            119.7,
-            124.0,
-            108.6,
-            115.8
-          ]
-        },
-        "5": {
-          "n": 5,
-          "median": 144.3,
-          "spread": 8.0,
-          "values": [
-            145.9,
-            150.4,
-            144.3,
-            138.8,
-            143.9
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 160.3,
-          "spread": 7.8,
-          "values": [
-            161.8,
-            155.9,
-            160.3,
-            165.0,
-            152.5
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-13T02:00:14+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 484.6,
-      "worst_spread": 13.3,
-      "detail_pass": 5,
-      "change": "",
       "gates": {
         "gate_france": [
           " Paris. The capital of Italy",
@@ -10891,7 +9466,6 @@
       "guarded": true,
       "sum": 334.3,
       "worst_spread": 12.1,
-      "detail_pass": 3,
       "change": "`main-029-proto2` rebuilt from the phase-1 base with the stale SM12x fp8_einsum recipe override removed from `apply_main`, `GPU_MEMORY_UTILIZATION=0.86`, k=7, capture 48, `--async-scheduling`, page cache dropped on both nodes first",
       "gates": {
         "gate_france": [
@@ -10959,7 +9533,6 @@
       "guarded": true,
       "sum": 412.1,
       "worst_spread": 12.8,
-      "detail_pass": 3,
       "change": "`v0.30.0rc1` (`a00a3544b93e`) matched-main rebuild, image `vllm-spark-0731:main-030-rc1`, same pin flags as `proto2-dg` (`VLLM_B12X_INDEXER_DIRECT_GATHER=1`, k=7, capture 48, util 0.8389, `--async-scheduling`). One variable: the base.",
       "gates": {
         "gate_france": [
@@ -11033,7 +9606,6 @@
       "guarded": true,
       "sum": 444.5,
       "worst_spread": 12.6,
-      "detail_pass": 5,
       "change": "the v0.30.0 re-baseline: `configs/pin.main-029.env` moved to `VLLM_REF=9ed533eb4adfe48aef7e569a08daeccd2a773fed` and `IMAGE=vllm-spark-0731:main-030-0`, overlay scan FAIL=0 applied=43 no-op=12, phase-1 built, overlays applied, image copied to spark2, five passes. Serving defaults carried over: humming, WO overlay off, k=6. Confirmed engine `v0.30.1.dev0+g9ed533eb4`.",
       "gates": {
         "gate_france": [
@@ -11108,7 +9680,6 @@
       "guarded": true,
       "sum": 485.9,
       "worst_spread": 10.8,
-      "detail_pass": 5,
       "change": "the same v0.30.0 default as `proto2-030-0` (same image, same config: humming, WO overlay off, k=6), re-measured five passes thirty minutes later, as the adjacent control for the capture-size arm. One variable against `proto2-030-0`: time.",
       "gates": {
         "gate_france": [
@@ -11175,7 +9746,6 @@
       "guarded": true,
       "sum": 417.5,
       "worst_spread": 14.0,
-      "detail_pass": 3,
       "change": "matched-main pin moved to `v0.30.0rc2` (`fa6ff060667f`), image `vllm-spark-0731:main-030-rc2`. Same serve config as `proto2-030`. Overlay scan FAIL=0. Phase 1 sha `vllm=fa6ff060667f`. Also pinned FlashInfer `v0.7.0rc3`, InstantTensor `v0.2.0`, fastsafetensors `0.4.0`, LMCache `v0.5.5`, DeepEP `v1.2.1`, humming-kernels 0.1.15. b12x stays 1.2.6.",
       "gates": {
         "gate_france": [
@@ -11241,7 +9811,6 @@
       "guarded": true,
       "sum": 334.0,
       "worst_spread": 49.5,
-      "detail_pass": 3,
       "change": "`proto2` with `VLLM_B12X_MOE_FP4_FORCE_A16=1` through `SERVE_EXTRA_ENV`, which selects `B12X_MXFP4_BF16` -- BF16 activations with MXFP4 weights, the closest analogue of the `B12X_MXFP4` backend the reference engine logs",
       "gates": {
         "gate_france": [
@@ -11309,7 +9878,6 @@
       "guarded": true,
       "sum": 328.1,
       "worst_spread": 7.3,
-      "detail_pass": 3,
       "change": "`proto2` with `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` set to `FLASHINFER_MLA_SPARSE_DSV4`, the attention the reference engine actually runs -- but on a cold FlashInfer autotune cache, so it fell back to the default tactic heuristic",
       "gates": {
         "gate_france": [
@@ -11376,7 +9944,6 @@
       "guarded": true,
       "sum": 320.9,
       "worst_spread": 4.4,
-      "detail_pass": 3,
       "change": "the identical arm, re-run after the previous boot wrote FlashInfer's sparse MLA DSv4 decode autotune entries -- one variable (cache populated vs not), same image, same env",
       "gates": {
         "gate_france": [
@@ -11443,7 +10010,6 @@
       "guarded": true,
       "sum": 318.9,
       "worst_spread": 6.8,
-      "detail_pass": 3,
       "change": "`proto2` with `VLLM_USE_AOT_COMPILE=0`, meant to reach `CompilationMode.VLLM_COMPILE`",
       "gates": {
         "gate_france": [
@@ -11510,7 +10076,6 @@
       "guarded": true,
       "sum": 437.2,
       "worst_spread": 13.9,
-      "detail_pass": 3,
       "change": "the **stock** arm after `VLLM_B12X_INDEXER_DIRECT_GATHER=1` was promoted into `configs/pin.main-029.env` and the serve forward list -- no extra env on the command line",
       "gates": {
         "gate_france": [
@@ -11576,7 +10141,6 @@
       "guarded": true,
       "sum": 405.1,
       "worst_spread": 18.3,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -11644,7 +10208,6 @@
       "guarded": true,
       "sum": 426.4,
       "worst_spread": 7.6,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -11711,7 +10274,6 @@
       "guarded": true,
       "sum": 424.3,
       "worst_spread": 14.6,
-      "detail_pass": 3,
       "change": "`proto2` with `VLLM_B12X_INDEXER_DIRECT_GATHER=1` (via `SERVE_EXTRA_ENV`), the packed-indexer gather that reads the KV cache directly instead of materialising a full-cache copy on every layer of every decode step",
       "gates": {
         "gate_france": [
@@ -11778,7 +10340,6 @@
       "guarded": true,
       "sum": 422.6,
       "worst_spread": 4.4,
-      "detail_pass": 3,
       "change": "the identical `proto2-dgather` run repeated, to satisfy the loop's re-measure-before-believing rule",
       "gates": {
         "gate_france": [
@@ -11844,7 +10405,6 @@
       "guarded": true,
       "sum": 328.3,
       "worst_spread": 48.6,
-      "detail_pass": 3,
       "change": "`proto2` with `LINEAR_BACKEND=deep_gemm`, i.e. the linear layer family set to the kernel the reference engine actually selects",
       "gates": {
         "gate_france": [
@@ -11911,7 +10471,6 @@
       "guarded": true,
       "sum": 308.1,
       "worst_spread": 15.5,
-      "detail_pass": 3,
       "change": "the `proto2` arm with `--enforce-eager` (`INSTANTTENSOR_MAX_FREE_MEM_USAGE=0.8` to boot), i.e. CUDA graphs off",
       "gates": {
         "gate_france": [
@@ -11978,7 +10537,6 @@
       "guarded": true,
       "sum": 109.0,
       "worst_spread": 0.5,
-      "detail_pass": 3,
       "change": "`proto2` with `DISABLE_DSPARK=1` and the mHC prenorm GEMM forced onto its TileLang fallback instead of DeepGEMM's tf32 kernel (`_USE_DEEP_GEMM = False`, bind-mounted `mhc/tilelang.py`)",
       "gates": {
         "gate_france": [
@@ -12044,7 +10602,6 @@
       "guarded": true,
       "sum": 334.3,
       "worst_spread": 11.5,
-      "detail_pass": 3,
       "change": "`proto2` with `B12X_MOE_FORCE_A8=0`, so the MoE uses the reference's FP4 activations instead of the FP8 ones our pin forces",
       "gates": {
         "gate_france": [
@@ -12111,7 +10668,6 @@
       "guarded": true,
       "sum": 425.7,
       "worst_spread": 8.2,
-      "detail_pass": 3,
       "change": "the kept arm (`proto2-dg`) plus `B12X_DYNAMIC_TILE_MN=64x128`, the MoE tile-shape override b12x documents as a benchmarking knob -- the first time any of the three tile knobs has been tried",
       "gates": {
         "gate_france": [
@@ -12178,7 +10734,6 @@
       "guarded": true,
       "sum": 107.8,
       "worst_spread": 0.6,
-      "detail_pass": 3,
       "change": "`proto2` with `DISABLE_DSPARK=1`, i.e. speculative decoding off, so exactly one token is produced per engine step and the meter's per-stream tok/s *is* 1/step-time",
       "gates": {
         "gate_france": [
@@ -12245,7 +10800,6 @@
       "guarded": true,
       "sum": 327.5,
       "worst_spread": 9.2,
-      "detail_pass": 3,
       "change": "`main-029-proto2` with a corrected `o_proj.py` bind-mounted over the image's stale copy, before the overlay fix was rebuilt into an image; `GPU_MEMORY_UTILIZATION=0.86`",
       "gates": {
         "gate_france": [
@@ -12311,7 +10865,6 @@
       "guarded": true,
       "sum": 290.9,
       "worst_spread": 15.1,
-      "detail_pass": 3,
       "change": "",
       "gates": {
         "gate_france": [
@@ -12381,7 +10934,6 @@
       "guarded": true,
       "sum": 153.4,
       "worst_spread": 0.3,
-      "detail_pass": 3,
       "change": "`proto2` with `DISABLE_DSPARK=1` **and** `self.ffn(x, input_ids)` in the layer forward replaced by `x = x` (bind-mounted `model.py`), so the FFN half is priced by removal",
       "gates": {
         "gate_france": [
@@ -12450,7 +11002,6 @@
       "guarded": true,
       "sum": 349.7,
       "worst_spread": 4.3,
-      "detail_pass": 3,
       "change": "`NUM_SPECULATIVE_TOKENS=5` (k=5 instead of 7)",
       "gates": {
         "gate_france": [
@@ -12517,7 +11068,6 @@
       "guarded": true,
       "sum": 346.7,
       "worst_spread": 9.5,
-      "detail_pass": 3,
       "change": "proto base, k=7, capture 48, `--async-scheduling`",
       "gates": {
         "gate_france": [
@@ -12591,147 +11141,10 @@
       "guarded": true,
       "sum": 448.7,
       "worst_spread": 11.3,
-      "detail_pass": 5,
       "change": "the **previous** pin image (`vllm-spark-0731:main-030-rc2`) served with today's defaults (humming, WO overlay off, k=6), five passes, immediately after `proto2-030-0`. One variable against `proto2-030-0`: the image, i.e. vLLM `fa6ff060667f` vs `9ed533eb4adf`. This is the back-to-back control that the pin bump needs, because the rig drifts between sessions.",
       "gates": {
         "gate_france": [
           " Paris. The capital of Italy",
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "ref-k7",
-      "levels": {
-        "1": {
-          "n": 2,
-          "median": 27.4,
-          "spread": 26.3,
-          "values": [
-            31.0,
-            23.8
-          ]
-        },
-        "3": {
-          "n": 2,
-          "median": 65.3,
-          "spread": 5.2,
-          "values": [
-            63.6,
-            67.0
-          ]
-        },
-        "5": {
-          "n": 2,
-          "median": 72.7,
-          "spread": 55.0,
-          "values": [
-            92.7,
-            52.7
-          ]
-        },
-        "6": {
-          "n": 2,
-          "median": 61.6,
-          "spread": 1.6,
-          "values": [
-            62.1,
-            61.1
-          ]
-        }
-      },
-      "passes": 3,
-      "max_tokens": 512,
-      "start": "2026-09-13T00:51:39+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 227.0,
-      "worst_spread": 55.0,
-      "detail_pass": 3,
-      "change": "",
-      "gates": {
-        "gate_france": [
-          " Paris. The capital of Spain"
-        ],
-        "gate_9x8": [
-          "72, 9x9"
-        ]
-      }
-    },
-    {
-      "tag": "refbase-k7",
-      "levels": {
-        "1": {
-          "n": 5,
-          "median": 64.0,
-          "spread": 5.9,
-          "values": [
-            61.9,
-            64.9,
-            64.0,
-            65.7,
-            63.6
-          ]
-        },
-        "3": {
-          "n": 5,
-          "median": 113.1,
-          "spread": 8.2,
-          "values": [
-            113.1,
-            120.6,
-            113.0,
-            113.2,
-            111.3
-          ]
-        },
-        "5": {
-          "n": 5,
-          "median": 148.1,
-          "spread": 24.7,
-          "values": [
-            112.5,
-            149.1,
-            148.1,
-            148.4,
-            147.1
-          ]
-        },
-        "6": {
-          "n": 5,
-          "median": 160.1,
-          "spread": 4.0,
-          "values": [
-            163.4,
-            160.1,
-            162.1,
-            158.4,
-            157.0
-          ]
-        }
-      },
-      "passes": 5,
-      "max_tokens": 512,
-      "start": "2026-09-13T01:53:11+08:00",
-      "guard": {
-        "port_holder": null,
-        "container": null,
-        "engine": null
-      },
-      "guarded": false,
-      "sum": 485.3,
-      "worst_spread": 24.7,
-      "detail_pass": 5,
-      "change": "",
-      "gates": {
-        "gate_france": [
           " Paris. The capital of Spain"
         ],
         "gate_9x8": [
@@ -12794,7 +11207,6 @@
       "guarded": true,
       "sum": 473.1,
       "worst_spread": 16.1,
-      "detail_pass": 3,
       "change": "reference arm: anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the base checkpoint `deepseek-ai/DeepSeek-V4-Flash-0731`, launched by `~/goal/launch-refbase.sh`",
       "gates": {
         "gate_france": [
@@ -12869,7 +11281,6 @@
       "guarded": true,
       "sum": 483.9,
       "worst_spread": 26.6,
-      "detail_pass": 5,
       "change": "the anemll reference (`ghcr.io/anemll/dspark-vllm-gx10:0.1.1`, `harness/ref-base0731.yaml`) re-measured **in the same session** as the comparison arms, five passes. The rig drifts ~6-7 % between sessions (see `rc2back-rc2`), so a reference measured hours earlier cannot be compared against.",
       "gates": {
         "gate_france": [
@@ -12936,7 +11347,6 @@
       "guarded": true,
       "sum": 467.9,
       "worst_spread": 21.9,
-      "detail_pass": 3,
       "change": "same-day anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the `v0.30.0rc2` pin day, launched by `configs/examples/refg-rc2.sh` (`~/goal/launch-refbase.sh` + `drive-median.sh`). Protocol k=7, capture 48, base checkpoint. Not a candidate.",
       "gates": {
         "gate_france": [
@@ -13003,7 +11413,6 @@
       "guarded": true,
       "sum": 485.9,
       "worst_spread": 20.7,
-      "detail_pass": 3,
       "change": "same-day anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on 2026-09-20, launched by `configs/examples/refg-rc2b.sh` (`~/goal/launch-refbase.sh` + `drive-median.sh`). Protocol k=7, capture 48, base checkpoint. Not a candidate.",
       "gates": {
         "gate_france": [
@@ -13069,7 +11478,6 @@
       "guarded": true,
       "sum": 483.7,
       "worst_spread": 18.5,
-      "detail_pass": 3,
       "change": "same-day reference arm: anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the base checkpoint, launched by `~/goal/launch-refbase.sh` on 2026-09-18 after `proto2-030`",
       "gates": {
         "gate_france": [
@@ -13136,7 +11544,6 @@
       "guarded": true,
       "sum": 420.0,
       "worst_spread": 12.6,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=1`. One variable: pin MLA decode split-K to 1. Unset uses the FlashInfer-ported wave-balanced heuristic. Overlay `B12X_MLA_SPARSE` decode goes through `compressed_sparse_mla.run` -> `run_unified_decode`, which reads this env per call. Confirmed in container env (`B12X_MLA_SM120_NUM_SPLITS=1`).",
       "gates": {
         "gate_france": [
@@ -13202,7 +11609,6 @@
       "guarded": true,
       "sum": 425.8,
       "worst_spread": 9.1,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=2`. One variable: pin MLA decode split-K to 2. Unset uses the wave-balanced heuristic; `split1` pinned 1. Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Dual-cache protocol is ~11 chunks. Confirmed in container env (`B12X_MLA_SM120_NUM_SPLITS=2`).",
       "gates": {
         "gate_france": [
@@ -13268,7 +11674,6 @@
       "guarded": true,
       "sum": 422.2,
       "worst_spread": 11.0,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=4`. One variable: pin MLA decode split-K to 4. Unset uses the wave-balanced heuristic; `split1` pinned 1 and `split2` pinned 2. Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Dual-cache protocol is ~11 chunks. Confirmed in container env (`B12X_MLA_SM120_NUM_SPLITS=4`).",
       "gates": {
         "gate_france": [
@@ -13335,7 +11740,6 @@
       "guarded": true,
       "sum": 418.5,
       "worst_spread": 8.5,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=8`. One variable: pin MLA decode split-K to 8. Unset uses the wave-balanced heuristic; `split1`/`split2`/`split4` already sat in pin noise. Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Dual-cache protocol is ~11 chunks. Confirmed in container env (`B12X_MLA_SM120_NUM_SPLITS=8`).",
       "gates": {
         "gate_france": [
@@ -13402,7 +11806,6 @@
       "guarded": true,
       "sum": 248.9,
       "worst_spread": 9.2,
-      "detail_pass": 3,
       "change": "our WO-projection and sparse-indexer overlays off (`VLLM_USE_B12X_WO_PROJECTION=0`, `VLLM_USE_B12X_SPARSE_INDEXER=0`), with `MAX_MODEL_LEN=32768` so the KV pool fits",
       "gates": {
         "gate_france": [
@@ -13468,7 +11871,6 @@
       "guarded": true,
       "sum": 411.3,
       "worst_spread": 12.3,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=128x128`. One variable: dynamic MoE tile. Auto planner returns (16, 128) for the protocol band on `w4a8_mx`. 32x128 (`moetile32`) and 64x128 (`proto2-moetile`) were pin noise. 128x128 is the remaining ladder step. Confirmed in container env (`B12X_DYNAMIC_TILE_MN=128x128`).",
       "gates": {
         "gate_france": [
@@ -13535,7 +11937,6 @@
       "guarded": true,
       "sum": 417.7,
       "worst_spread": 6.3,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=128x128`. One variable: remaining W4A8 dense-candidate tile after auto (16, 128). Confirmed `B12X_DYNAMIC_TILE_MN=128x128`. Re-measure of rc1 `tile128` on this pin.",
       "gates": {
         "gate_france": [
@@ -13602,7 +12003,6 @@
       "guarded": true,
       "sum": 429.0,
       "worst_spread": 6.2,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `GPU_MEMORY_UTILIZATION=0.8663`. One variable: restore the pre-profiler KV budget. v0.30 CUDA-graph memory profiling maps 0.8389 to effective 0.8115; the engine names 0.8663 as the util that keeps the same KV size as 0.8389 without the profiler. Confirmed in the engine log (`gpu_memory_utilization=0.8663`, Available KV 13.82 GiB vs `moecap175`'s 9.39 GiB at 0.8389).",
       "gates": {
         "gate_france": [
@@ -13668,7 +12068,6 @@
       "guarded": true,
       "sum": 424.3,
       "worst_spread": 6.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `GPU_MEMORY_UTILIZATION=0.8663`. One variable: restore the pre-profiler KV budget. v0.30 CUDA-graph memory profiling maps 0.8389 to a smaller effective util; 0.8663 is the engine's named equivalent. Confirmed `gpu_memory_utilization: 0.8663`. Re-measure of rc1 `util8663` (429.0) after `moemar-rc2` died at 9.48 vs 9.27 GiB.",
       "gates": {
         "gate_france": [
@@ -13734,7 +12133,6 @@
       "guarded": true,
       "sum": 424.0,
       "worst_spread": 7.4,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_W4A8_CONVERT_SCRATCH_MB=128`. One variable: W4A8 prepare scratch 128 MiB vs default 64. Distinct from `now4mat-rc2` (materialized off, a c6 cost). Confirmed `B12X_W4A8_CONVERT_SCRATCH_MB=128`.",
       "gates": {
         "gate_france": [
@@ -13801,7 +12199,6 @@
       "guarded": true,
       "sum": 418.0,
       "worst_spread": 6.1,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=1`. One variable: WO MXFP8 quant chunks (default 16). Last legal step after 2/4/8/32 pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=1`.",
       "gates": {
         "gate_france": [
@@ -13868,7 +12265,6 @@
       "guarded": true,
       "sum": 429.5,
       "worst_spread": 13.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=2`. One variable: WO MXFP8 quant chunks (default 16). Chunks 4/8/32 were pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=2`.",
       "gates": {
         "gate_france": [
@@ -13935,7 +12331,6 @@
       "guarded": true,
       "sum": 424.7,
       "worst_spread": 10.2,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=32`. One variable: WO MXFP8 quant chunks (default 16). Chunks 8 was pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=32`.",
       "gates": {
         "gate_france": [
@@ -14002,7 +12397,6 @@
       "guarded": true,
       "sum": 432.9,
       "worst_spread": 5.9,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=4`. One variable: WO MXFP8 quant chunks (default 16). Chunks 8 and 32 were pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=4`.",
       "gates": {
         "gate_france": [
@@ -14068,7 +12462,6 @@
       "guarded": true,
       "sum": 424.1,
       "worst_spread": 13.5,
-      "detail_pass": 3,
       "change": "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=8`. One variable: WO MXFP8 quant chunks (default 16). Eager profile priced live c1 WO at 57.4 ms (38 % of 150.6 ms). Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=8`.",
       "gates": {
         "gate_france": [
@@ -14135,7 +12528,6 @@
       "guarded": true,
       "sum": 427.4,
       "worst_spread": 5.9,
-      "detail_pass": 3,
       "change": "`wooff-rc2` (WO overlay off by pin default) plus `SERVE_EXTRA_ENV=VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable against the new standing `wooff-rc2`: force W4A16 on the MoE, the lever that measured best alone (`moea16-rc2`, 453.7 / 152.8). Confirmed `VLLM_B12X_MOE_FP4_FORCE_A16=1` and `VLLM_USE_B12X_WO_PROJECTION=0`. Targets the `ffn` region the c1 profile names at 53 % of the step.",
       "gates": {
         "gate_france": [
@@ -14210,7 +12602,6 @@
       "guarded": true,
       "sum": 445.2,
       "worst_spread": 7.6,
-      "detail_pass": 5,
       "change": "`wooff-rc2` (WO overlay off) plus `NUM_SPECULATIVE_TOKENS=6`, **five** passes. Re-measure of `wooff-k6-rc2` at higher power, because the c1 median swing at three passes (~10 %) is larger than the effect being measured. Confirmed `num_spec_tokens=6`, `max_cudagraph_capture_size' = 48`, `VLLM_USE_B12X_WO_PROJECTION=0`.",
       "gates": {
         "gate_france": [
@@ -14276,7 +12667,6 @@
       "guarded": true,
       "sum": 448.4,
       "worst_spread": 9.7,
-      "detail_pass": 3,
       "change": "`wooff-rc2` (WO overlay off) plus `NUM_SPECULATIVE_TOKENS=6`. One variable against `wooff-rc2`: speculative depth 6 vs 7, with capture 48 unchanged (6*7 = 42 still fits). Confirmed `num_spec_tokens=6`, `max_cudagraph_capture_size' = 48`, `VLLM_USE_B12X_WO_PROJECTION=0`.",
       "gates": {
         "gate_france": [
@@ -14343,7 +12733,6 @@
       "guarded": true,
       "sum": 426.9,
       "worst_spread": 7.5,
-      "detail_pass": 3,
       "change": "the WO projection overlay made non-default: `configs/pin.main-029.env` now sets `VLLM_USE_B12X_WO_PROJECTION:-0`, so `try_b12x_wo_proj` returns None and `deep_gemm_fp8_o_proj` runs the einsum path. One variable: the served WO projection. Confirmed `VLLM_USE_B12X_WO_PROJECTION=0` in the container. Fix landed from the c1 decode profile, which puts the `wo` region at 57.4 ms of a 150.6 ms step (38 %).",
       "gates": {
         "gate_france": [
@@ -14417,7 +12806,6 @@
       "guarded": true,
       "sum": 429.4,
       "worst_spread": 8.5,
-      "detail_pass": 5,
       "change": "`wooff-rc2` (WO overlay off, k=7) re-measured with **five** passes (`PASSES=5`). One variable against `wooff-rc2`: measurement power. The keep-rule's bar is the larger median spread, and the c1 swing at three passes (~10 %) was larger than any effect found, so the baseline itself had to be tightened.",
       "gates": {
         "gate_france": [
@@ -14484,7 +12872,6 @@
       "guarded": true,
       "sum": 418.4,
       "worst_spread": 8.2,
-      "detail_pass": 3,
       "change": "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_DSV4_H16_NATIVE=1`. One variable: force DSV4 H16 native decode on. Unset is auto; `noh16` forced 0. Force 1 so small-row c1 also uses H16 (auto keeps H8 in the sub-wave latency regime). Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Confirmed in container env (`B12X_MLA_SM120_DSV4_H16_NATIVE=1`).",
       "gates": {
         "gate_france": [
