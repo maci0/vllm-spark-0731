@@ -64,6 +64,7 @@ generations, levels 1 3 5 6, three passes, median reported per level. Both arms 
 | `abwo-b` | 56.5 | 103.6 | 133.9 | 150.8 | 444.8 | 5.5 % | pass |
 | `proto2-030-0` | 57.3 | 104.8 | 132.2 | 150.2 | 444.5 | 12.6 % | pass |
 | `k5-rc2` | 56.7 | 106.5 | 118.8 | 162.0 | 444.0 | 6.2 % | pass |
+| `kv262u086` | 61.5 | 105.1 | 128.6 | 148.5 | 443.7 | 9.7 % | pass |
 | `nowo-rc2` | 57.7 | 102.6 | 132.9 | 149.0 | 442.2 | 5.7 % | pass |
 | `ncclp2p0-rc2` | 55.8 | 98.4 | 137.7 | 148.7 | 440.6 | 13.8 % | pass |
 | `ncclqps4-rc2` | 55.6 | 101.2 | 135.5 | 146.4 | 438.7 | 8.1 % | pass |
@@ -831,6 +832,21 @@ Container `vllm-ds4-0731 Up 2 minutes`, engine `(not in the log)`, 3 passes at 5
 | 3 | 106.1 / 106.5 / 108.0 | 106.5 | 1.8 % | - | - | - |
 | 5 | 120.6 / 118.8 / 116.8 | 118.8 | 3.2 % | - | - | - |
 | 6 | 161.9 / 162.0 / 171.4 | 162.0 | 5.9 % | - | - | - |
+
+### `kv262u086`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 2 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 3 passes at 512 tokens, started 2026-09-22T01:10:41+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 61.5 / 56.9 / 61.5 | 61.5 | 7.5 % | - | - | - |
+| 3 | 105.1 / 98.8 / 109.0 | 105.1 | 9.7 % | - | - | - |
+| 5 | 129.5 / 128.6 / 127.8 | 128.6 | 1.3 % | - | - | - |
+| 6 | 147.9 / 148.5 / 151.3 | 148.5 | 2.3 % | - | - | - |
 
 ### `nowo-rc2`
 
@@ -4057,5 +4073,5 @@ python3 scripts/experiment-ledger.py
 ```
 
 Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in `superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered `*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`.
-As of the last run: 196 guarded arms, 0 superseded, 70 failed.
+As of the last run: 197 guarded arms, 0 superseded, 70 failed.
 

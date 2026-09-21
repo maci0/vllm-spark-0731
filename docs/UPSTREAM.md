@@ -11134,3 +11134,23 @@ measured throughput cost. The reference's KV pool is unreachable.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: MAX_MODEL_LEN=262144 reproducible at util 0.86
+
+Round 111 concluded the reference's max_model_len=262144 was "not reproducible
+on this rig" because it died at our standing gpu_memory_utilization=0.8389.
+That was a util artifact, not the layout: the KV pool is larger than 0.8389
+reserves. At `GPU_MEMORY_UTILIZATION=0.86` the same `MAX_MODEL_LEN=262144`
+**does serve** — the reference's exact context spec is reachable.
+
+`kv262u086`: 61.5 / 105.1 / 128.6 / 148.5, sum **443.7**, worst spread 9.7 %,
+gates 3/3. Against the pin default `proto2-030-0` (444.5 / 150.2, round 107)
+this is -0.2 % sum / -1.1 % c6: a wash, as expected for a KV-depth change
+(the sweep already showed KV depth is performance-neutral up to 4x). The
+point is provenance and spec-matching, not throughput.
+
+Recipes: `configs/examples/kv-max-245760-rc2.sh` (4x context at standing util,
+KV 11.32 GiB) and `configs/examples/kv-ref-spec-rc2.sh` (262144 @ util 0.86,
+the reference's exact context). Pin default `MAX_MODEL_LEN=65536` unchanged.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
