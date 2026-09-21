@@ -1,0 +1,50 @@
+recipe_version: '1'
+model: deepseek-ai/DeepSeek-V4-Flash-0731
+runtime: vllm-ray
+builder: eugr
+container: vllm-node-b12x
+metadata:
+  description: DeepSeek-V4-Flash-0731 FP8 on 2x DGX Spark (GB10) via eugr B12X - 512K ctx, CUDA graphs, TP2 over RoCE
+  maintainer: maci0
+build_args:
+- --exp-b12x
+defaults:
+  port: 8000
+  host: 0.0.0.0
+  tensor_parallel: 2
+  gpu_memory_utilization: 0.86
+  max_model_len: 524288
+  max_num_batched_tokens: 16384
+  max_num_seqs: 48
+  max_cudagraph_capture_size: 64
+env:
+  CUTE_DSL_ARCH: sm_121a
+  VLLM_USE_AOT_COMPILE: '1'
+  VLLM_USE_BREAKABLE_CUDAGRAPH: '0'
+  VLLM_USE_MEGA_AOT_ARTIFACT: '-1'
+  VLLM_MEMORY_PROFILE_INCLUDE_ATTN: '1'
+  VLLM_USE_FLASHINFER_SAMPLER: '1'
+  VLLM_USE_B12X_WO_PROJECTION: '1'
+  VLLM_USE_B12X_MHC: '1'
+  VLLM_USE_B12X_FP8_GEMM: '1'
+  VLLM_USE_B12X_MOE: '1'
+  VLLM_USE_B12X_SPARSE_INDEXER: '1'
+  VLLM_USE_V2_MODEL_RUNNER: '1'
+  B12X_MLA_SM120_UNIFIED: '1'
+  B12X_MOE_FORCE_A8: '1'
+command: |
+  vllm serve deepseek-ai/DeepSeek-V4-Flash-0731 \
+    --served-model-name deepseek-v4-flash \
+    --host {host} --port {port} \
+    --distributed-executor-backend ray --tensor-parallel-size {tensor_parallel} \
+    --trust-remote-code --tokenizer-mode deepseek_v4 \
+    --tool-call-parser deepseek_v4 --enable-auto-tool-choice \
+    --reasoning-parser deepseek_v4 \
+    --gpu-memory-utilization {gpu_memory_utilization} --max-model-len {max_model_len} \
+    --kv-cache-dtype fp8 --block-size 256 \
+    --max-num-seqs {max_num_seqs} --max-num-batched-tokens {max_num_batched_tokens} \
+    --enable-prefix-caching \
+    --moe-backend b12x --linear-backend b12x --attention-backend B12X_MLA_SPARSE \
+    --max-cudagraph-capture-size {max_cudagraph_capture_size} \
+    --compilation-config '{{"cudagraph_mode":"FULL_AND_PIECEWISE","custom_ops":["all"]}}' \
+    --load-format safetensors

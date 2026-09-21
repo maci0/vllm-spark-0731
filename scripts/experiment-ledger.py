@@ -1,0 +1,4826 @@
+#!/usr/bin/env python3
+"""Regenerate the experiment record from the measurement artifacts.
+
+Every arm is one `<tag>.median.log` written by `~/drive-median.sh`, with the raw
+per-pass output beside it as `<tag>-<N>.meter.log` and `<tag>-<N>.meter.txt`.
+
+Two things decide whether an arm's numbers can be believed:
+
+* **The guard.** `drive-median.sh` records the port holder and the container that
+  answered, because a still-running reference container once answered an entire
+  series and made five candidate arms look like the reference. Arms measured
+  before the guard existed (2026-09-13T03:15) are listed as superseded, with their
+  numbers kept for history, and are not evidence.
+* **The spread.** One 128-token pass swings up to 18 % on this rig, which is larger
+  than most effects being chased. A change is kept only if it beats the larger of
+  the two arms' median spreads.
+
+What an arm changed and what was concluded cannot be derived from the logs, so the
+annotations live in NOTES below; everything else is parsed. Regenerate with:
+
+    python3 scripts/experiment-ledger.py
+
+Writes docs/EXPERIMENTS.md and outputs/experiments.json.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DRIVER = ROOT / "outputs" / "driver"
+DOC = ROOT / "docs" / "EXPERIMENTS.md"
+JSON_OUT = ROOT / "outputs" / "experiments.json"
+
+GUARD_EPOCH = "2026-09-13T03:15"
+
+# tag -> (what it changed, what was concluded). Only the guarded arms carry a
+# verdict; the superseded ones are marked by the generator.
+NOTES: dict[str, tuple[str, str]] = {
+    "aboth-bel": (
+        "decisive interleaved comparison of our v0.30.0 default against the "
+        "anemll reference, in the order ours, ref, ref, ours (`abOTH-a`, "
+        "`abREF-b`, `abREF-c`, `abOTH-d`), three passes each, so a monotonic "
+        "session drift cancels. This is the only kind of cross-engine "
+        "comparison the +-9 % rig drift permits.",
+        "**statistical parity: -0.3 % on the sum, -1.0 % at c6.** "
+        "`abOTH-a` 60.3/107.5/138.3/151.3 sum 457.4, `abREF-b` "
+        "61.8/114.9/145.0/159.0 sum 480.7, `abREF-c` 63.1/111.9/139.6/155.7 "
+        "sum 470.3, `abOTH-d` 67.6/116.0/146.6/160.3 sum **490.5** (our best "
+        "arm exceeds their best). Means: ours 474.0, ref 475.5, i.e. "
+        "**-0.3 %**; c6 ours 155.8 vs ref 157.3, **-1.0 %**. Per level: c1 "
+        "+1.4 %, c3 -1.4 %, c5 +0.1 %, c6 -1.0 %. Our own interleaved swing "
+        "is 457.4-490.5 (+-3.6 %) and the reference's is 470.3-480.7 "
+        "(+-1.2 %), so the remaining deltas are inside the measurement noise. "
+        "All gates pass everywhere; acceptance and tokens per step hold in "
+        "both engines.",
+    ),
+
+    "abwo-bel": (
+        "interleaved, drift-cancelled A/B of the landed WO-overlay-off default "
+        "against the b12x WO overlay (on) on the v0.30.0 default (humming, "
+        "k=6). Four three-pass arms in the order off,on,on,off (`abwo-a`, b, "
+        "c, d). Confirmed `VLLM_USE_B12X_WO_PROJECTION=1` in the on-arms.",
+        "**wash; the landed off-default stands.** off 450.4/447.6, on "
+        "444.8/453.1. Drift-cancelled on-off: **0.0 %** on the sum, **-1.0 %** "
+        "at c6. All gates pass; acceptance and tokens per step hold the floor "
+        "in all four. The b12x WO overlay and the einsum path are equivalent; "
+        "keeping it off removes our own emulation layer at no cost.",
+    ),
+
+    "abk-bel": (
+        "interleaved, drift-cancelled A/B of the landed k=6 default against "
+        "k=7 on the v0.30.0 default (humming, WO overlay off). Four three-pass "
+        "arms in the order k7,k6,k6,k7 (`abk7-a`, `abk6-a`, `abk6-b`, `abk7-b`) "
+        "so a monotonic session drift cancels in the average of the two "
+        "differences. First correctly-controlled test of a landed default, "
+        "after round 107 showed the rig swings about +-9 % between sessions.",
+        "**validated: k=6 is genuinely better than k=7.** k7-a 425.2, k6-a "
+        "448.8, k6-b 449.4, k7-b 421.9. Pair deltas (k6-k7): pair1 +5.6 %, "
+        "pair2 +6.5 %, mean **+6.0 % on the sum**, **+9.0 % at c6**. "
+        "Acceptance higher for k6 (52.2-64.3 %) than k7 (48.5-57.2 %); tokens "
+        "per step 4.129-4.83 (one dip) vs 4.376-4.955. All gates pass. "
+        "Confirms the original `k6-rc2` +6.7 %; the k=6 default is correct.",
+    ),
+
+    "capsz-030-0": (
+        "`proto2-030-0` plus `CUDAGRAPH_CAPTURE_SIZES=[7,21,35,42,48]`, five "
+        "passes, run immediately after the control `proto2-030-0b`. One "
+        "variable against the control: the CUDA-graph capture sizes. With k=6 "
+        "the per-level target batch is 7/21/35/42 tokens while the list still "
+        "held the k=7 sizes [1,2,4,8,16,24,32,40,48], so every level padded up "
+        "to the next size (7->8, 21->24, 35->40, 42->48), ~14 % wasted rows; "
+        "this arm matched the graphs to the real sizes.",
+        "**wash; the padding hypothesis is refuted.** 62.3 / 117.6 / 145.6 / "
+        "**159.5**, sum **485.0**, worst spread 11.6 %. Both gates pass in all "
+        "five passes; acceptance 51.0-54.2 % and tokens per step 4.539-4.770 "
+        "hold the floor. Against the adjacent control `proto2-030-0b` "
+        "(485.9 / 158.9, spread 10.8 %) this is **-0.2 % / +0.4 %**. Either "
+        "the padded rows are not the cost at these sizes, or vLLM already "
+        "pads to a captured size and the extra rows are free. Keep the "
+        "standing capture list.",
+    ),
+    "proto2-030-0b": (
+        "the same v0.30.0 default as `proto2-030-0` (same image, same config: "
+        "humming, WO overlay off, k=6), re-measured five passes thirty minutes "
+        "later, as the adjacent control for the capture-size arm. One "
+        "variable against `proto2-030-0`: time.",
+        "**the drift control, and the most important number in this round.** "
+        "64.1 / 117.8 / 145.1 / **158.9**, sum **485.9**, worst spread 10.8 %. "
+        "Both gates pass in all five passes. Against the identical "
+        "`proto2-030-0` (444.5 / 150.2, measured 16:13) this is **+9.3 % / "
+        "+5.8 %** with literally nothing changed but the clock. Together with "
+        "`rc2back-rc2` (identical image and config, 477.5 at 14:14 vs 448.7 at "
+        "16:23, -6.4 %) the rig is shown to swing roughly +-9 % between "
+        "sessions, so only adjacent arms are comparable. Against the "
+        "same-session reference `refg-now` (483.9 / 161.2) this control is "
+        "**+0.4 % / -1.4 %**, i.e. parity.",
+    ),
+
+    "refg-now": (
+        "the anemll reference (`ghcr.io/anemll/dspark-vllm-gx10:0.1.1`, "
+        "`harness/ref-base0731.yaml`) re-measured **in the same session** as "
+        "the comparison arms, five passes. The rig drifts ~6-7 % between "
+        "sessions (see `rc2back-rc2`), so a reference measured hours earlier "
+        "cannot be compared against.",
+        "**reference, not a candidate.** 63.7 / 117.0 / 142.0 / **161.2**, "
+        "sum **483.9**, worst spread 26.6 % (c5 114.6-152.4; c1 is tight at "
+        "2.2 %). Both gates pass in all five passes. Acceptance 49.9-54.5 %, "
+        "tokens per step 4.476-4.785. Against this same-session reference, "
+        "our v0.30.0 default (`proto2-030-0`, 444.5 / 150.2) is **-8.1 % / "
+        "-6.8 %** and the rc2 image at identical defaults (`rc2back-rc2`, "
+        "448.7 / 153.3) is **-7.3 % / -4.9 %**. Per-level deficit for "
+        "v0.30.0: c1 -10.0 %, c3 -10.4 %, c5 -6.9 %, c6 -6.8 % — the "
+        "small-batch levels are the worst, so the gap is not a single kernel.",
+    ),
+    "rc2back-rc2": (
+        "the **previous** pin image (`vllm-spark-0731:main-030-rc2`) served "
+        "with today's defaults (humming, WO overlay off, k=6), five passes, "
+        "immediately after `proto2-030-0`. One variable against "
+        "`proto2-030-0`: the image, i.e. vLLM `fa6ff060667f` vs "
+        "`9ed533eb4adf`. This is the back-to-back control that the pin bump "
+        "needs, because the rig drifts between sessions.",
+        "**the pin bump is a wash.** 56.9 / 104.0 / 134.5 / **153.3**, sum "
+        "**448.7**, worst spread 11.3 %. Both gates pass in all five passes. "
+        "Against `proto2-030-0` (444.5 / 150.2, spread 12.6 %) this is "
+        "**+0.9 % / +2.0 %**, i.e. inside noise: v0.30.0's only change is a "
+        "two-file DeepGEMM build fix, and torch, triton and CUDA are "
+        "byte-identical across the two images (`torch 2.14.0a0+git2b3ec34`, "
+        "`triton 3.7.1`, `cuda 13.3`). **Drift finding:** the identical "
+        "image *and* config (`hum-k6-rc2b`) measured **477.5 / 160.6** at "
+        "14:14 and **448.7 / 153.3** at 16:23, a **6.4 %** session-to-session "
+        "shift. That is the same size as every effect chased in rounds "
+        "103-106, and is the dominant confound in this ledger.",
+    ),
+    "proto2-030-0": (
+        "the v0.30.0 re-baseline: `configs/pin.main-029.env` moved to "
+        "`VLLM_REF=9ed533eb4adfe48aef7e569a08daeccd2a773fed` and "
+        "`IMAGE=vllm-spark-0731:main-030-0`, overlay scan FAIL=0 applied=43 "
+        "no-op=12, phase-1 built, overlays applied, image copied to spark2, "
+        "five passes. Serving defaults carried over: humming, WO overlay off, "
+        "k=6. Confirmed engine `v0.30.1.dev0+g9ed533eb4`.",
+        "**new-pin baseline.** 57.3 / 104.8 / 132.2 / **150.2**, sum "
+        "**444.5**, worst spread 12.6 %. Both gates pass in all five passes; "
+        "acceptance 56.1-65.5 % holds, one pass dipped to 4.376 tokens per "
+        "step. Against the back-to-back rc2 control `rc2back-rc2` (448.7 / "
+        "153.3) this is -0.9 % / -2.0 %: the tag bump costs nothing and gains "
+        "nothing, as expected from a two-file build fix. Against the "
+        "same-session reference `refg-now` (483.9 / 161.2) it is **-8.1 % / "
+        "-6.8 %**.",
+    ),
+    "hum-a16-rc2": (
+        "`hum-k6-rc2b` (humming, WO off, k=6) plus "
+        "`SERVE_EXTRA_ENV=VLLM_B12X_MOE_FP4_FORCE_A16=1`, five passes. One "
+        "variable against the standing default: force W4A16 on the MoE now "
+        "that the backend is humming — the format anemll's `flashinfer_b12x` "
+        "alias resolves to, and the lever that measured best under b12x.",
+        "**negative.** 57.8 / 102.9 / 134.9 / **149.5**, sum **445.1**, worst "
+        "spread 7.6 %. Both gates pass in all five passes; acceptance "
+        "58.2-65.5 % and tokens per step 4.452-4.923 hold the floor (no dips). "
+        "Against the standing `hum-k6-rc2b` (477.5 / 160.6, spread 11.8 %) this "
+        "is **-6.8 % / -6.9 %**. So A16 does not help under humming either: "
+        "under b12x it was +8.7 % once and then failed to replicate (+0.1 % on "
+        "the WO-off default), and here it is a clear loss. **A16 is closed.** "
+        "Same-day `refg-rc2b` (485.9 / 162.2) leaves -8.4 % / -7.8 % for this "
+        "arm.",
+    ),
+    "hum-k6-rc2b": (
+        "`wooff-rc2` + k=6 plus `MOE_BACKEND=humming` passed through the "
+        "**launcher** channel (`harness/run-arm.sh <tag> \"MOE_BACKEND=humming\"`), "
+        "five passes. One variable against the standing default: the MoE "
+        "backend (humming MXFP4 kernels vs b12x). Confirmed "
+        "`moe_backend='humming'` in the resolved engine config. This is the "
+        "correct-channel re-run of `hum-k6-rc2`, which was invalid.",
+        "**large positive, and the best same-pin result; adopted as the "
+        "served default.** 58.5 / 111.6 / 146.8 / **160.6**, sum **477.5**, "
+        "worst spread 11.8 %. Both gates pass in all five passes. Acceptance "
+        "53.1-64.3 % holds the floor; one pass dipped to 4.197 tokens per "
+        "step against the 4.427 floor. Against the preceding default "
+        "`wooff-k6-5-rc2` (445.2 / 152.3, spread 7.6 %) this is **+7.3 % / "
+        "+5.4 %**, inside the keep bar max(7.6 %, 11.8 %) = 11.8 %. Against "
+        "the contract standing arm `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) it is **+14.4 % / +13.7 %**: the sum clears the 14.0 % bar "
+        "and c6 misses it by 0.3 points. Against same-day `refg-rc2b` "
+        "(485.9 / 162.2, spread 20.7 %) the gap is **-1.7 % / -1.0 %**, "
+        "down from -12.0 % / -13.9 % at the start of round 103. Positive in "
+        "two independent measurements (`moehum-rc2` +6.7 % on the old "
+        "baseline, this +7.3 % on the new one). `MOE_BACKEND` now defaults "
+        "to humming in the pin.",
+    ),
+    "hum-k6-rc2": (
+        "`wooff-rc2` + k=6 with `SERVE_EXTRA_ENV=MOE_BACKEND=humming`, five "
+        "passes. **Invalid channel**: `MOE_BACKEND` is read by "
+        "`scripts/05-serve.sh` on the launcher to build `--moe-backend`, so "
+        "setting it as container env (`-e`) is too late and the flag still "
+        "said b12x. Confirmed `moe_backend='b12x'` and zero humming lines in "
+        "the engine log.",
+        "**not a humming measurement.** 56.8 / 102.7 / 136.8 / **152.6**, sum "
+        "**448.9**. Because the backend never changed, this is a third "
+        "independent sample of the k=6 / WO-off default (445.2 at five passes "
+        "and 448.4 at three), i.e. +0.8 % against it, which is a useful "
+        "confirmation of the noise floor rather than a result about humming. "
+        "Superseded by `hum-k6-rc2b`. Trap recorded here so it is not "
+        "repeated: container-env (`SERVE_EXTRA_ENV`) is for variables read "
+        "inside the container; launcher-side knobs must go through the "
+        "assignment prefix (`run-arm.sh <tag> \"VAR=value\"`).",
+    ),
+    "cgpiece-k6-rc2": (
+        "`wooff-rc2` + k=6 plus `CUDAGRAPH_MODE=PIECEWISE`, five passes. One "
+        "variable against the standing default: piecewise-only CUDA graphs vs "
+        "FULL_AND_PIECEWISE, re-measured on the new default after "
+        "`cgpiece-rc2` had shown +7.2 % against the old one at three passes "
+        "with a 17.8 % spread.",
+        "**negative; the earlier gain was noise.** 55.1 / 96.1 / 129.9 / "
+        "**139.5**, sum **420.6**, worst spread 8.9 %. Both gates pass in all "
+        "five passes; acceptance 56.7-66.5 % holds, one pass dipped to 4.401 "
+        "tokens per step. Against `wooff-k6-5-rc2` (445.2 / 152.3, spread "
+        "7.6 %) this is **-5.5 % / -8.4 %**, so PIECEWISE-only is a clear "
+        "loss at five passes and `cgpiece-rc2`'s +7.2 % did not replicate. "
+        "Consistent with `cgfull` and `proto2-dg-cgfull`, both large "
+        "negatives: `FULL_AND_PIECEWISE` stands.",
+    ),
+    "wooff-k6-5-rc2": (
+        "`wooff-rc2` (WO overlay off) plus `NUM_SPECULATIVE_TOKENS=6`, "
+        "**five** passes. Re-measure of `wooff-k6-rc2` at higher power, "
+        "because the c1 median swing at three passes (~10 %) is larger than "
+        "the effect being measured. Confirmed `num_spec_tokens=6`, "
+        "`max_cudagraph_capture_size' = 48`, `VLLM_USE_B12X_WO_PROJECTION=0`.",
+        "**positive, not a keep; adopted as the served default.** 56.3 / "
+        "103.7 / 132.9 / **152.3**, sum **445.2**, worst spread 7.6 %. Both "
+        "gates pass in all five passes. Acceptance **57.5-67.5 %** against "
+        "49.8-56.9 % at k=7, and tokens per step 4.437-5.020 hold the floor "
+        "(min 4.437 vs 4.427). Against the five-pass k=7 re-baseline "
+        "`wooff5-rc2` (429.4 / 144.6, spread 8.5 %) this is +3.7 % / +5.3 %, "
+        "inside the keep bar max(8.5 %, 7.6 %) = 8.5 %. Against the contract "
+        "standing arm `proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) it is "
+        "+6.6 % / +7.9 %. Positive in three independent measurements "
+        "(`k6-rc2` +6.7 %, `wooff-k6-rc2` +5.0 %, this +3.7 %), acceptance "
+        "improves rather than trades off, and the mechanism is the one the "
+        "profile supports. `NUM_SPECULATIVE_TOKENS` now defaults to 6 in the "
+        "pin and in `harness/run-arm.sh`.",
+    ),
+    "wooff5-rc2": (
+        "`wooff-rc2` (WO overlay off, k=7) re-measured with **five** passes "
+        "(`PASSES=5`). One variable against `wooff-rc2`: measurement power. "
+        "The keep-rule's bar is the larger median spread, and the c1 swing at "
+        "three passes (~10 %) was larger than any effect found, so the "
+        "baseline itself had to be tightened.",
+        "**re-baseline, confirms the 3-pass number.** 54.2 / 99.5 / 131.1 / "
+        "**144.6**, sum **429.4**, worst spread 8.5 %. Both gates pass in all "
+        "five passes; acceptance 49.8-56.9 % and tokens per step 4.476-4.923 "
+        "hold the floor. Against the same config at three passes "
+        "(`wooff-rc2`, 426.9 / 144.2) it is +0.6 % / +0.3 %, so the three-pass "
+        "figure was not an outlier. c1 is still 8.5 % spread at n=5, i.e. the "
+        "rig's c1 variance is intrinsic and caps the detectable effect size.",
+    ),
+    "wooff-k6-rc2": (
+        "`wooff-rc2` (WO overlay off) plus `NUM_SPECULATIVE_TOKENS=6`. One "
+        "variable against `wooff-rc2`: speculative depth 6 vs 7, with capture "
+        "48 unchanged (6*7 = 42 still fits). Confirmed `num_spec_tokens=6`, "
+        "`max_cudagraph_capture_size' = 48`, `VLLM_USE_B12X_WO_PROJECTION=0`.",
+        "**positive, not a keep.** 56.9 / 102.2 / 137.5 / **151.8**, sum "
+        "**448.4**, worst spread 9.7 %. Both gates pass in all three passes. "
+        "One pass dipped to 4.243 tokens per step, below the 4.427 floor; "
+        "acceptance 54.6-63.8 % holds. Against `wooff-rc2` (426.9 / 144.2) "
+        "+5.0 % / +5.3 %, inside the keep bar. Against same-day `refg-rc2b` "
+        "(485.9 / 162.2) -8.4 % / -6.4 %: the best same-pin result to that "
+        "point.",
+    ),
+    "wooff-a16-rc2": (
+        "`wooff-rc2` (WO overlay off by pin default) plus "
+        "`SERVE_EXTRA_ENV=VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable "
+        "against the new standing `wooff-rc2`: force W4A16 on the MoE, the "
+        "lever that measured best alone (`moea16-rc2`, 453.7 / 152.8). "
+        "Confirmed `VLLM_B12X_MOE_FP4_FORCE_A16=1` and "
+        "`VLLM_USE_B12X_WO_PROJECTION=0`. Targets the `ffn` region the c1 "
+        "profile names at 53 % of the step.",
+        "**wash, and it does not replicate `moea16-rc2`.** 54.9 / 102.1 / "
+        "130.8 / **139.6**, sum **427.4**, worst spread 5.9 %. Gates pass; "
+        "acceptance 50.3-55.2 % and tokens per step 4.518-4.876 hold the "
+        "floor. Against `wooff-rc2` (426.9 / 144.2) +0.1 % / -3.2 %, i.e. a "
+        "wash. Against standing `proto2-030-rc2` (417.5) +2.4 %. Against "
+        "the `moea16-rc2` measurement of the same knob (453.7 / 152.8) it is "
+        "5.8 % / 8.6 % **worse**, so the 453.7 was mostly rig noise. "
+        "Reading: on this pin every remaining one-variable knob sits inside "
+        "the rig's own ~14 % swing, which is why no single-variable arm can "
+        "clear the keep-rule. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "-12.0 % / -13.9 %.",
+    ),
+    "wooff-rc2": (
+        "the WO projection overlay made non-default: "
+        "`configs/pin.main-029.env` now sets "
+        "`VLLM_USE_B12X_WO_PROJECTION:-0`, so `try_b12x_wo_proj` returns None "
+        "and `deep_gemm_fp8_o_proj` runs the einsum path. One variable: the "
+        "served WO projection. Confirmed `VLLM_USE_B12X_WO_PROJECTION=0` in "
+        "the container. Fix landed from the c1 decode profile, which puts the "
+        "`wo` region at 57.4 ms of a 150.6 ms step (38 %).",
+        "**positive, not a keep.** 56.8 / 96.5 / 129.4 / **144.2**, sum "
+        "**426.9**, worst spread 7.5 % (the tightest of any same-pin arm). "
+        "Gates pass in all three passes; acceptance 49.6-57.0 % and tokens "
+        "per step 4.452-4.971 hold the floor. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is "
+        "+2.3 % / +2.1 %, inside keep-spread. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. This is a re-measure of "
+        "`nowo-rc2` (442.2 / 149.0) and is 3.5 % below it, so the earlier "
+        "single-arm gain was partly noise; the honest reading is that "
+        "disabling the overlay is never worse and both arms favour it. Kept "
+        "as the default because the overlay is our own emulation layer with "
+        "documented Dynamo fragility and it removes four elementwise passes "
+        "plus a per-group Python copy loop per layer. vs same-day "
+        "`refg-rc2b` (485.9 / 162.2) still -12.1 % / -11.1 %.",
+    ),
+    "ncclinfo-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET,GRAPH,TUNING`. "
+        "One variable: NCCL logging only. Twenty NCCL env arms had been "
+        "measured without ever inspecting the chosen transport. Diagnostic.",
+        "**attribution, not a candidate.** Transport is healthy: `NET/IB : "
+        "Using [0]rocep1s0f1:1/RoCE [1]roceP2p1s0f1:1/RoCE [RO]`, `Using "
+        "network IB`, both HCAs alternating per channel (`via NET/IB/0` / "
+        "`NET/IB/1`), `64 coll channels, 0 nvls channels, 64 p2p channels, 2 "
+        "p2p channels per peer`, `CC Off`, 0 CollNet devices, "
+        "`RMA/Plugin: RMA_IB_PROXY`, `maxP2pPeers = 2`. The c1 region split "
+        "puts the TP all-reduce at 81.3 ms of device time over 87 calls "
+        "(0.93 ms avg) but **gpu_min is 0.08 ms**, so the fabric can do the "
+        "round trip in 80 us and the average is contention, not bandwidth. "
+        "That is why every channel/proto/path knob (`ncclch1`, `ncclmin2`, "
+        "`ncclpeer2`, `nccltc106`, `ncclsl0`, `ncclretry1`, `ncclar1`, "
+        "`ncclcnet0`, `ncclplug0`, `ncclnetib`) was pin noise. AR wall_sum "
+        "is 5.4 ms, so it overlaps compute.",
+    ),
+    "torchc6": (
+        "in-process torch profiler on `main-030-rc2` (`PROFILE_ENABLE=1`, "
+        "POST /start_profile, c6 level). One variable: profiler only. "
+        "Diagnostic.",
+        "**attribution, not a candidate.** The trace carries only "
+        "`python_function` events (188k) and zero CUDA activity, and the "
+        "trace name is `async_llm`, i.e. the API process, so vLLM's torch "
+        "profiler here cannot attribute kernels. The top self-time rows are "
+        "idle waits (`_queue.SimpleQueue.get`, `select.poll`) and "
+        "`monitor_engine_cores`. Not usable for kernel attribution; the "
+        "region marks remain the only device-time source.",
+    ),
+    "noaot-rc2": (
+        "`proto2-030-rc2` plus `VLLM_USE_AOT_COMPILE=0`. One variable: AOT "
+        "compile cache off (pin defaults it on). `proto2-compile` tried "
+        "this on an earlier pin and still resolved "
+        "`CompilationMode.NONE`. Confirmed `VLLM_USE_AOT_COMPILE=0` in the "
+        "container; resolved config still `CompilationMode.NONE`.",
+        "**pin noise, not a keep.** 54.3 / 95.8 / 126.3 / **141.1**, sum "
+        "**417.5**, worst spread 9.4 %. Gates pass in all three passes; "
+        "acceptance 49.3-56.9 % and tokens per step 4.439-4.971 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.0 % / -0.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. AOT off only loses the "
+        "persist cache; compilation never happens on this stack. vs "
+        "same-day `refg-rc2b` (485.9 / 162.2) still -14.1 % / -13.0 %. "
+        "Standing arm remains `proto2-030-rc2`.",
+    ),
+    "cgpiece-rc2": (
+        "`proto2-030-rc2` plus `CUDAGRAPH_MODE=PIECEWISE`. One variable: "
+        "piecewise-only CUDA graphs vs standing FULL_AND_PIECEWISE. "
+        "FULL-only was a large negative on earlier pins. Confirmed "
+        "`cudagraph_mode': <CUDAGraphMode.PIECEWISE: 1>`.",
+        "**positive, not a keep.** 54.6 / 106.4 / 136.1 / **150.4**, sum "
+        "**447.5**, worst spread 17.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.6 % / tokens per step 4.339, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +7.2 % / +6.5 %, inside "
+        "keep-spread. Against same-day control `p030-rc2b` (424.6 / 144.2) "
+        "+5.4 % / +4.3 %. Second-best same-pin sum after `moea16-rc2` "
+        "(453.7 / 152.8). vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-7.9 % / -7.3 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclnetib-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NET=IB`. One "
+        "variable: force NCCL NET=IB vs auto. Complementary to "
+        "`ncclplug0-rc2` (NET_PLUGIN=none, pin noise). Confirmed "
+        "`NCCL_NET=IB`.",
+        "**negative, not a keep.** 54.4 / 96.1 / 127.1 / **139.1**, sum "
+        "**416.7**, worst spread 12.3 %. Gates pass in all three passes; "
+        "acceptance 49.9-58.1 % and tokens per step 4.485-5.069 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is -0.2 % / -1.5 %. Worse at c6 than standing and "
+        "than `p030-rc2b` (424.6 / 144.2). Forced NET=IB is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-14.2 % / -14.2 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclplug0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NET_PLUGIN=none`. One "
+        "variable: disable external NCCL NET plugins. Complementary to "
+        "`ncclcnet0-rc2` (CollNet off, pin noise). Confirmed "
+        "`NCCL_NET_PLUGIN=none`.",
+        "**pin noise, not a keep.** 53.7 / 101.3 / 132.0 / **142.4**, sum "
+        "**429.4**, worst spread 10.0 %. Gates pass in all three passes. "
+        "One pass dipped to accept 45.6 % / tokens per step 4.197, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +2.9 % / +0.8 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. NET plugin "
+        "none is not the remaining gap. vs same-day `refg-rc2b` (485.9 / "
+        "162.2) still -11.6 % / -12.2 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclcnet0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_COLLNET_ENABLE=0`. One "
+        "variable: disable NCCL CollNet in-network collectives. Standing "
+        "TP2 all-reduce is PYNCCL over two-host RoCE. Confirmed "
+        "`NCCL_COLLNET_ENABLE=0`.",
+        "**pin noise, not a keep.** 52.9 / 99.6 / 126.1 / **143.0**, sum "
+        "**421.6**, worst spread 7.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.3 % / tokens per step 4.267, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.0 % / +1.3 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. CollNet off "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -13.2 % / -11.8 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "w4scr128-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_W4A8_CONVERT_SCRATCH_MB=128`. "
+        "One variable: W4A8 prepare scratch 128 MiB vs default 64. Distinct "
+        "from `now4mat-rc2` (materialized off, a c6 cost). Confirmed "
+        "`B12X_W4A8_CONVERT_SCRATCH_MB=128`.",
+        "**pin noise, not a keep.** 53.0 / 98.3 / 129.2 / **143.5**, sum "
+        "**424.0**, worst spread 7.4 %. Gates pass in all three passes; "
+        "acceptance 49.9-54.3 % and tokens per step 4.478-4.785 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +1.6 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Convert scratch 128 is not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.7 % / -11.5 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "now4mat-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_MATERIALIZED=0`. "
+        "One variable: W4A8 materialized-queue off (default on when dense "
+        "candidate is true). Distinct from closed work-source "
+        "`persistent_grid`. Confirmed `B12X_DYNAMIC_W4A8_MATERIALIZED=0`.",
+        "**negative, not a keep.** 53.8 / 99.1 / 127.6 / **139.3**, sum "
+        "**419.8**, worst spread 15.7 %. Gates pass in all three passes; "
+        "acceptance 50.1-57.7 % and tokens per step 4.498-5.020 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.6 % / -1.3 %. Worse at c6 than standing and "
+        "than `p030-rc2b` (424.6 / 144.2). Materialized off is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-13.6 % / -14.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclar1-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_AR_ALGORITHM=1`. One "
+        "variable: IB adaptive routing. Distinct from `ncclring-rc2` "
+        "(`NCCL_ALGO=Ring`, worse at c6). Confirmed "
+        "`NCCL_IB_AR_ALGORITHM=1`.",
+        "**pin noise, not a keep.** 56.4 / 99.1 / 131.5 / **141.8**, sum "
+        "**428.8**, worst spread 10.1 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.1 % / tokens per step 4.420, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +2.7 % / +0.4 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. IB adaptive "
+        "routing is not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -11.8 % / -12.6 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclretry1-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_RETRY_CNT=1`. One "
+        "variable: IB retry count 1 vs default 7. Standing TP2 all-reduce "
+        "is PYNCCL over RoCE. Confirmed `NCCL_IB_RETRY_CNT=1`.",
+        "**pin noise, not a keep.** 53.1 / 101.1 / 125.1 / **142.5**, sum "
+        "**421.8**, worst spread 9.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.8 % / tokens per step 4.376, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.0 % / +0.9 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. IB retry 1 is "
+        "not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -13.2 % / -12.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclsl0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_SL=0`. One "
+        "variable: IB service level 0. Complementary to `nccltc106-rc2` "
+        "(TC 106, pin noise). Confirmed `NCCL_IB_SL=0`.",
+        "**pin noise, not a keep.** 54.8 / 97.7 / 130.8 / **142.6**, sum "
+        "**425.9**, worst spread 10.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.9 % / tokens per step 4.339, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +2.0 % / +1.0 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. IB SL 0 is "
+        "not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -12.3 % / -12.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nccltc106-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_TC=106`. One "
+        "variable: IB traffic class 106 (DSCP 26). Standing TP2 all-reduce "
+        "is PYNCCL over RoCE. Confirmed `NCCL_IB_TC=106`.",
+        "**pin noise, not a keep.** 52.0 / 102.8 / 128.0 / **141.2**, sum "
+        "**424.0**, worst spread 6.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.2 % / tokens per step 4.339, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.6 % / +0.0 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. IB TC 106 is "
+        "not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -12.7 % / -12.9 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclpeer2-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NCHANNELS_PER_NET_PEER=2`. "
+        "One variable: NCCL channels per net peer. Complementary to "
+        "`ncclch1-rc2` / `ncclmin2-rc2`. Confirmed "
+        "`NCCL_NCHANNELS_PER_NET_PEER=2`.",
+        "**negative, not a keep.** 53.3 / 96.6 / 129.8 / **140.3**, sum "
+        "**420.0**, worst spread 4.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.8 % / tokens per step 4.401, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +0.6 % / -0.6 %. Worse at "
+        "c6 than standing and than `p030-rc2b` (424.6 / 144.2). Per-peer "
+        "channels 2 is not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -13.6 % / -13.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclmin2-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_MIN_NCHANNELS=2`. One "
+        "variable: raise NCCL channel floor. Complementary to "
+        "`ncclch1-rc2` (`NCCL_MAX_NCHANNELS=1`, pin noise). Confirmed "
+        "`NCCL_MIN_NCHANNELS=2`.",
+        "**negative, not a keep.** 51.5 / 96.6 / 127.0 / **140.3**, sum "
+        "**415.4**, worst spread 8.4 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.5 % / tokens per step 4.303, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is -0.5 % / -0.6 %. Worse at "
+        "c6 than standing and than `p030-rc2b` (424.6 / 144.2). MIN "
+        "channels 2 is not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -14.5 % / -13.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclto22-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_TIMEOUT=22`. One "
+        "variable: IB timeout 22 vs default 18. Standing TP2 all-reduce is "
+        "PYNCCL over RoCE. Confirmed `NCCL_IB_TIMEOUT=22`.",
+        "**pin noise, not a keep.** 55.1 / 97.6 / 131.2 / **145.6**, sum "
+        "**429.5**, worst spread 11.6 %. 9x8 gate passes in all three "
+        "passes; pass 1 france gate is garbled (` Paris.\", \"The capital "
+        "of`). One pass dipped to accept 47.7 % / tokens per step 4.339, "
+        "below standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +2.9 % / "
+        "+3.1 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. IB timeout 22 is not the remaining gap. vs same-day "
+        "`refg-rc2b` (485.9 / 162.2) still -11.6 % / -10.2 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "ncclnsock4-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NSOCKS_PERTHREAD=4`. "
+        "One variable: NCCL sockets per helper thread. Complementary to "
+        "`ncclsock4-rc2` (`NCCL_SOCKET_NTHREADS=4`, a c6 cost). Confirmed "
+        "`NCCL_NSOCKS_PERTHREAD=4`.",
+        "**pin noise, not a keep.** 53.0 / 99.0 / 128.1 / **142.0**, sum "
+        "**422.1**, worst spread 12.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.0 % / tokens per step 4.414, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.1 % / +0.6 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Extra sockets "
+        "per thread are not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -13.1 % / -12.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "moetile64-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=64x128`. "
+        "One variable: force W4A8 dynamic tile M64 vs auto M16/M32 on GB10. "
+        "32x128 and 128x128 already measured on this pin. Confirmed "
+        "`B12X_DYNAMIC_TILE_MN=64x128`.",
+        "**pin noise, not a keep.** 55.4 / 102.0 / 131.0 / **142.2**, sum "
+        "**430.6**, worst spread 12.6 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.3 % / tokens per step 4.303, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +3.1 % / +0.7 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Forced M64 "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -11.4 % / -12.3 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclsock4-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_SOCKET_NTHREADS=4`. One "
+        "variable: NCCL socket helper threads (default 1). Standing TP2 "
+        "all-reduce is PYNCCL over RoCE. Confirmed "
+        "`NCCL_SOCKET_NTHREADS=4`.",
+        "**negative, not a keep.** 53.4 / 96.4 / 128.2 / **139.4**, sum "
+        "**417.4**, worst spread 7.1 %. Gates pass in all three passes; "
+        "acceptance 50.2-56.6 % and tokens per step 4.485-4.971 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is -0.0 % / -1.3 %. Worse at c6 than standing and "
+        "than `p030-rc2b` (424.6 / 144.2). Socket helper threads are not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-14.1 % / -14.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "igp-rc2": (
+        "`proto2-030-rc2` plus `USE_INDUCTOR_GRAPH_PARTITION=true`. One "
+        "variable: inductor graph partition around piecewise CUDA-graph "
+        "breaks (standing None/False). Confirmed "
+        "`use_inductor_graph_partition': True`. Plumbing added in "
+        "`scripts/05-serve.sh`.",
+        "**pin noise, not a keep.** 53.1 / 95.8 / 130.7 / **143.2**, sum "
+        "**422.8**, worst spread 4.9 %. 9x8 gate passes in all three "
+        "passes; pass 1 france gate is garbled (` Paris.\",\\n    "
+        "\"label\":`). Acceptance 49.9-53.7 % and tokens per step "
+        "4.452-4.750 hold the floor. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.3 % / +1.4 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Inductor "
+        "graph partition is not the remaining gap. vs same-day "
+        "`refg-rc2b` (485.9 / 162.2) still -13.0 % / -11.7 %. Standing "
+        "arm remains `proto2-030-rc2`.",
+    ),
+    "cgwarm3-rc2": (
+        "`proto2-030-rc2` plus `CUDAGRAPH_NUM_OF_WARMUPS=3`. One variable: "
+        "CUDA-graph warmups before capture (standing 0). Confirmed "
+        "`cudagraph_num_of_warmups': 3` on the APIServer compilation "
+        "config (EngineCore later logs 1). Plumbing added in "
+        "`scripts/05-serve.sh`.",
+        "**pin noise, not a keep.** 53.6 / 99.6 / 129.3 / **146.8**, sum "
+        "**429.3**, worst spread 9.3 %. Gates pass in all three passes. "
+        "One pass dipped to accept 46.4 % / tokens per step 4.197, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +2.8 % / +4.0 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Extra graph "
+        "warmups are not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -11.6 % / -9.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "kvblnhc-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_KV_CACHE_LAYOUT=BLNHC`. "
+        "One variable: the other legal layout vs standing auto BLHNC. "
+        "`kvlbnhc-rc2` died: LBNHC is illegal; valid layouts are "
+        "`['BLHNC', 'BLNHC']`. Confirmed `VLLM_KV_CACHE_LAYOUT=BLNHC`.",
+        "**pin noise, not a keep.** 56.8 / 97.3 / 132.1 / **147.0**, sum "
+        "**433.2**, worst spread 5.1 %. Gates pass in all three passes; "
+        "acceptance 50.3-57.1 % and tokens per step 4.518-4.971 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +3.8 % / +4.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. BLNHC is not the remaining "
+        "gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -10.8 % / "
+        "-9.4 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclshm0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_SHM_DISABLE=1`. One "
+        "variable: disable NCCL shared-memory / CUDA-IPC path. Standing TP2 "
+        "all-reduce is PYNCCL across two hosts; SHM is intra-node. Confirmed "
+        "`NCCL_SHM_DISABLE=1`.",
+        "**pin noise, not a keep.** 52.9 / 95.7 / 125.4 / **142.5**, sum "
+        "**416.5**, worst spread 11.4 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.1 % / tokens per step 4.339, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is -0.2 % / +0.9 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. SHM off is "
+        "not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -14.3 % / -12.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclchk0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CHECKS_DISABLE=1`. One "
+        "variable: disable NCCL argument checks on every collective. "
+        "Standing TP2 all-reduce is PYNCCL. Confirmed "
+        "`NCCL_CHECKS_DISABLE=1`.",
+        "**pin noise, not a keep.** 56.1 / 92.3 / 126.5 / **145.1**, sum "
+        "**420.0**, worst spread 18.3 %. Gates pass in all three passes. "
+        "One pass dipped to accept 46.9 % / tokens per step 4.267, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +0.6 % / +2.8 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. NCCL checks "
+        "off is not the remaining gap. vs same-day `refg-rc2b` (485.9 / "
+        "162.2) still -13.6 % / -10.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclpxn0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PXN_DISABLE=1`. One "
+        "variable: disable NCCL PXN (proxy NIC). Standing TP2 all-reduce is "
+        "PYNCCL over two-host RoCE. Confirmed `NCCL_PXN_DISABLE=1`.",
+        "**pin noise, not a keep.** 54.2 / 101.2 / 127.7 / **144.8**, sum "
+        "**427.9**, worst spread 7.3 %. 9x8 gate passes in all three "
+        "passes; pass 3 france gate is garbled (` Paris.\", \"The capital "
+        "of`). One pass dipped to accept 48.1 % / tokens per step 4.339, "
+        "below standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +2.5 % / "
+        "+2.5 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. PXN off is not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -11.9 % / -10.7 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "ncclhca-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_HCA=rocep1s0f1,"
+        "roceP2p1s0f1`. One variable: name both ACTIVE RoCE HCAs. Standing "
+        "`NCCL_IB_HCA` is empty (auto). Confirmed "
+        "`NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1`.",
+        "**pin noise, not a keep.** 53.2 / 101.1 / 130.5 / **141.7**, sum "
+        "**426.5**, worst spread 11.3 %. Gates pass in all three passes; "
+        "acceptance 50.0-58.4 % and tokens per step 4.504-5.069 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.2 % / +0.4 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Naming both HCAs is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.2 % / -12.6 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclxnic-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CROSSNIC=1`. One "
+        "variable: NCCL CrossNIC across both UP RoCE ports. Standing "
+        "`SPARK_IFACES` is `enp1s0f1np1` only; both sparks also have "
+        "`enP2p1s0f1np1` UP. Confirmed `NCCL_CROSSNIC=1`.",
+        "**pin noise, not a keep.** 56.9 / 101.9 / 127.0 / **145.3**, sum "
+        "**431.1**, worst spread 7.9 %. Gates pass in all three passes; "
+        "acceptance 49.2-56.3 % and tokens per step 4.444-4.923 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +3.3 % / +2.9 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. CrossNIC is not the remaining "
+        "gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -11.3 % / "
+        "-10.4 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moewarm-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_WARM_MS=8,24,40,48`. "
+        "One variable: MoE warm-run sizes for protocol tokens c1=8, c3=24, "
+        "c5=40, c6=48 (default 1,2,3,4,5,8 plus inferred capture sizes). "
+        "Confirmed `B12X_MOE_WARM_MS=8,24,40,48`.",
+        "**pin noise, not a keep.** 53.8 / 98.9 / 131.1 / **148.9**, sum "
+        "**432.7**, worst spread 11.3 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.5 % / tokens per step 4.303, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +3.6 % / +5.5 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Explicit MoE "
+        "warm sizes are not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -10.9 % / -8.2 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "cgcopy-rc2": (
+        "`proto2-030-rc2` plus `CUDAGRAPH_COPY_INPUTS=true`. One variable: "
+        "copy CUDA-graph inputs on replay (standing False). Confirmed "
+        "`cudagraph_copy_inputs': True`.",
+        "**pin noise, not a keep.** 55.0 / 102.6 / 128.7 / **142.3**, sum "
+        "**428.6**, worst spread 7.8 %. Gates pass in all three passes; "
+        "acceptance 49.4-54.9 % and tokens per step 4.444-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.7 % / +0.8 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Copying graph inputs is not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-11.8 % / -12.3 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "cgsizes-rc2": (
+        "`proto2-030-rc2` plus `CUDAGRAPH_CAPTURE_SIZES=[8,24,40,48]`. One "
+        "variable: explicit CUDA-graph capture sizes for protocol tokens "
+        "c1=8, c3=24, c5=40, c6=48. Pin `max_cudagraph_capture_size=48`, "
+        "capture_sizes unset. Confirmed `cudagraph_capture_sizes': [8, 24, "
+        "40, 48]`.",
+        "**pin noise, not a keep.** 53.8 / 99.2 / 129.5 / **145.6**, sum "
+        "**428.1**, worst spread 9.3 %. Gates pass in all three passes; "
+        "acceptance 49.6-55.3 % and tokens per step 4.452-4.845 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.5 % / +3.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Explicit capture sizes are not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-11.9 % / -10.2 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclqps4-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_IB_QPS_PER_CONNECTION=4`. "
+        "One variable: IB queue pairs per connection (default 1). Standing "
+        "TP2 all-reduce is PYNCCL over RoCE. Confirmed "
+        "`NCCL_IB_QPS_PER_CONNECTION=4`.",
+        "**pin noise, not a keep.** 55.6 / 101.2 / 135.5 / **146.4**, sum "
+        "**438.7**, worst spread 8.1 %. Gates pass in all three passes; "
+        "acceptance 50.1-54.6 % and tokens per step 4.491-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +5.1 % / +3.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Four IB QPs is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-9.7 % / -9.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclp2p0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_P2P_DISABLE=1`. One "
+        "variable: disable NCCL CUDA P2P. Standing TP2 all-reduce is PYNCCL "
+        "across two hosts; CUDA-IPC does not work across nodes. Confirmed "
+        "`NCCL_P2P_DISABLE=1`.",
+        "**pin noise, not a keep.** 55.8 / 98.4 / 137.7 / **148.7**, sum "
+        "**440.6**, worst spread 13.8 %. 9x8 gate passes in all three "
+        "passes; pass 3 france gate is garbled (` Paris.\",\\n    "
+        "\"label\":`). One pass dipped to accept 48.2 % / tokens per step "
+        "4.376, below standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +5.5 % / "
+        "+5.3 %, inside keep-spread. Against same-day control `p030-rc2b` "
+        "(424.6 / 144.2) a wash. P2P off is not the remaining gap. vs "
+        "same-day `refg-rc2b` (485.9 / 162.2) still -9.3 % / -8.3 %. "
+        "Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclgrp-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_LAUNCH_MODE=GROUP`. One "
+        "variable: NCCL CUDA launch mode GROUP vs default PARALLEL. Standing "
+        "TP2 all-reduce is PYNCCL. Eager profile priced 87 all-reduce calls "
+        "at 81.3 ms gpu_sum on live c1. Confirmed `NCCL_LAUNCH_MODE=GROUP`.",
+        "**pin noise, not a keep.** 54.4 / 95.3 / 126.9 / **141.6**, sum "
+        "**418.2**, worst spread 8.8 %. Gates pass in all three passes; "
+        "acceptance 49.5-57.8 % and tokens per step 4.439-5.020 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.2 % / +0.3 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. GROUP launch is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-13.9 % / -12.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclbuf1m-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_BUFFSIZE=1048576`. One "
+        "variable: NCCL buffer 1 MiB vs default 4 MiB. Standing TP2 "
+        "all-reduce is PYNCCL. SYMM_MEM needs world_size>=4 so TP2 skips. "
+        "Confirmed `NCCL_BUFFSIZE=1048576`.",
+        "**pin noise, not a keep.** 52.8 / 101.3 / 134.9 / **143.7**, sum "
+        "**432.7**, worst spread 9.3 %. Gates pass in all three passes; "
+        "acceptance 50.1-57.1 % and tokens per step 4.491-4.971 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +3.6 % / +1.8 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. NCCL buffer 1 MiB is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-10.9 % / -11.4 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclcu0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_CUMEM_ENABLE=0`. One "
+        "variable: disable NCCL cuMemMap allocations. GB10 is UMA; default "
+        "cuMem can fragment host-device unified memory. Standing TP2 "
+        "all-reduce is PYNCCL. Confirmed `NCCL_CUMEM_ENABLE=0`.",
+        "**pin noise, not a keep.** 53.6 / 96.2 / 126.1 / **145.0**, sum "
+        "**420.9**, worst spread 5.6 %. Gates pass in all three passes; "
+        "acceptance 49.5-52.9 % and tokens per step 4.444-4.683 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.8 % / +2.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. NCCL cuMem off is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-13.4 % / -10.6 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclnt64-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_NTHREADS=64`. One "
+        "variable: NCCL thread count. Standing TP2 all-reduce is PYNCCL. "
+        "Exclusive LL was a large cost; LL,Simple / MAX_NCHANNELS=1 / "
+        "ALGO=Ring were pin noise or worse at c6. Confirmed "
+        "`NCCL_NTHREADS=64`.",
+        "**pin noise, not a keep.** 54.8 / 97.3 / 125.7 / **147.8**, sum "
+        "**425.6**, worst spread 6.6 %. Gates pass in all three passes; "
+        "acceptance 49.7-55.5 % and tokens per step 4.478-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.9 % / +4.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. NCCL thread count is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.4 % / -8.9 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclring-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_ALGO=Ring`. One "
+        "variable: NCCL algorithm Ring vs auto (Tree for small). Anemll "
+        "nsys landed on RING_LL. Exclusive `NCCL_PROTO=LL` was a large "
+        "cost; LL,Simple and MAX_NCHANNELS=1 were pin noise. Confirmed "
+        "`NCCL_ALGO=Ring`.",
+        "**negative, not a keep.** 55.1 / 100.2 / 128.0 / **138.2**, sum "
+        "**421.5**, worst spread 12.9 %. Gates pass in all three passes; "
+        "acceptance 49.2-57.1 % and tokens per step 4.433-4.987 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.0 % / -2.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) worse at c6. Forced Ring is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-13.3 % / -14.8 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nccllls-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PROTO=LL,Simple`. One "
+        "variable: enable LL as an option, keep Simple for large messages. "
+        "Exclusive `NCCL_PROTO=LL` (`nccpll-rc2`) was a large cost. Anemll "
+        "nsys landed on RING_LL; exclusive LL is not that. Confirmed "
+        "`NCCL_PROTO=LL,Simple`.",
+        "**pin noise, not a keep.** 54.2 / 89.0 / 131.3 / **146.4**, sum "
+        "**420.9**, worst spread 6.4 %. Gates pass in all three passes; "
+        "acceptance 49.6-53.9 % and tokens per step 4.439-4.785 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.8 % / +3.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Optional LL is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-13.4 % / -9.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "ncclch1-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_MAX_NCHANNELS=1`. One "
+        "variable: NCCL channel count. Standing TP2 all-reduce is PYNCCL. "
+        "`NCCL_PROTO=LL` was a large cost; one channel is a different lever "
+        "for 87 small all-reduce calls. Confirmed `NCCL_MAX_NCHANNELS=1`.",
+        "**pin noise, not a keep.** 53.5 / 100.1 / 127.4 / **142.9**, sum "
+        "**423.9**, worst spread 7.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.8 % / tokens per step 4.391, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.5 % / +1.2 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. One NCCL "
+        "channel is not the remaining gap. vs same-day `refg-rc2b` (485.9 / "
+        "162.2) still -12.8 % / -11.9 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "nccpll-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=NCCL_PROTO=LL`. One "
+        "variable: NCCL low-latency protocol. Standing TP2 all-reduce is "
+        "PYNCCL (FlashInfer MNNVL needs NVSwitch; FLASHINFER_PCIE_IPC is "
+        "same-node CUDA-IPC). Eager profile priced 87 all-reduce calls at "
+        "81.3 ms gpu_sum on live c1. Confirmed `NCCL_PROTO=LL`.",
+        "**negative, not a keep.** 51.1 / 86.8 / 101.6 / **112.8**, sum "
+        "**352.3**, worst spread 8.8 %. Gates pass in all three passes. "
+        "One pass dipped to accept 46.8 % / tokens per step 4.267, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is -15.6 % / -20.1 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a large cost. NCCL "
+        "LL is not the remaining gap. vs same-day `refg-rc2b` (485.9 / "
+        "162.2) still -27.5 % / -30.5 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "moecut32-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_DYNAMIC_CUTOVER_PAIRS=32`. "
+        "One variable: micro vs dynamic routed-row cutover (default 64). "
+        "Dispatch is `num_tokens<=8` and `routed_rows < cutover`. Protocol "
+        "c1 is 8 tok x topk 6 = 48 pairs, so only c1 is micro at default. "
+        "Cutover 32 sends c1 to dynamic. Confirmed "
+        "`B12X_MICRO_DYNAMIC_CUTOVER_PAIRS=32`.",
+        "**pin noise, not a keep.** 55.4 / 99.6 / 129.9 / **141.0**, sum "
+        "**425.9**, worst spread 5.4 %. Gates pass in all three passes; "
+        "acceptance 49.5-55.4 % and tokens per step 4.459-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.0 % / -0.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Sending c1 to dynamic is not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.3 % / -13.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "loadsaf-rc2": (
+        "`proto2-030-rc2` plus `--load-format safetensors` via "
+        "`ARM_EXTRA_ARGS`. One variable: pin `LOAD_FORMAT=instanttensor` "
+        "is sourced after EXTRA, so env override cannot win. Anemll uses "
+        "`load_format=auto`. InstantTensor env knobs already closed. "
+        "Confirmed `load_format': 'safetensors'`.",
+        "**pin noise, not a keep.** 55.3 / 96.9 / 127.0 / **144.9**, sum "
+        "**424.1**, worst spread 7.9 %. Gates pass in all three passes; "
+        "acceptance 50.0-55.1 % and tokens per step 4.483-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +2.6 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Loader format is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.7 % / -10.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nocar-rc2": (
+        "`proto2-030-rc2` plus `--disable-custom-all-reduce` via "
+        "`ARM_EXTRA_ARGS`. One variable: match anemll "
+        "`disable_custom_all_reduce=True`. Eager profile priced 87 "
+        "all-reduce calls at 81.3 ms gpu_sum on live c1. Confirmed "
+        "`disable_custom_all_reduce': True`. Re-measure of "
+        "`proto2-dg-nocar` (negative) on this pin.",
+        "**pin noise, not a keep.** 54.1 / 99.6 / 129.7 / **140.6**, sum "
+        "**424.0**, worst spread 12.0 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.4 % / tokens per step 4.303, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.6 % / -0.4 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash / slightly "
+        "worse at c6. Custom AR off is not the remaining gap. vs same-day "
+        "`refg-rc2b` (485.9 / 162.2) still -12.7 % / -13.3 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "wochunk1-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=1`. "
+        "One variable: WO MXFP8 quant chunks (default 16). Last legal "
+        "step after 2/4/8/32 pin noise. Confirmed "
+        "`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=1`.",
+        "**negative, not a keep.** 53.7 / 99.9 / 127.7 / **136.7**, sum "
+        "**418.0**, worst spread 6.1 %. Gates pass in all three passes; "
+        "acceptance 49.7-56.5 % and tokens per step 4.472-4.923 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +0.1 % / -3.2 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) worse at c6. WO chunks 1 is a cost. "
+        "vs same-day `refg-rc2b` (485.9 / 162.2) still -14.0 % / -15.7 %. "
+        "WO chunk ladder closed (1 cost, 2/4/8/32 wash). Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "wochunk2-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=2`. "
+        "One variable: WO MXFP8 quant chunks (default 16). Chunks 4/8/32 "
+        "were pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=2`.",
+        "**pin noise, not a keep.** 56.8 / 94.8 / 130.2 / **147.7**, sum "
+        "**429.5**, worst spread 13.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 47.5 % / tokens per step 4.303, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +2.9 % / +4.6 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. WO chunks 2 "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -11.6 % / -8.9 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "wochunk4-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=4`. "
+        "One variable: WO MXFP8 quant chunks (default 16). Chunks 8 and 32 "
+        "were pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=4`.",
+        "**pin noise, not a keep.** 55.3 / 101.5 / 130.3 / **145.8**, sum "
+        "**432.9**, worst spread 5.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.9 % / tokens per step 4.406, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +3.7 % / +3.3 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. WO chunks 4 "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -10.9 % / -10.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "wochunk32-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=32`. "
+        "One variable: WO MXFP8 quant chunks (default 16). Chunks 8 was "
+        "pin noise. Confirmed `B12X_WO_QUANT_CHUNKS_PER_PROGRAM=32`.",
+        "**pin noise, not a keep.** 53.1 / 99.4 / 129.0 / **143.2**, sum "
+        "**424.7**, worst spread 10.2 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.6 % / tokens per step 4.376, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.7 % / +1.4 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. WO chunks 32 "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -12.6 % / -11.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "wochunk8-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_WO_QUANT_CHUNKS_PER_PROGRAM=8`. "
+        "One variable: WO MXFP8 quant chunks (default 16). Eager profile "
+        "priced live c1 WO at 57.4 ms (38 % of 150.6 ms). Confirmed "
+        "`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=8`.",
+        "**pin noise, not a keep.** 54.5 / 96.6 / 129.9 / **143.1**, sum "
+        "**424.1**, worst spread 13.5 %. Gates pass in all three passes; "
+        "acceptance 49.8-58.5 % and tokens per step 4.465-5.086 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +1.3 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Halving WO chunks is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.7 % / -11.8 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "profeager-rc2": (
+        "eager decode profiler on `main-030-rc2`. Capture-mode "
+        "(`profcap-rc2`) died `CUDA error: invalid argument`. EngineCore "
+        "drops unregistered `VLLM_*`, so the worker never saw "
+        "`VLLM_PROFILE_DECODE`. Alias `B12X_PROFILE_*` plus bind-mount of "
+        "`sm12x_b12x_kernels.py` (dump after 12 `execute_model`; "
+        "`B12X_DEBUG=1` because overlay `print` is a Dynamo no-op). "
+        "Diagnostic, distorts tok/s.",
+        "**attribution, not a candidate.** Last live c1 step "
+        "`execute_model tok=8` gpu **150.6 ms** (wall 142.4). Region "
+        "split: FFN **80.3 ms (53 %)**, attn 67.8 (WO 57.4 of that, 38 % "
+        "of the step), all-reduce 81.3 across 87 calls (0.93 ms avg), "
+        "indexer 1.4, MLA 0.9. Layers avg 3.49 ms. Window mixes compile "
+        "warmup (fwd_gpu/step 1123 ms). WO overlay already a cost "
+        "(`nowo-rc2`). Next one-variable: `B12X_WO_QUANT_CHUNKS_PER_PROGRAM`. "
+        "Log: `outputs/driver/one-off/profeager-rc2-region.txt`.",
+    ),
+    "maxlen32k-rc2": (
+        "`proto2-030-rc2` plus `MAX_MODEL_LEN=32768`. One variable: "
+        "manager max seq len. Pin is 65536; anemll uses 262144. Protocol "
+        "gens 512, so 32k is plenty. Smaller page table for overlay sparse "
+        "indexer. Confirmed `max_model_len': 32768`.",
+        "**pin noise, not a keep.** 54.3 / 97.7 / 128.6 / **144.3**, sum "
+        "**424.9**, worst spread 6.8 %. Gates pass in all three passes; "
+        "acceptance 49.8-55.8 % and tokens per step 4.476-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.8 % / +2.2 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Cutting max_model_len is not "
+        "the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.6 % / -11.0 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "micromax-rc2": (
+        "`proto2-030-rc2` plus bind-mount of patched "
+        "`b12x/moe/fused_moe/_impl.py`: `_MICRO_MAX_TOKENS` 8→48 and "
+        "`_MICRO_DYNAMIC_CUTOVER_PAIRS_DEFAULT` 64→320. One variable: "
+        "extend native micro MoE so protocol c6 (48 tok × topk 6 = 288) "
+        "stays micro. Native b12x has no static kernel; FlashInfer static "
+        "IMA'd on live MXFP4. Confirmed overlay `_MICRO_MAX_TOKENS = 48`.",
+        "**pin noise, not a keep.** 54.8 / 99.9 / 133.9 / **142.4**, sum "
+        "**431.0**, worst spread 10.6 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.8 % / tokens per step 4.401, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +3.2 % / +0.8 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Extending "
+        "micro past m=8 is not the remaining gap. vs same-day `refg-rc2b` "
+        "(485.9 / 162.2) still -11.3 % / -12.2 %. Standing arm remains "
+        "`proto2-030-rc2`. Overlay not kept.",
+    ),
+    "nopagemax-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MSA_DECODE_PAGEMAX=0`. "
+        "One variable: MSA scheduled page-max decode off (default 1). "
+        "Overlay scores DSA indexer logits via `logits_paged`. Confirmed "
+        "`B12X_MSA_DECODE_PAGEMAX=0`.",
+        "**pin noise, not a keep.** 54.0 / 97.7 / 128.7 / **141.8**, sum "
+        "**422.2**, worst spread 11.5 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.8 % / tokens per step 4.414, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.1 % / +0.4 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Page-max off "
+        "is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) "
+        "still -13.1 % / -12.6 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moetilem16-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_TILE_MN=16x128`. "
+        "One variable: micro MoE tile. Default is 64x128; 32x128 was pin "
+        "noise; 128x128 died at KV floor. Confirmed "
+        "`B12X_MOE_TILE_MN=16x128`.",
+        "**pin noise, not a keep.** 55.3 / 97.5 / 128.7 / **142.7**, sum "
+        "**424.2**, worst spread 6.1 %. Gates pass in all three passes; "
+        "acceptance 49.8-55.2 % and tokens per step 4.460-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +1.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Micro 16x128 is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.7 % / -12.0 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moetilem32-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_TILE_MN=32x128`. "
+        "One variable: micro MoE tile. `B12X_MOE_TILE_MN` gates "
+        "`_select_micro_mma_tiler_mn` (c1, below the 64-row cutover). "
+        "Default is 64x128; 128x128 died at KV floor. Confirmed "
+        "`B12X_MOE_TILE_MN=32x128`.",
+        "**pin noise, not a keep.** 51.9 / 98.4 / 130.4 / **146.8**, sum "
+        "**427.5**, worst spread 17.0 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.1 % / tokens per step 4.414, a hair "
+        "under standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +2.4 % / "
+        "+4.0 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. Micro 32x128 is not the remaining gap. vs same-day "
+        "`refg-rc2b` (485.9 / 162.2) still -12.0 % / -9.5 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "noreuse-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_REUSE_COMPILED=0`. "
+        "One variable: micro MoE compiled-kernel reuse off (default 1). "
+        "Micro owns the tiny tail below the 64 routed-row cutover "
+        "(protocol c1). Confirmed `B12X_MICRO_REUSE_COMPILED=0`.",
+        "**pin noise, not a keep.** 54.7 / 100.5 / 127.0 / **143.8**, sum "
+        "**426.0**, worst spread 5.1 %. Gates pass in all three passes; "
+        "acceptance 49.9-55.8 % and tokens per step 4.491-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.0 % / +1.8 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Micro reuse off is not the "
+        "remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still "
+        "-12.3 % / -11.3 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "refg-rc2b": (
+        "same-day anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on "
+        "2026-09-20, launched by `configs/examples/refg-rc2b.sh` "
+        "(`~/goal/launch-refbase.sh` + `drive-median.sh`). Protocol k=7, "
+        "capture 48, base checkpoint. Not a candidate.",
+        "**comparator for 2026-09-20.** 63.0 / 114.6 / 146.1 / **162.2**, "
+        "sum **485.9**, worst spread 20.7 % (c5 119.4-149.6). Gates pass "
+        "in all three passes (`' Paris...'`, `'72, 9x9'`). Acceptance "
+        "50.7-56.5 %, tokens per step 4.531-4.923. vs yesterday "
+        "`refg-rc2` (467.9 / 157.1) this is +3.8 % / +3.2 % — rig noise "
+        "up. Standing `proto2-030-rc2` (417.5 / 141.2) is now -14.1 % / "
+        "-12.9 % vs this same-day anemll. Best same-pin `moea16-rc2` "
+        "(453.7 / 152.8) is -6.6 % / -5.8 %.",
+    ),
+    "nogemv-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DISABLE_BF16_GEMV=1`. "
+        "One variable: BF16 small-N GEMV off (default on). Path covers "
+        "N<=1024, K>=1024; DSV4 O-proj is o_lora_rank 1024. Confirmed "
+        "`B12X_DISABLE_BF16_GEMV=1`.",
+        "**pin noise, not a keep.** 54.1 / 97.1 / 127.2 / **144.6**, sum "
+        "**423.0**, worst spread 7.6 %. Gates pass in all three passes; "
+        "acceptance 50.4-57.7 % and tokens per step 4.504-5.020 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.3 % / +2.4 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. GEMV off is not the remaining "
+        "gap. vs same-day `refg-rc2` (467.9 / 157.1) still -9.6 % / -8.0 %. "
+        "Standing arm remains `proto2-030-rc2`.",
+    ),
+    "noidxk-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_INDEXER_DIRECT_K=0`. "
+        "One variable: fused-indexer direct-K score off (default 1). "
+        "Kill-switch restores the staged pipeline. Distinct from closed "
+        "`VLLM_B12X_INDEXER_DIRECT_GATHER`. Confirmed "
+        "`B12X_INDEXER_DIRECT_K=0`.",
+        "**pin noise, not a keep.** 54.0 / 100.0 / 129.0 / **141.7**, sum "
+        "**424.7**, worst spread 7.7 %. Gates pass in all three passes. "
+        "One pass dipped to tokens per step 4.420, a hair under standing "
+        "floor 4.427; acceptance 49.2-53.9 % holds. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +1.7 % / "
+        "+0.4 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. Direct-K off is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -9.2 % / -9.8 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "noprki-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DENSE_PER_ROW_IN_KERNEL=0`. "
+        "One variable: dense per-row GS host chain instead of in-kernel "
+        "(default 1). Bit-identical by construction. Confirmed "
+        "`B12X_DENSE_PER_ROW_IN_KERNEL=0`.",
+        "**pin noise, not a keep.** 55.5 / 99.3 / 126.5 / **139.4**, sum "
+        "**420.7**, worst spread 7.9 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.0 % / tokens per step 4.414, a hair "
+        "under standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +0.8 % / "
+        "-1.3 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. Host per-row GS is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -10.1 % / -11.3 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "nogqa6-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_PAGED_GQA6_COMPACT_SYNC=0`. "
+        "One variable: GQA6 compact-sync decode fastpath off (default 1). "
+        "DSV4 is GQA 6; overlay `B12X_MLA_SPARSE` decode goes through the "
+        "paged indexer. Confirmed `B12X_PAGED_GQA6_COMPACT_SYNC=0`.",
+        "**pin noise, not a keep.** 54.6 / 94.2 / 132.4 / **142.2**, sum "
+        "**423.4**, worst spread 9.2 %. Gates pass in all three passes; "
+        "acceptance 49.5-54.9 % and tokens per step 4.439-4.800 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.4 % / +0.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Compact-sync off is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.5 % / -9.5 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moetile32-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=32x128`. "
+        "One variable: remaining W4A8 tile after auto (16, 128), 64x128, "
+        "and 128x128. Confirmed `B12X_DYNAMIC_TILE_MN=32x128`. Re-measure "
+        "of rc1 `moetile32` (424.2) on this pin.",
+        "**pin noise, not a keep.** 53.7 / 96.4 / 127.5 / **144.4**, sum "
+        "**422.0**, worst spread 8.2 %. Gates pass in all three passes; "
+        "acceptance 49.7-55.9 % and tokens per step 4.491-4.876 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.1 % / +2.3 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Tile 32x128 is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.8 % / -8.1 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "dsl471-rc2": (
+        "`proto2-030-rc2` plus `nvidia-cutlass-dsl[cu13]==4.7.1` (and "
+        "`libs-base` / `libs-cu13` 4.7.1) committed as "
+        "`vllm-spark-0731:main-030-rc2-dsl471`. One variable: latest tagged "
+        "cutlass-dsl vs pin 4.7.0. Confirmed `nvidia-cutlass-dsl==4.7.1`.",
+        "**pin noise, not a keep.** 55.9 / 98.5 / 128.3 / **140.6**, sum "
+        "**423.3**, worst spread 6.0 %. Gates pass in all three passes; "
+        "acceptance 49.8-55.4 % and tokens per step 4.465-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.4 % / -0.4 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Do not pin 4.7.1. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -9.5 % / -10.5 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "noasync-rc2": (
+        "`proto2-030-rc2` plus `--no-async-scheduling` via `ARM_EXTRA_ARGS`. "
+        "One variable: drop async scheduling. `run-arm.sh` always prepends "
+        "`--async-scheduling`; BooleanOptionalAction last-flag wins. The "
+        "anemll recipe also enables async scheduling. Confirmed "
+        "`async_scheduling': False`. Re-measure of rc1 `noasync` (423.1) "
+        "on this pin.",
+        "**pin noise, not a keep.** 52.3 / 97.6 / 126.0 / **142.6**, sum "
+        "**418.5**, worst spread 12.6 %. Gates pass in all three passes. "
+        "One pass dipped to accept 46.0 % / tokens per step 4.231, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +0.2 % / +1.0 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Async "
+        "scheduling off is not the remaining gap. vs same-day `refg-rc2` "
+        "(467.9 / 157.1) still -10.6 % / -9.2 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "idxfi-rc2": (
+        "`proto2-030-rc2` plus `--sparse-indexer-topk-backend flashinfer` via "
+        "`ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is "
+        "cooperative (excluded on SM120) -> persistent (topk 512) -> "
+        "per_row; flashinfer is opt-in. Confirmed "
+        "`sparse_indexer_topk_backend': 'flashinfer'`. First `run-arm` "
+        "health window expired at 450s (CUDA-graph capture); protocol then "
+        "ran against the live healthy container. Re-measure of rc1 `idxfi` "
+        "(419.4) on this pin.",
+        "**pin noise, not a keep.** 50.7 / 97.6 / 127.8 / **146.2**, sum "
+        "**422.3**, worst spread 11.0 %. Gates pass in all three passes. "
+        "One pass dipped to accept 45.3 % / tokens per step 4.163, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.1 % / +3.5 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. FlashInfer "
+        "indexer top-k is not the remaining gap. vs same-day `refg-rc2` "
+        "(467.9 / 157.1) still -9.7 % / -6.9 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "now4sh-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. "
+        "One variable: W4A8 shared-input producer off. DSV4 MXFP4 experts "
+        "map to `quant_mode=w4a8_mx`. Share-input default is on when dense "
+        "or decode candidate is true (`moeshare-rc2` forced it on). "
+        "Confirmed `B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. Re-measure of rc1 "
+        "`now4sh` (420.1) on this pin.",
+        "**pin noise, not a keep.** 52.1 / 99.1 / 130.9 / **147.3**, sum "
+        "**429.4**, worst spread 6.2 %. Gates pass in all three passes; "
+        "acceptance 49.2-55.1 % and tokens per step 4.439-4.845 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.9 % / +4.3 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) inside keep-spread. W4A8 share-input "
+        "off is not the remaining gap. vs same-day `refg-rc2` (467.9 / "
+        "157.1) still -8.2 % / -6.2 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "memprof0-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. "
+        "One variable: disable v0.30 CUDA-graph memory profiler (default on; "
+        "maps 0.8389 to effective 0.8115). `util8663-rc2` raised the util "
+        "number; this turns the profiler off at standing 0.8389. Confirmed "
+        "`VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. Re-measure of rc1 "
+        "`memprof0` (425.2) on this pin.",
+        "**pin noise, not a keep.** 50.2 / 98.4 / 130.6 / **140.4**, sum "
+        "**419.6**, worst spread 10.0 %. Gates pass in all three passes. "
+        "One pass dipped to accept 45.4 % / tokens per step 4.163, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +0.5 % / -0.6 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) slightly worse. Extra "
+        "KV without the profiler is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -10.3 % / -10.6 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "nopfx-rc2": (
+        "`proto2-030-rc2` plus `--no-enable-prefix-caching` via `ARM_EXTRA_ARGS`. "
+        "One variable: prefix cache off. Pin sets `ENABLE_PREFIX_CACHING=1`; "
+        "vLLM default is already True. Protocol reuses one prompt across "
+        "levels. Confirmed `enable_prefix_caching': False`. Re-measure of "
+        "rc1 `nopfx` (418.3) on this pin.",
+        "**pin noise, not a keep.** 54.6 / 100.0 / 128.3 / **140.2**, sum "
+        "**423.1**, worst spread 6.6 %. Gates pass in all three passes; "
+        "acceptance 49.5-57.6 % and tokens per step 4.452-5.020 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.3 % / -0.7 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Prefix cache off is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.6 % / -10.8 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nostream-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_INDEXER_STREAM_SCORER=0`. "
+        "One variable: indexer stream scorer off (default True). Overlay "
+        "scores DSA indexer logits via `logits_paged`. Confirmed "
+        "`B12X_INDEXER_STREAM_SCORER=0`. Re-measure of rc1 `nostream` on "
+        "this pin.",
+        "**pin noise, not a keep.** 55.5 / 99.4 / 129.1 / **143.7**, sum "
+        "**427.7**, worst spread 7.4 %. Gates pass in all three passes; "
+        "acceptance 50.0-56.2 % and tokens per step 4.460-4.923 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.4 % / +1.8 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Stream scorer off is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-8.6 % / -8.5 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "notiny-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_W4A8_TINY_DECODE=0`. One "
+        "variable: W4A8 tiny-decode off (default 1). On SM121 DSV4F the tiny "
+        "path is excluded for `num_tokens>=3`, so it only owns c1 (m=1). "
+        "Confirmed `B12X_W4A8_TINY_DECODE=0`. Re-measure of rc1 `notiny` "
+        "(426.1) on this pin.",
+        "**pin noise, not a keep.** 55.2 / 98.9 / 127.9 / **144.2**, sum "
+        "**426.2**, worst spread 7.2 %. Gates pass in all three passes; "
+        "acceptance 50.3-56.6 % and tokens per step 4.507-4.939 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.1 % / +2.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Tiny-decode off is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-8.9 % / -8.2 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "noshare-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. "
+        "One variable: disable micro MoE shared-input across experts "
+        "(default 1). Fires on W4A8 micro at m=1 (protocol c1). Confirmed "
+        "`B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. Re-measure of rc1 "
+        "`noshare` (424.8) on this pin.",
+        "**pin noise, not a keep.** 51.7 / 99.5 / 127.4 / **145.0**, sum "
+        "**423.6**, worst spread 7.2 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.0 % / tokens per step 4.414, a hair "
+        "under standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +1.5 % / "
+        "+2.7 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. Micro share-input off is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -9.5 % / -7.7 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "lintri-rc2": (
+        "`proto2-030-rc2` plus `LINEAR_BACKEND=triton`. One variable: FP8 "
+        "linear via `TritonFp8BlockScaledMMKernel`. MoE stays b12x. "
+        "Confirmed `linear_backend: triton`. Re-measure of rc1 `lintri` "
+        "(416.4) on this pin.",
+        "**negative, not a keep.** 52.4 / 96.7 / 125.4 / **141.1**, sum "
+        "**415.6**, worst spread 5.0 %. Gates pass in all three passes; "
+        "acceptance 49.8-53.9 % and tokens per step 4.468-4.785 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is -0.5 % / -0.1 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) slightly worse. Triton linear is not "
+        "the remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-11.2 % / -10.2 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "idxpr-rc2": (
+        "`proto2-030-rc2` plus `--sparse-indexer-topk-backend per_row` via "
+        "`ARM_EXTRA_ARGS`. One variable: indexer top-k. Auto chain is "
+        "cooperative (excluded on SM120) -> persistent (topk 512) -> "
+        "per_row. Confirmed `sparse_indexer_topk_backend': 'per_row'`. "
+        "Re-measure of rc1 `idxpr` (423.4) on this pin.",
+        "**pin noise, not a keep.** 53.5 / 98.5 / 128.8 / **143.4**, sum "
+        "**424.2**, worst spread 5.3 %. Gates pass in all three passes; "
+        "acceptance 50.0-53.9 % and tokens per step 4.465-4.785 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +1.6 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. per_row topk is not the "
+        "remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.3 % / -8.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "lpf1024-rc2": (
+        "`proto2-030-rc2` plus `--long-prefill-token-threshold 1024` via "
+        "`ARM_EXTRA_ARGS`. One variable: pin already names "
+        "`LONG_PREFILL_TOKEN_THRESHOLD=1024` and the anemll recipe passes "
+        "the flag, but `05-serve.sh` never forwards it. vLLM default is 0. "
+        "Confirmed `long_prefill_token_threshold': 1024`. Re-measure of rc1 "
+        "`lpf1024` (425.5) on this pin.",
+        "**pin noise, not a keep.** 53.9 / 99.2 / 129.0 / **143.4**, sum "
+        "**425.5**, worst spread 7.3 %. Gates pass in all three passes. "
+        "One pass dipped to accept 49.0 % / tokens per step 4.414, a hair "
+        "under standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +1.9 % / "
+        "+1.6 %. Against same-day control `p030-rc2b` (424.6 / 144.2) a "
+        "wash. Forwarding the documented flag does not close the reference "
+        "gap. vs same-day `refg-rc2` (467.9 / 157.1) still -9.1 % / -8.7 %. "
+        "Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nofast-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_FAST_MATH=0`. One "
+        "variable: disable b12x MoE fast-math (default True). Keyed into "
+        "the dynamic W4A8 kernel cache. Confirmed `B12X_FAST_MATH=0`. "
+        "Re-measure of rc1 `nofast` (424.4) on this pin.",
+        "**pin noise, not a keep.** 51.4 / 99.5 / 130.2 / **142.3**, sum "
+        "**423.4**, worst spread 5.1 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.1 % / tokens per step 4.339, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.4 % / +0.8 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Fast-math off "
+        "is not the remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) "
+        "still -9.5 % / -9.4 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "atom24-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DENSE_ATOM_24=1`. One "
+        "variable: experimental 24-atom MMA in b12x dense GEMM (default 0). "
+        "Changes generated code and is keyed into the persistent compile "
+        "cache. Confirmed `B12X_DENSE_ATOM_24=1`. Re-measure of rc1 "
+        "`atom24` (426.0) on this pin.",
+        "**pin noise, not a keep.** 54.0 / 97.6 / 130.8 / **141.6**, sum "
+        "**424.0**, worst spread 15.4 %. Gates pass in all three passes. "
+        "One pass dipped to accept 44.2 % / tokens per step 4.096, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.6 % / +0.3 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. 24-atom dense "
+        "GEMM is not the remaining gap. vs same-day `refg-rc2` (467.9 / "
+        "157.1) still -9.4 % / -9.9 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "moework-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. "
+        "One variable: b12x dynamic MoE work source. Library default is "
+        "`materialized_queue`; `persistent_grid` is arithmetic striding. "
+        "Confirmed `B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. Re-measure of "
+        "rc1 `moework` (426.8) on this pin.",
+        "**pin noise, not a keep.** 53.9 / 102.9 / 132.2 / **142.2**, sum "
+        "**431.2**, worst spread 10.2 %. Gates pass in all three passes. "
+        "One pass dipped to accept 48.9 % / tokens per step 4.414, a hair "
+        "under standing floor 49.2 % / 4.427. Against standing "
+        "`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) this is +3.3 % / "
+        "+0.7 %. Against same-day control `p030-rc2b` (424.6 / 144.2) inside "
+        "keep-spread. Work source is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -7.8 % / -9.5 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "moeshare-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. "
+        "One variable: force the W4A8 shared-input producer on. Default is "
+        "on only when dense or decode candidate is true; decode candidate "
+        "requires routed_rows <= 64, so only c1. Confirmed "
+        "`B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. Re-measure of rc1 `moeshare` "
+        "(420.8) on this pin.",
+        "**pin noise, not a keep.** 51.3 / 98.0 / 129.3 / **144.2**, sum "
+        "**422.8**, worst spread 13.5 %. Gates pass in all three passes. "
+        "One pass dipped to accept 46.5 % / tokens per step 4.231, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.3 % / +2.1 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Forced "
+        "share-input on c3-c6 is not the remaining gap. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -9.6 % / -8.2 %. Standing arm "
+        "remains `proto2-030-rc2`.",
+    ),
+    "conn8-rc2": (
+        "`proto2-030-rc2` plus `CUDA_DEVICE_MAX_CONNECTIONS=8`. One variable: "
+        "CUDA default instead of `env.spark.sh`'s 1. The anemll recipe does "
+        "not set this. Confirmed `CUDA_DEVICE_MAX_CONNECTIONS=8`. Re-measure "
+        "of rc1 `conn8` (422.6) on this pin.",
+        "**pin noise, not a keep.** 55.0 / 98.7 / 130.6 / **140.3**, sum "
+        "**424.6**, worst spread 3.3 %. Gates pass in all three passes; "
+        "acceptance 50.5-54.3 % and tokens per step 4.524-4.785 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.7 % / -0.6 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. CUDA max connections 8 is not "
+        "the remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.3 % / -10.7 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "gencvllm-rc2": (
+        "`proto2-030-rc2` plus `--generation-config vllm` via `ARM_EXTRA_ARGS`. "
+        "One variable: match the anemll recipe. Ours default `auto` loads "
+        "checkpoint `generation_config.json`. Protocol requests send "
+        "temperature. Confirmed `generation_config: vllm`. Re-measure of "
+        "rc1 `gencvllm` (426.8) on this pin.",
+        "**pin noise, not a keep.** 55.9 / 99.1 / 130.4 / **142.4**, sum "
+        "**427.8**, worst spread 7.6 %. Gates pass in all three passes; "
+        "acceptance 50.4-59.0 % and tokens per step 4.511-5.069 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +2.5 % / +0.8 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) a wash. Neutral vLLM sampling defaults "
+        "are not the remaining gap. vs same-day `refg-rc2` (467.9 / 157.1) "
+        "still -8.6 % / -9.4 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moecap175-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. "
+        "One variable: match the reference static kernel's 175-cluster cap "
+        "at the c6 band (288 routed rows). Pin decode policy is a flat 188 "
+        "up to 640. Confirmed `B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. "
+        "Re-measure of rc1 `moecap175` on this pin.",
+        "**pin noise, not a keep.** 55.3 / 100.1 / 124.5 / **142.5**, sum "
+        "**422.4**, worst spread 8.3 %. Gates pass in all three passes. One "
+        "pass dipped to accept 48.2 % / tokens per step 4.376, below "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.2 % / +0.9 %. Against "
+        "same-day control `p030-rc2b` (424.6 / 144.2) a wash. Cluster cap "
+        "175 is not the remaining gap. vs same-day `refg-rc2` (467.9 / "
+        "157.1) still -9.7 % / -9.3 %. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "tile128-rc2": (
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=128x128`. "
+        "One variable: remaining W4A8 dense-candidate tile after auto "
+        "(16, 128). Confirmed `B12X_DYNAMIC_TILE_MN=128x128`. Re-measure of "
+        "rc1 `tile128` on this pin.",
+        "**pin noise, not a keep.** 53.8 / 98.8 / 122.6 / **142.5**, sum "
+        "**417.7**, worst spread 6.3 %. Gates pass in all three passes; "
+        "acceptance 49.8-57.0 % and tokens per step 4.460-4.971 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is a wash. Against same-day control `p030-rc2b` "
+        "(424.6 / 144.2) slightly worse. Tile shape is not the remaining "
+        "MoE gap. vs same-day `refg-rc2` (467.9 / 157.1) still -10.7 % / "
+        "-9.3 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "util8663-rc2": (
+        "`proto2-030-rc2` plus `GPU_MEMORY_UTILIZATION=0.8663`. One variable: "
+        "restore the pre-profiler KV budget. v0.30 CUDA-graph memory "
+        "profiling maps 0.8389 to a smaller effective util; 0.8663 is the "
+        "engine's named equivalent. Confirmed `gpu_memory_utilization: "
+        "0.8663`. Re-measure of rc1 `util8663` (429.0) after `moemar-rc2` "
+        "died at 9.48 vs 9.27 GiB.",
+        "**pin noise, not a keep.** 52.4 / 100.0 / 128.8 / **143.1**, sum "
+        "**424.3**, worst spread 6.9 %. Gates pass in all three passes; "
+        "acceptance 49.9-55.1 % and tokens per step 4.491-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +1.6 % / +1.3 %. Against same-day control "
+        "`p030-rc2b` (424.6 / 144.2) this is a wash. Extra KV does not "
+        "close the reference gap. vs same-day `refg-rc2` (467.9 / 157.1) "
+        "still -9.3 % / -8.9 %. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "p030-rc2b": (
+        "same pin as `proto2-030-rc2` (`main-030-rc2`, no extra env), new tag "
+        "so the log does not append. Same-day re-baseline after later "
+        "same-image arms clustered at 442-453 while the first sample was "
+        "417.5.",
+        "**control, not a keep.** 52.8 / 99.6 / 128.0 / **144.2**, sum "
+        "**424.6**, worst spread 13.6 %. Gates pass in all three passes. "
+        "One pass dipped to accept 45.6 % / tokens per step 4.197, below "
+        "standing floor 49.2 % / 4.427. Against original `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.7 % / +2.1 %, pin noise. "
+        "Confirms the 442-453 cluster (`nowo-rc2` / `moehum-rc2` / `k6-rc2` "
+        "/ `moea16-rc2`) is a real one-variable lift vs the pin, still "
+        "inside keep-spread. Standing arm remains `proto2-030-rc2`. Future "
+        "keep-rule on this pin should treat ~420 as the noise center, not "
+        "a new champion. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-9.3 % / -8.2 %.",
+    ),
+    "attnfi-rc2": (
+        "`proto2-030-rc2` plus `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` "
+        "= `FLASHINFER_MLA_SPARSE_DSV4`. One family: FlashInfer sparse MLA "
+        "DSV4 on tagged FlashInfer `v0.7.0rc3` (rc1 used floating `main`). "
+        "Confirmed in non-default args. Re-measure of rc1 `attnfi030` "
+        "(431.4) on this pin.",
+        "**pin noise, not a keep.** 53.0 / 99.3 / 129.3 / **142.8**, sum "
+        "**424.4**, worst spread 5.7 %. Gates pass in all three passes. One "
+        "pass dipped to accept 49.0 % / tokens per step 4.414, a hair under "
+        "standing floor 49.2 % / 4.427. Against standing `proto2-030-rc2` "
+        "(417.5 / 141.2, spread 14.0 %) this is +1.7 % / +1.1 %, pin noise. "
+        "vs same-day `refg-rc2` (467.9 / 157.1) still -9.3 % / -9.1 %. "
+        "FlashInfer MLA DSV4 on this pin is not the remaining gap. Standing "
+        "arm remains `proto2-030-rc2`.",
+    ),
+    "k5-rc2": (
+        "`proto2-030-rc2` plus `NUM_SPECULATIVE_TOKENS=5`. One variable: "
+        "DSpark k=5 (checkpoint block size; pin is k=7). Capture 48 covers "
+        "6*(5+1)=36. Confirmed `num_speculative_tokens': 5`. Re-measure of "
+        "rc1 `k5` (c6 163.2, tokens/step fail) on this pin.",
+        "**c6 win, quality fail, not a keep.** 56.7 / 106.5 / 118.8 / "
+        "**162.0**, sum **444.0**, worst spread 6.2 %. Gates pass in all "
+        "three passes; acceptance 66.2-72.0 % is high. Tokens per step "
+        "4.303-4.571: min 4.303 is below standing floor 4.427. c6 162.0 "
+        "beats same-day `refg-rc2` 157.1 (+3.1 %) and standing 141.2 "
+        "(+14.7 %), but the sum 444.0 is +6.3 % vs standing 14.0 % keep "
+        "spread and still -5.1 % vs `refg-rc2` 467.9. Same pattern as rc1 "
+        "`k5`. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "moea16-rc2": (
+        "`proto2-030-rc2` plus `VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable: "
+        "b12x MXFP4 with BF16 activations (`B12X_MXFP4_BF16`). Confirmed in "
+        "the engine log. Re-measure of rc1 `moea16` (446.3) on this pin.",
+        "**positive, not a keep.** 56.7 / 105.7 / 138.5 / **152.8**, sum "
+        "**453.7**, worst spread 7.1 %. Gates pass in all three passes; "
+        "acceptance 50.5-54.6 % and tokens per step 4.491-4.830 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +8.7 % / +8.2 %, inside keep-spread. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -3.0 % / -2.7 %. Best same-pin "
+        "sum so far. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "k6-rc2": (
+        "`proto2-030-rc2` plus `NUM_SPECULATIVE_TOKENS=6`. One variable: "
+        "DSpark k=6 (pin is k=7). Capture 48 covers 6*(6+1)=42. Confirmed "
+        "`num_speculative_tokens: 6` in engine args. Re-measure of rc1 `k6` "
+        "(449.5) on this pin.",
+        "**positive, not a keep.** 55.9 / 107.6 / 132.2 / **149.9**, sum "
+        "**445.6**, worst spread 10.9 %. Gates pass in all three passes; "
+        "acceptance 58.1-63.5 % and tokens per step 4.476-4.800 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +6.7 % / +6.2 %, inside keep-spread. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -4.8 % / -4.6 %. Tied with "
+        "`moehum-rc2` (445.5) for best same-pin sum. Standing arm remains "
+        "`proto2-030-rc2`.",
+    ),
+    "moehum-rc2": (
+        "`proto2-030-rc2` plus `MOE_BACKEND=humming`. One variable: humming "
+        "MXFP4 MoE (image humming-kernels 0.1.15). Confirmed humming GEMM "
+        "config override in the engine log. Re-measure of rc1 `moehum` "
+        "(448.3) on this pin.",
+        "**positive, not a keep.** 58.1 / 102.2 / 132.3 / **152.9**, sum "
+        "**445.5**, worst spread 4.7 %. Gates pass in all three passes. "
+        "Tokens per step 4.429-4.785 holds the floor. One pass dipped to "
+        "accept 49.1 %, a hair under `proto2-030-rc2`'s 49.2 %. Against "
+        "standing (417.5 / 141.2, spread 14.0 %) this is +6.7 % / +8.3 %, "
+        "inside keep-spread. vs same-day `refg-rc2` (467.9 / 157.1) still "
+        "-4.8 % / -2.7 %. Best same-pin number so far, not a keep. "
+        "Standing arm remains `proto2-030-rc2`.",
+    ),
+    "nowo-rc2": (
+        "`proto2-030-rc2` plus `VLLM_USE_B12X_WO_PROJECTION=0`. One variable: "
+        "stock O-proj einsum instead of overlay b12x WO. Confirmed `WO=0` in "
+        "the container. Re-measure of rc1 `nowo` (448.0) on this pin.",
+        "**positive, not a keep.** 57.7 / 102.6 / 132.9 / **149.0**, sum "
+        "**442.2**, worst spread 5.7 %. Gates pass in all three passes; "
+        "acceptance 50.6-56.6 % and tokens per step 4.523-4.923 hold the "
+        "floor. Against standing `proto2-030-rc2` (417.5 / 141.2, spread "
+        "14.0 %) this is +5.9 % / +5.5 %, inside keep-spread. vs same-day "
+        "`refg-rc2` (467.9 / 157.1) still -5.5 % / -5.2 %. WO overlay is "
+        "still a cost on this pin. Standing arm remains `proto2-030-rc2`.",
+    ),
+    "refg-rc2": (
+        "same-day anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the "
+        "`v0.30.0rc2` pin day, launched by `configs/examples/refg-rc2.sh` "
+        "(`~/goal/launch-refbase.sh` + `drive-median.sh`). Protocol k=7, "
+        "capture 48, base checkpoint. Not a candidate.",
+        "**comparator for the v0.30.0rc2 pin.** 58.6 / 113.4 / 138.8 / "
+        "**157.1**, sum **467.9**, worst spread 21.9 % (c5 111.6-142.0). "
+        "Gates pass in all three passes (`' Paris...'`, `'72, 9x9'`). "
+        "Acceptance 48.9-53.9 %, tokens per step 4.414-4.785. vs previous "
+        "day `refg030` (483.7 / 162.1) this is -3.3 % / -3.1 % — rig noise, "
+        "not a new reference image. Standing control `proto2-030-rc2` "
+        "(417.5 / 141.2) is still -10.8 % / -10.1 % vs this same-day "
+        "`refg-rc2`.",
+    ),
+    "proto2-030-rc2": (
+        "matched-main pin moved to `v0.30.0rc2` (`fa6ff060667f`), image "
+        "`vllm-spark-0731:main-030-rc2`. Same serve config as `proto2-030`. Overlay "
+        "scan FAIL=0. Phase 1 sha `vllm=fa6ff060667f`. Also pinned FlashInfer "
+        "`v0.7.0rc3`, InstantTensor `v0.2.0`, fastsafetensors `0.4.0`, LMCache "
+        "`v0.5.5`, DeepEP `v1.2.1`, humming-kernels 0.1.15. b12x stays 1.2.6.",
+        "**new-base control, not a keep.** 51.7 / 98.0 / 126.6 / **141.2**, sum "
+        "**417.5**, worst spread 14.0 %. Gates pass in all three passes; acceptance "
+        "49.2-56.7 % and tokens per step 4.427-4.963, neither lower than "
+        "`proto2-030`. Against standing `proto2-030` (412.1 / 138.3, spread 12.8 %) "
+        "this is pin noise. vs `refg030` (483.7 / 162.1) still -13.7 % / -12.9 %. "
+        "Standing keep-rule arm on this pin is this sample until a same-day "
+        "re-baseline says otherwise. Best previous-pin number remains `moemar` "
+        "455.3 on `main-030-rc1`.",
+    ),
+    "split8": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=8`. One variable: pin "
+        "MLA decode split-K to 8. Unset uses the wave-balanced heuristic; `split1`/`split2`/"
+        "`split4` already sat in pin noise. Overlay `B12X_MLA_SPARSE` decode goes through "
+        "`run_unified_decode`. Dual-cache protocol is ~11 chunks. Confirmed in container env "
+        "(`B12X_MLA_SM120_NUM_SPLITS=8`).",
+        "**negative, not kept.** 53.0 / 97.2 / 125.9 / **142.4**, sum **418.5**, worst "
+        "spread 8.5 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 48.6 %, below `proto2-030`'s floor 49.0 %; "
+        "tokens per step 4.414-4.830 holds the floor. The num_splits ladder is closed. "
+        "Standing arm remains `proto2-030`.",
+    ),
+    "split4": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=4`. One variable: pin "
+        "MLA decode split-K to 4. Unset uses the wave-balanced heuristic; `split1` pinned 1 "
+        "and `split2` pinned 2. Overlay `B12X_MLA_SPARSE` decode goes through "
+        "`run_unified_decode`. Dual-cache protocol is ~11 chunks. Confirmed in container env "
+        "(`B12X_MLA_SM120_NUM_SPLITS=4`).",
+        "**negative, not kept.** 51.9 / 100.9 / 126.6 / **142.8**, sum **422.2**, worst "
+        "spread 11.0 %. Gates pass in all three passes; acceptance 49.3-56.9 % and tokens "
+        "per step 4.452-4.971, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. MLA num_splits=4 is not the remaining gap. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "split2": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=2`. One variable: pin "
+        "MLA decode split-K to 2. Unset uses the wave-balanced heuristic; `split1` pinned 1. "
+        "Overlay `B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Dual-cache "
+        "protocol is ~11 chunks. Confirmed in container env (`B12X_MLA_SM120_NUM_SPLITS=2`).",
+        "**negative, not kept.** 54.7 / 93.1 / 130.5 / **147.5**, sum **425.8**, worst "
+        "spread 9.1 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) +3.3 % / +6.7 %, inside that spread. Against "
+        "`p030b` (420.3) +1.3 %. One pass dipped to accept 48.0 % and 4.339 tokens/step, "
+        "below `proto2-030`'s floor (49.0 % / 4.414). MLA num_splits=2 is not the remaining "
+        "gap. Standing arm remains `proto2-030`.",
+    ),
+    "yesh16": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_DSV4_H16_NATIVE=1`. One variable: "
+        "force DSV4 H16 native decode on. Unset is auto; `noh16` forced 0. Force 1 so "
+        "small-row c1 also uses H16 (auto keeps H8 in the sub-wave latency regime). Overlay "
+        "`B12X_MLA_SPARSE` decode goes through `run_unified_decode`. Confirmed in container "
+        "env (`B12X_MLA_SM120_DSV4_H16_NATIVE=1`).",
+        "**negative, not kept.** 55.8 / 96.3 / 127.6 / **138.7**, sum **418.4**, worst "
+        "spread 8.2 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 48.9 % and 4.401 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). H16 force-on is not the remaining gap. "
+        "Standing arm remains `proto2-030`.",
+    ),
+    "noh16": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_DSV4_H16_NATIVE=0`. One variable: "
+        "force DSV4 H16 native decode off. Unset is auto; on Spark (48 SMs) auto turns H16 "
+        "on for many-chunk / batched-row decode. Overlay `B12X_MLA_SPARSE` decode goes "
+        "through `run_unified_decode`. Confirmed in container env "
+        "(`B12X_MLA_SM120_DSV4_H16_NATIVE=0`).",
+        "**negative, not kept.** 53.6 / 100.8 / 129.5 / **143.4**, sum **427.3**, worst "
+        "spread 8.0 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 47.7 % and 4.339 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). H16 auto is not the remaining gap. Standing "
+        "arm remains `proto2-030`.",
+    ),
+    "split1": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_NUM_SPLITS=1`. One variable: pin "
+        "MLA decode split-K to 1. Unset uses the FlashInfer-ported wave-balanced heuristic. "
+        "Overlay `B12X_MLA_SPARSE` decode goes through `compressed_sparse_mla.run` -> "
+        "`run_unified_decode`, which reads this env per call. Confirmed in container env "
+        "(`B12X_MLA_SM120_NUM_SPLITS=1`).",
+        "**negative, not kept.** 53.0 / 100.5 / 124.8 / **141.7**, sum **420.0**, worst "
+        "spread 12.6 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 47.8 % and 4.303 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). MLA num_splits=1 is not the remaining gap. "
+        "Standing arm remains `proto2-030`.",
+    ),
+    "notiny": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_W4A8_TINY_DECODE=0`. One variable: W4A8 "
+        "tiny-decode off (default 1). On SM121 DSV4F (k=6144, n=1024) the tiny path is "
+        "excluded for `num_tokens>=3`, so it only owns c1 (m=1). Confirmed in container env "
+        "(`B12X_W4A8_TINY_DECODE=0`).",
+        "**negative, not kept.** 52.8 / 99.2 / 133.1 / **141.0**, sum **426.1**, worst "
+        "spread 8.9 %. Gates pass in all three passes; acceptance 49.8-55.2 % and tokens "
+        "per step 4.452-4.830, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. Tiny-decode is not the remaining gap. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "tile128": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=128x128`. One variable: "
+        "dynamic MoE tile. Auto planner returns (16, 128) for the protocol band on "
+        "`w4a8_mx`. 32x128 (`moetile32`) and 64x128 (`proto2-moetile`) were pin noise. "
+        "128x128 is the remaining ladder step. Confirmed in container env "
+        "(`B12X_DYNAMIC_TILE_MN=128x128`).",
+        "**negative, not kept.** 55.3 / 95.4 / 124.4 / **136.2**, sum **411.3**, worst "
+        "spread 12.3 %. Gates pass in all three passes. One pass dipped to accept 48.8 %, "
+        "below `proto2-030`'s floor 49.0 %; tokens per step 4.414-5.020 holds the floor. "
+        "Against standing `proto2-030` (412.1 / 138.3) this is slightly worse. Auto 16x128 "
+        "stays. Standing arm remains `proto2-030`.",
+    ),
+    "now4sh": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=0`. One variable: "
+        "W4A8 shared-input producer off. DSV4 MXFP4 experts map to `quant_mode=w4a8_mx`. "
+        "Share-input default is on when dense or decode candidate is true (`moeshare` forced "
+        "it on). Confirmed in container env (`B12X_DYNAMIC_W4A8_SHARE_INPUT=0`).",
+        "**negative, not kept.** 52.5 / 100.1 / 127.4 / **140.1**, sum **420.1**, worst "
+        "spread 8.3 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 48.2 % and 4.376 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). W4A8 share-input off is not the remaining "
+        "gap. Standing arm remains `proto2-030`.",
+    ),
+    "downsc": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_ENABLE_DYNAMIC_DOWN_SCALE=1`. One variable: "
+        "dynamic MoE down-scale on (default False). Applied as "
+        "`_dynamic_down_scale_enabled() and not is_w4a8`. DSV4 MXFP4 experts map to "
+        "`quant_mode=w4a8_mx`, so this is a no-op on this pin. Confirmed in container env "
+        "(`B12X_ENABLE_DYNAMIC_DOWN_SCALE=1`).",
+        "**negative, not kept.** 56.0 / 97.3 / 129.1 / **140.1**, sum **422.5**, worst "
+        "spread 5.0 %. Gates pass in all three passes; acceptance 49.4-56.0 % and tokens "
+        "per step 4.439-4.923, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. Dynamic down-scale is not the remaining gap. Standing "
+        "arm remains `proto2-030`.",
+    ),
+    "nostream": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_INDEXER_STREAM_SCORER=0`. One variable: "
+        "indexer stream scorer off (unset defaults True). Overlay scores DSA indexer logits "
+        "via `logits_paged` -> `run_paged_logits_kernel`; the tiled/supertile path gates "
+        "stream-scorer on this env. Confirmed in container env "
+        "(`B12X_INDEXER_STREAM_SCORER=0`).",
+        "**negative, not kept.** 52.5 / 100.0 / 133.6 / **141.6**, sum **427.7**, worst "
+        "spread 9.7 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 47.7 % and 4.339 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). Stream scorer is not the remaining gap. "
+        "Standing arm remains `proto2-030`.",
+    ),
+    "nopfx": (
+        "`proto2-030` plus `--no-enable-prefix-caching` via `ARM_EXTRA_ARGS`. One variable: "
+        "prefix cache off. Pin sets `ENABLE_PREFIX_CACHING=1`; vLLM default is already True. "
+        "BooleanOptionalAction last-flag wins over `05-serve.sh`'s `--enable-prefix-caching`. "
+        "Protocol reuses one prompt across levels. Confirmed `enable_prefix_caching: False`.",
+        "**negative, not kept.** 53.9 / 98.2 / 124.0 / **142.2**, sum **418.3**, worst "
+        "spread 8.5 %. Gates pass in all three passes; acceptance 49.6-53.7 % and tokens "
+        "per step 4.444-4.758, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. Prefix cache is not the remaining gap. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "conn8": (
+        "`proto2-030` plus `CUDA_DEVICE_MAX_CONNECTIONS=8`. One variable: CUDA default "
+        "instead of `env.spark.sh`'s 1. The anemll recipe does not set this. `05-serve.sh` "
+        "already `-e` the name, so EXTRA overrides. Confirmed in container env "
+        "(`CUDA_DEVICE_MAX_CONNECTIONS=8`).",
+        "**negative, not kept.** 54.7 / 100.4 / 125.8 / **141.7**, sum **422.6**, worst "
+        "spread 7.9 %. Gates pass in all three passes; acceptance 49.9-58.9 % and tokens "
+        "per step 4.499-5.120, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. CUDA max connections 8 is not the remaining gap. "
+        "Standing arm remains `proto2-030`.",
+    ),
+    "nogath": (
+        "`proto2-030` plus `VLLM_B12X_INDEXER_DIRECT_GATHER=0`. One variable: packed-indexer "
+        "direct gather off. Default 1 in `05-serve.sh`. Proto-era +27 % win. Never isolated "
+        "off on `main-030-rc1`. Overlay still scores logits via `logits_paged`. Confirmed "
+        "in container env (`VLLM_B12X_INDEXER_DIRECT_GATHER=0`).",
+        "**negative, load-bearing default.** 37.0 / 76.2 / 107.2 / **119.9**, sum **340.3**, "
+        "worst spread 3.5 %. Gates pass in all three passes; acceptance 49.3-54.5 % and "
+        "tokens per step 4.452-4.800, neither lower than `proto2-030`. Throughput dropped "
+        "17.4 % on the sum and 13.3 % at c6 vs standing `proto2-030` (412.1 / 138.3). Direct "
+        "gather is required on this pin, not a leftover knob. Standing arm remains "
+        "`proto2-030`.",
+    ),
+    "noasync": (
+        "`proto2-030` plus `--no-async-scheduling` via `ARM_EXTRA_ARGS`. One variable: "
+        "drop async scheduling. `run-arm.sh` always prepends `--async-scheduling`; the "
+        "BooleanOptionalAction last-flag wins (`async_scheduling: False`). The anemll "
+        "recipe also enables async scheduling. Never isolated off on `main-030-rc1`.",
+        "**negative, not kept.** 55.7 / 97.4 / 127.0 / **143.0**, sum **423.1**, worst "
+        "spread 11.8 %. Gates pass in all three passes. Against standing `proto2-030` "
+        "(412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this "
+        "is pin noise. One pass dipped to accept 47.3 % and 4.303 tokens/step, below "
+        "`proto2-030`'s floor (49.0 % / 4.414). Async scheduling is not the remaining "
+        "gap. Standing arm remains `proto2-030`.",
+    ),
+    "k6": (
+        "`proto2-030` plus `NUM_SPECULATIVE_TOKENS=6`. One variable: DSpark k=6, between "
+        "checkpoint-native k=5 and the pin's k=7. Capture 48 covers 6*(6+1)=42. EXTRA "
+        "overrides `run-arm.sh`'s hardcoded k=7. Confirmed `num_speculative_tokens: 6`. "
+        "`k5` won c6 but lost tokens/step; this checks the midpoint.",
+        "**negative, not kept.** 58.4 / 106.7 / 132.8 / **151.6**, sum **449.5**, worst "
+        "spread 9.6 %. Gates pass in all three passes; acceptance 57.5-68.7 % and tokens "
+        "per step 4.437-5.120, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) +9.1 % / +9.6 %, inside that spread. "
+        "Against `p030b` (420.3) +7.0 %. Behind same-image ceiling `moemar` (455.3). k=6 "
+        "keeps tokens/step where k=5 did not, but does not clear the keep-gate. Standing "
+        "arm remains `proto2-030`.",
+    ),
+    "k5": (
+        "`proto2-030` plus `NUM_SPECULATIVE_TOKENS=5`. One variable: DSpark k=5, the "
+        "checkpoint's native block size. Protocol pin uses k=7. `proto5` on the old pin "
+        "was rejected because capture missed 5x6=30; this pin captures 48, which covers "
+        "6*(5+1)=36. EXTRA overrides `run-arm.sh`'s hardcoded k=7. Confirmed "
+        "`num_speculative_tokens: 5`.",
+        "**negative, not kept.** 55.5 / 96.6 / 118.1 / **163.2**, sum **433.4**, worst "
+        "spread 10.5 %. `gate_9x8` passes; `gate_france` is noisy on pass 3. Against "
+        "standing `proto2-030` (412.1 / 138.3, spread 12.8 %) c6 is +18.0 % (outside that "
+        "spread) but the sum is only +5.2 % (inside). Tokens per step 4.031-4.571, below "
+        "`proto2-030`'s floor 4.414 — k=5 returns fewer tokens per step even though "
+        "acceptance rose to 60.8-71.8 %. vs `refg030` c6 163.2 vs 162.1 is inside the "
+        "reference's 18.5 % spread, and the sum is still 10.4 % behind. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "gencvllm": (
+        "`proto2-030` plus `--generation-config vllm` via `ARM_EXTRA_ARGS`. One variable: "
+        "match the anemll recipe. Ours default `auto` loads checkpoint "
+        "`generation_config.json` (`do_sample` true, temp 1.0, top_p 1.0). Protocol "
+        "requests send temperature explicitly, so this may be a no-op. Confirmed in "
+        "non-default args (`generation_config: vllm`).",
+        "**negative, not kept.** 55.9 / 101.4 / 127.7 / **141.8**, sum **426.8**, worst "
+        "spread 6.8 %. Gates pass in all three passes; acceptance 50.0-56.1 % and tokens "
+        "per step 4.491-4.876, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) and same-day control `p030b` (420.3 / "
+        "141.6) this is pin noise. Neutral vLLM sampling defaults are not the remaining "
+        "gap. Standing arm remains `proto2-030`.",
+    ),
+    "nomulti": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_ENABLE_MULTICTA=0`. One variable: "
+        "disable dynamic MoE multi-CTA (default 1). Off forces `effective_mac=1`. On, DSV4F "
+        "TP2 decode (E=256, k=6144, n=1024, 24-48 routed rows) caps at 24 resident CTAs and "
+        "may double occupancy for compact tile_m<=32. Confirmed in container env "
+        "(`B12X_DYNAMIC_ENABLE_MULTICTA=0`). Linear stayed `B12xFp8BlockScaledMMKernel`.",
+        "**negative, load-bearing default.** 11.0 / 15.7 / 19.7 / **20.9**, sum **67.3**, "
+        "worst spread 9.1 %. Gates pass in all three passes; acceptance 51.7-57.0 % and "
+        "tokens per step 4.613-4.971, neither lower than `proto2-030`. Throughput collapsed "
+        "~6x vs standing `proto2-030` (412.1 / 138.3). Multi-CTA occupancy is required on "
+        "this pin, not a leftover knob. Standing arm remains `proto2-030`.",
+    ),
+    "idxpr": (
+        "`proto2-030` plus `--sparse-indexer-topk-backend per_row` via `ARM_EXTRA_ARGS`. One "
+        "variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent "
+        "(topk 512, our k) -> per_row. `idxfi` already measured flashinfer (pin noise). "
+        "deep_select needs SM100. Overlay scores logits in fp32. Confirmed in non-default "
+        "args (`sparse_indexer_topk_backend: per_row`).",
+        "**negative, not kept.** 52.8 / 96.2 / 128.5 / **145.9**, sum **423.4**, worst spread "
+        "9.4 %. Gates pass in all three passes. Against standing `proto2-030` (412.1 / 138.3, "
+        "spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. One "
+        "pass dipped to accept 48.9 % (tokens/step 4.414 at the `proto2-030` floor). per_row "
+        "topk is not the remaining gap. Standing arm remains `proto2-030`.",
+    ),
+    "noshare": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MICRO_SHARE_INPUT_ACROSS_EXPERTS=0`. One "
+        "variable: disable micro MoE shared-input across experts (default 1). Fires on W4A8 "
+        "micro when activation is silu/relu2, m==1, and a1_gscale is a scalar (protocol c1 "
+        "is m=1 decode). Confirmed in container env. Linear stayed `B12xFp8BlockScaledMMKernel`.",
+        "**negative, not kept.** 54.6 / 100.0 / 128.8 / **141.4**, sum **424.8**, worst spread "
+        "11.6 %. Gates pass in all three passes; acceptance 50.3-56.3 % and tokens per step "
+        "4.531-4.939, neither lower than `proto2-030`. Against standing `proto2-030` (412.1 / "
+        "138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. "
+        "Micro share-input off is not the remaining gap. Standing arm remains `proto2-030`.",
+    ),
+    "noturbo": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DENSE_SPLITK_TURBO=0`. One variable: disable "
+        "atomic-BF16 reduction on dense GEMM split-K (default 1). Decode policy picks 2-way "
+        "split-K for m in 2..6 and k >= 4096 (our FP8 linear decode band). Confirmed in "
+        "container env (`B12X_DENSE_SPLITK_TURBO=0`); linear stayed `B12xFp8BlockScaledMMKernel`.",
+        "**quality fail, not kept.** 53.7 / 96.1 / 128.8 / **144.5**, sum **423.1**, worst "
+        "spread 8.9 %. `gate_france` passes; **`gate_9x8` fails all three passes** "
+        "(`'E5=8F='`, `'0x9a,0'`, `'E5=8F='` instead of `'72, 9x9'`). One pass also dipped "
+        "to accept 48.6 % and 4.384 tokens/step, below `proto2-030`'s floor. Atomic-BF16 "
+        "split-K is numerically required on this pin. Standing arm remains `proto2-030`.",
+    ),
+    "nowo": (
+        "`proto2-030` plus `VLLM_USE_B12X_WO_PROJECTION=0`. One variable: overlay fused "
+        "inv-RoPE FP8 + bmm O-proj off; layer falls back to einsum. `stockops2` mixed this "
+        "with sparse-indexer-off. Never isolated on `main-030-rc1`. Confirmed in container "
+        "env (`VLLM_USE_B12X_WO_PROJECTION=0`).",
+        "**negative, not kept, but informative.** 58.8 / 105.4 / 132.3 / **151.5**, sum "
+        "**448.0**, worst spread 5.4 %. Gates pass in all three passes; acceptance 49.9-55.0 % "
+        "and tokens per step 4.483-4.830, neither lower than `proto2-030`. Against standing "
+        "`proto2-030` (412.1 / 138.3, spread 12.8 %) +8.7 % / +9.5 %, inside that spread. "
+        "Against `p030b` (420.3) +6.6 %. Behind same-image ceiling `moemar` (455.3). Isolated "
+        "WO-off is a cost, not a win — opposite of `stockops2` which mixed WO-off with "
+        "indexer-off and lost 34 % at c6. Overlay indexer stays load-bearing; WO overlay is "
+        "the slower path. Standing arm remains `proto2-030`.",
+    ),
+    "nofast": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_FAST_MATH=0`. One variable: disable b12x MoE "
+        "fast-math (default True). Keyed into the dynamic W4A8 kernel cache. Confirmed in "
+        "container env (`B12X_FAST_MATH=0`); linear stayed `B12xFp8BlockScaledMMKernel`, MoE "
+        "stayed `B12X_MXFP4_MXFP8`. Warm FLASHINFER MLA autotune was skipped this round: the "
+        "0.7.0 cache JSON is metadata-only (499 B, no tactic entries), so a rerun would still "
+        "hit the default heuristic.",
+        "**negative, not kept.** 56.2 / 101.1 / 124.4 / **142.7**, sum **424.4**, worst spread "
+        "16.4 %. Gates pass in all three passes. Against standing `proto2-030` (412.1 / 138.3, "
+        "spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. One "
+        "pass dipped to accept 45.5 % and 4.163 tokens/step, below `proto2-030`'s floor "
+        "(49.0 % / 4.414). Fast-math off is not the remaining gap. Standing arm remains "
+        "`proto2-030`.",
+    ),
+    "attnfi030": (
+        "`proto2-030` plus `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` = "
+        "`FLASHINFER_MLA_SPARSE_DSV4`. One family: FlashInfer sparse MLA DSV4, the SM12x "
+        "auto-pick on the reference fork. Never re-measured on `main-030-rc1`. SM120 DSV4 "
+        "specialization is present (`has_flashinfer_sparse_mla_sm120_config` True). Boot "
+        "logged `No FlashInfer SM120 sparse MLA DSv4 decode autotune cache entries found. "
+        "Falling back to FlashInfer's default tactic heuristic.` — cold-cache path, same "
+        "as `proto2-attnfi` on the old pin.",
+        "**negative, not kept.** 56.6 / 99.7 / 129.8 / **145.3**, sum **431.4**, worst spread "
+        "10.6 %. Gates pass in all three passes; acceptance 50.8-58.3 % and tokens per step "
+        "4.531-5.069, neither lower than `proto2-030`. Against standing `proto2-030` (412.1 / "
+        "138.3, spread 12.8 %) +4.7 % / +5.1 %, inside that spread. Against `p030b` (420.3) "
+        "+2.6 %. Behind same-image ceiling `moemar` (455.3). FlashInfer MLA DSV4 on this pin "
+        "is not the remaining gap. Standing arm remains `proto2-030`.",
+    ),
+    "atom24": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DENSE_ATOM_24=1`. One variable: experimental "
+        "24-atom MMA in b12x dense GEMM (default 0). Changes generated code and is keyed into "
+        "the persistent compile cache. Hits `B12xFp8BlockScaledMMKernel` via `mm_block_fp8` -> "
+        "`dense_gemm`. Confirmed in container env (`B12X_DENSE_ATOM_24=1`); linear selection "
+        "stayed `B12xFp8BlockScaledMMKernel`.",
+        "**negative, not kept.** 52.8 / 103.0 / 125.4 / **144.8**, sum **426.0**, worst spread "
+        "9.7 %. Gates pass in all three passes. Against standing `proto2-030` (412.1 / 138.3, "
+        "spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. One "
+        "pass dipped to accept 45.7 % and 4.197 tokens/step, below `proto2-030`'s floor "
+        "(49.0 % / 4.414). 24-atom dense GEMM is not the remaining gap. Standing arm remains "
+        "`proto2-030`.",
+    ),
+    "lintri": (
+        "`proto2-030` plus `LINEAR_BACKEND=triton`. One variable: FP8 linear via "
+        "`TritonFp8BlockScaledMMKernel` (`is_supported` returns True on CUDA). MoE stays "
+        "b12x. Linear family so far: b12x works, deep_gemm worse/unstable, humming/marlin "
+        "die on O-proj, torch block-scaled is Hopper-only, flashinfer_b12x is NVFP4-only. "
+        "Engine log: `Selected TritonFp8BlockScaledMMKernel for Fp8LinearMethod`.",
+        "**negative, not kept.** 52.5 / 93.0 / 129.2 / **141.7**, sum **416.4**, worst spread "
+        "10.2 %. Gates pass in all three passes. Against standing `proto2-030` (412.1 / 138.3, "
+        "spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. One "
+        "pass dipped to accept 48.9 % and 4.401 tokens/step, below `proto2-030`'s floor "
+        "(49.0 % / 4.414). Triton linear is not the remaining gap. Standing arm remains "
+        "`proto2-030`.",
+    ),
+    "moea16": (
+        "`proto2-030` plus `VLLM_B12X_MOE_FP4_FORCE_A16=1`. One variable: select "
+        "`B12X_MXFP4_BF16` instead of the pin's `B12X_MXFP4_MXFP8`. Reference (anemll 0.1.1, "
+        "b12x 0.15.3) logs `Using 'B12X_MXFP4'` with activation_key None (BF16). Older library "
+        "is banned; this is the analogue on 1.2.6. `proto2-a16` was a wash on the old pin. "
+        "Engine log: `Using 'B12X_MXFP4_BF16' Mxfp4 MoE backend`.",
+        "**negative, not kept.** 59.3 / 105.4 / 135.4 / **146.2**, sum **446.3**, worst spread "
+        "10.2 %. Gates pass in all three passes; acceptance 50.1-56.9 % and tokens per step "
+        "4.483-4.971, neither lower than `proto2-030`. Against standing `proto2-030` (412.1 / "
+        "138.3, spread 12.8 %) +8.3 % / +5.7 %, inside that spread. Against `p030b` (420.3) "
+        "+6.2 %. Behind same-image ceiling `moemar` (455.3). Reference BF16 analogue is not "
+        "the remaining gap. Standing arm remains `proto2-030`.",
+    ),
+    "lpf1024": (
+        "`proto2-030` plus `--long-prefill-token-threshold 1024` via `ARM_EXTRA_ARGS`. One "
+        "variable: the pin already names `LONG_PREFILL_TOKEN_THRESHOLD=1024` and the reference "
+        "recipe passes the flag, but `05-serve.sh` never forwarded it. vLLM default is 0. "
+        "Confirmed in non-default args (`long_prefill_token_threshold: 1024`).",
+        "**negative, not kept.** 56.0 / 97.9 / 126.7 / **144.9**, sum **425.5**, worst spread "
+        "14.4 %. Gates pass in all three passes; acceptance 49.3-56.0 % and tokens per step "
+        "4.414-4.923, neither lower than `proto2-030`. Against standing `proto2-030` (412.1 / "
+        "138.3, spread 12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise "
+        "(c5 spread 14.4 % is the arm's own). Forwarding the documented flag does not close "
+        "the reference gap. Standing arm remains `proto2-030`.",
+    ),
+    "idxfi": (
+        "`proto2-030` plus `--sparse-indexer-topk-backend flashinfer` via `ARM_EXTRA_ARGS`. One "
+        "variable: indexer top-k. Auto chain is cooperative (excluded on SM120) -> persistent "
+        "(topk 512, our k) -> per_row; flashinfer is opt-in. Overlay scores logits in fp32, "
+        "which `top_k_ragged_transform` requires. Confirmed in non-default args. First "
+        "`run-arm` health window expired at 450s (FlashInfer init); protocol then ran against "
+        "the live healthy container.",
+        "**negative, not kept.** 55.6 / 97.3 / 124.2 / **142.3**, sum **419.4**, worst spread "
+        "12.2 %. Gates pass in all three passes. Against `proto2-030` (412.1 / 138.3, spread "
+        "12.8 %) and same-day control `p030b` (420.3 / 141.6) this is pin noise. One pass dipped "
+        "to accept 48.3 % and 4.339 tokens/step, below `proto2-030`'s floor (49.0 % / 4.414). "
+        "FlashInfer indexer top-k is not the remaining gap. Standing arm remains `proto2-030`.",
+    ),
+    "moemar": (
+        "`proto2-030` plus `MOE_BACKEND=marlin`. One variable: the MXFP4 oracle's Marlin expert "
+        "path (`MARLIN` / `MarlinExperts`, SM75+). Never measured on this pin. Engine log: "
+        "`Using 'MARLIN' Mxfp4 MoE backend`.",
+        "**best same-image sum, not a keep.** 58.7 / 101.8 / 140.0 / **154.8**, sum **455.3**, "
+        "worst spread 4.5 %. Gates pass in all three passes; acceptance 50.4-56.7 % and tokens "
+        "per step 4.518-4.923, neither lower than `proto2-030`. Against standing `proto2-030` "
+        "(412.1 / c6 138.3, spread 12.8 %) the sum is +10.5 % and c6 is +11.9 %, both inside "
+        "that spread. Against same-day control `p030b` (420.3 / 141.6, spread 11.0 %) +8.3 % / "
+        "+9.3 %, also inside. Against `moehum` (448.3 / 152.0) a small further lift. Against "
+        "`refg030` (483.7 / 162.1) still -5.9 % / -4.5 %. Standing arm remains `proto2-030`. "
+        "Marlin is the current ceiling on this pin, not a protocol win vs the keep-rule.",
+    ),
+    "moehum": (
+        "`proto2-030` plus `MOE_BACKEND=humming`. One variable: the MXFP4 oracle's humming expert "
+        "path (`HUMMING` / indexed gemm). Device gate is SM75+; `has_humming()` is true in this "
+        "image. Prior `moe_humming` (353.2) was on the old protog pin, never re-measured on "
+        "`main-030-rc1`. Engine log: `Using 'HUMMING' Mxfp4 MoE backend`.",
+        "**best same-image sum, not a keep.** 57.8 / 102.6 / 135.9 / **152.0**, sum **448.3**, "
+        "worst spread 8.8 %. Gates pass in all three passes; acceptance 49.2-55.0 % and tokens "
+        "per step 4.414-4.830, neither lower than `proto2-030`. Against standing `proto2-030` "
+        "(412.1 / c6 138.3, spread 12.8 %) the sum is +8.8 % and c6 is +9.9 %, both inside that "
+        "spread. Against same-day control `p030b` (420.3 / 141.6, spread 11.0 %) +6.7 % / +7.3 %, "
+        "also inside. Against `refg030` (483.7 / 162.1) still -7.3 % / -6.2 %. Standing arm "
+        "remains `proto2-030`. Humming is the current noise-ceiling on this pin, not a protocol "
+        "win vs the keep-rule.",
+    ),
+    "memprof0": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0`. One "
+        "variable: disable v0.30's CUDA-graph memory profiler (default on; maps 0.8389 to "
+        "effective 0.8115). `util8663` compensated by raising the util number; this turns the "
+        "profiler off at the standing 0.8389. Env confirmed; Available KV 13.36 GiB vs 9.39 GiB "
+        "with the profiler on.",
+        "**negative, not kept.** 56.5 / 97.5 / 131.0 / **140.2**, sum **425.2**, worst spread 9.1 %. "
+        "Gates pass in all three passes. Against `proto2-030` (412.1 / c6 138.3, spread 12.8 %) "
+        "and same-day control `p030b` (420.3) the sum is +3.2 % / +1.2 %, both inside the keep "
+        "spread. One pass dipped to accept 48.1 % and 4.351 tokens/step, below `proto2-030`'s "
+        "floor (49.0 % / 4.414). Extra KV without the profiler does not close the reference "
+        "gap. Standing arm remains `proto2-030`.",
+    ),
+    "p030b": (
+        "same pin as `proto2-030` (`main-030-rc1`, no extra env), new tag so the log does not "
+        "append. Same-day re-baseline after later same-image arms clustered at 421-429 while "
+        "the first sample was 412.1.",
+        "**control, not a keep.** 52.5 / 96.6 / 129.6 / **141.6**, sum **420.3**, worst spread "
+        "11.0 %. Gates pass in all three passes; acceptance 50.3-58.0 % and tokens per step "
+        "4.531-5.069. Against original `proto2-030` (412.1 / c6 138.3, spread 12.8 %) this is "
+        "+2.0 % on the sum and +2.4 % at c6, inside that spread. Confirms the later config "
+        "arms were sitting in the pin's own noise, not winning. Standing arm remains "
+        "`proto2-030`. Future keep-rule on this pin should use the larger of the two control "
+        "spreads (12.8 %) and treat ~420 as the current noise center, not a new champion.",
+    ),
+    "moeshare": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_W4A8_SHARE_INPUT=1`. One variable: force "
+        "the W4A8 shared-input producer on. Default is on only when dense or decode candidate is "
+        "true; decode candidate requires routed_rows <= 64, so only c1. c3-c6 (144-288 rows) "
+        "default off. Env confirmed in the container.",
+        "**negative, not kept.** 55.4 / 98.0 / 126.9 / **140.5**, sum **420.8**, worst spread 4.4 %. "
+        "Gates pass in all three passes; acceptance 50.1-55.9 % and tokens per step 4.476-4.876, "
+        "neither lower than `proto2-030`. Against same-base `proto2-030` (412.1 / c6 138.3, spread "
+        "12.8 %) the sum is +2.1 % and c6 is +1.6 %, both inside the larger spread. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "moetile32": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_TILE_MN=32x128`. One variable: the b12x "
+        "dynamic MoE tile. Auto planner returns (16, 128) for the whole protocol band (48-288 "
+        "routed rows). `64x128` was already a wash (`proto2-moetile`); M32 is the W4A8 ladder's "
+        "next tactic. Env confirmed in the container.",
+        "**negative, not kept.** 52.7 / 98.2 / 129.7 / **143.6**, sum **424.2**, worst spread 3.4 %. "
+        "Gates pass in all three passes; acceptance 50.0-53.2 % and tokens per step 4.491-4.712, "
+        "neither lower than `proto2-030`. Against same-base `proto2-030` (412.1 / c6 138.3, spread "
+        "12.8 %) the sum is +2.9 % and c6 is +3.8 %, both inside the larger spread. Tile shape is "
+        "not the remaining MoE gap. Standing arm remains `proto2-030`.",
+    ),
+    "util8663": (
+        "`proto2-030` plus `GPU_MEMORY_UTILIZATION=0.8663`. One variable: restore the pre-profiler "
+        "KV budget. v0.30 CUDA-graph memory profiling maps 0.8389 to effective 0.8115; the engine "
+        "names 0.8663 as the util that keeps the same KV size as 0.8389 without the profiler. "
+        "Confirmed in the engine log (`gpu_memory_utilization=0.8663`, Available KV 13.82 GiB vs "
+        "`moecap175`'s 9.39 GiB at 0.8389).",
+        "**negative, not kept.** 51.9 / 102.6 / 129.2 / **145.3**, sum **429.0**, worst spread 6.2 %. "
+        "Gates pass in all three passes; acceptance 49.7-56.3 % and tokens per step 4.452-4.923, "
+        "neither lower than `proto2-030`. Against same-base `proto2-030` (412.1 / c6 138.3, spread "
+        "12.8 %) the sum is +4.1 % and c6 is +5.1 %, both inside the larger spread. Extra KV does "
+        "not close the reference gap. Standing arm remains `proto2-030`.",
+    ),
+    "moework": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_WORK_SOURCE=persistent_grid`. One variable: "
+        "the b12x dynamic MoE work source. Library default is `materialized_queue`; `persistent_grid` "
+        "is documented as arithmetic striding for A/B. Env confirmed in the container.",
+        "**negative, not kept.** 54.8 / 97.3 / 129.3 / **145.4**, sum **426.8**, worst spread 6.6 %. "
+        "Gates pass in all three passes; acceptance 49.3-54.9 % and tokens per step 4.452-4.830, "
+        "neither lower than `proto2-030`. Against same-base `proto2-030` (412.1 / c6 138.3, spread "
+        "12.8 %) the sum is +3.6 % and c6 is +5.1 %, both inside the larger spread. Standing arm "
+        "remains `proto2-030`.",
+    ),
+    "moecap175": (
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_MAX_ACTIVE_CLUSTERS=175`. One variable: the "
+        "b12x dynamic MoE cluster cap. Offline sweep priced 175 at 0.941x the flat-188 time at 288 "
+        "routed rows; 175 is also the reference's static cap at c6. First boot died at "
+        "`_check_enough_kv_cache_memory` (9.39 GiB available vs 9.48 GiB needed); retry served.",
+        "**negative, not kept.** 55.3 / 101.0 / 128.8 / **139.2**, sum **424.3**, worst spread 9.5 %. "
+        "Gates pass in all three passes; acceptance 50.3-55.9 % and tokens per step 4.515-4.876, "
+        "neither lower than `proto2-030`. Against same-base `proto2-030` (412.1 / c6 138.3, spread "
+        "12.8 %) the sum is +3.0 % and c6 is +0.6 %, both inside the larger spread. The offline 6 % "
+        "does not survive the protocol. Standing arm remains `proto2-030`. Env confirmed in the "
+        "container (`printenv` = 175).",
+    ),
+    "proto2-030": (
+        "`v0.30.0rc1` (`a00a3544b93e`) matched-main rebuild, image `vllm-spark-0731:main-030-rc1`, "
+        "same pin flags as `proto2-dg` (`VLLM_B12X_INDEXER_DIRECT_GATHER=1`, k=7, capture 48, util 0.8389, "
+        "`--async-scheduling`). One variable: the base.",
+        "**new-base re-baseline, not a win.** 52.8 / 93.9 / 127.1 / **138.3**, sum **412.1**, worst spread "
+        "12.8 %. Gates pass in all three passes; acceptance 49.0-54.8 % and tokens per step 4.414-4.815. "
+        "Same-day `refg030` is 64.0 / 114.2 / 143.4 / **162.1**, sum **483.7**, worst spread 18.5 %. "
+        "Behind 14.7 % at c6 and 14.8 % on the sum, both outside the larger of the two arms' spreads "
+        "at those levels (c6 12.8 %, sum driven by the 18.5 % c5 swing on the reference). Standing "
+        "configuration on `v0.30.0rc1` until a one-variable arm beats it. Proto-era `proto2-dg` "
+        "(437.2) is a different base and a different day; do not A/B across them.",
+    ),
+    "refg030": (
+        "same-day reference arm: anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the base checkpoint, "
+        "launched by `~/goal/launch-refbase.sh` on 2026-09-18 after `proto2-030`",
+        "**comparator for the v0.30.0rc1 re-baseline.** 64.0 / 114.2 / 143.4 / **162.1**, sum **483.7**, "
+        "worst spread 18.5 % (c5 121.9-148.4). Gates pass in all three passes. Acceptance 49.4-55.8 % "
+        "and tokens per step 4.439-4.876. The previous `refg` row (sum 473.1 / 484.8) is a different day.",
+    ),
+    "refg": (
+        "reference arm: anemll `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` on the base checkpoint "
+        "`deepseek-ai/DeepSeek-V4-Flash-0731`, launched by `~/goal/launch-refbase.sh`",
+        "**comparator**. Not a candidate: nothing in it was changed. Re-measured 2026-09-17 on the same "
+        "rig and day as `proto2` (66.4 / 118.4 / 139.0 / 161.0, sum 484.8); the 2026-09-13 run "
+        "of the same image and recipe gave 63.1 / 112.1 / 140.9 / 156.0, sum 472.1, so the rig itself "
+        "moved about +3.2 % at c6 between the two days.",
+    ),
+    "protog": (
+        "proto base, k=7, capture 48, `--async-scheduling`",
+        "**baseline** for every A/B below.",
+    ),
+    "proto2-recipe2": (
+        "`main-029-proto2` with a corrected `o_proj.py` bind-mounted over the image's stale copy, "
+        "before the overlay fix was rebuilt into an image; `GPU_MEMORY_UTILIZATION=0.86`",
+        "**diagnostic, and the arm that proved the fix.** Mounting the corrected `o_proj.py` took "
+        "`csrc/utils/layout.hpp:113` from one occurrence per boot to zero and got the engine past the "
+        "forward to `_check_enough_kv_cache_memory`. Its numbers (34.8 / 74.9 / 100.8 / 117.0) agree "
+        "with `proto2`'s (35.4 / 78.9 / 103.0 / 117.0) inside the spreads, so the bind-mount was "
+        "equivalent to the rebuild and no second measurement was needed to carry the conclusion over.",
+    ),
+    "proto2-compile": (
+        "`proto2` with `VLLM_USE_AOT_COMPILE=0`, meant to reach `CompilationMode.VLLM_COMPILE`",
+        "**not the test it looks like, and the result is still useful.** It measured 35.1 / 75.3 / "
+        "97.1 / 111.4, sum **318.9** against `proto2`'s 334.3 -- 4.6 % worse -- but the resolved config "
+        "still reads `CompilationMode.NONE`, so compilation never happened. What the arm actually "
+        "measured is losing the AOT-compiled artifacts, which cost 4.6 %. **Keep `VLLM_USE_AOT_COMPILE=1`.** "
+        "The reason the mode stays NONE is `config/vllm.py:786`: `if is_breakable_cudagraph_enabled(): "
+        "self.compilation_config.mode = CompilationMode.NONE`, and `configs/env.spark.sh:47` forces "
+        "`VLLM_USE_BREAKABLE_CUDAGRAPH=1`. See `proto2-break0`.",
+    ),
+    "proto2-a16": (
+        "`proto2` with `VLLM_B12X_MOE_FP4_FORCE_A16=1` through `SERVE_EXTRA_ENV`, which selects "
+        "`B12X_MXFP4_BF16` -- BF16 activations with MXFP4 weights, the closest analogue of the "
+        "`B12X_MXFP4` backend the reference engine logs",
+        "**wash, and it is the first arm that actually tested the MoE activation format.** The engine "
+        "logged `Using 'B12X_MXFP4_BF16' Mxfp4 MoE backend` this time, so the variant really changed. "
+        "31.6 / 76.8 / 106.2 / 119.4, sum **334.0**, against `proto2`'s 334.3 -- the same sum, with "
+        "catastrophic instability: spreads of 22.5 / 12.8 / **40.9** / **49.5 %**, one c6 pass falling "
+        "to 63.0. Our default W4A8 path (`B12X_MXFP4_MXFP8`) is therefore not what is costing us, and "
+        "the reference's activation format is not transferable at a profit. The earlier `proto2-moea4` "
+        "arm did *not* test this: it set `B12X_MOE_FORCE_A8`, which no code in vLLM or b12x reads.",
+    ),
+    "proto2-moea4": (
+        "`proto2` with `B12X_MOE_FORCE_A8=0`, so the MoE uses the reference's FP4 activations instead of "
+        "the FP8 ones our pin forces",
+        "**a no-op arm, not a result.** 36.6 / 79.0 / 104.1 / 114.6, sum 334.3 against `proto2`'s 334.3, "
+        "identical because nothing happened: `B12X_MOE_FORCE_A8` is read by no code in vLLM or b12x. "
+        "The env var does reach the container -- `05-serve.sh` forwards it in its explicit `-e` list -- "
+        "but it is a dead knob in our own pin. **The activation format was tested properly by "
+        "`proto2-a16`, which uses the supported `VLLM_B12X_MOE_FP4_FORCE_A16` and really does change the "
+        "selected backend.**",
+    ),
+    "proto2-attnfi": (
+        "`proto2` with `ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` set to "
+        "`FLASHINFER_MLA_SPARSE_DSV4`, the attention the reference engine actually runs -- but on a cold "
+        "FlashInfer autotune cache, so it fell back to the default tactic heuristic",
+        "**negative.** 35.4 / 73.6 / 101.9 / 117.2, sum 328.1, against `proto2`'s 35.4 / 78.9 / 103.0 / "
+        "117.0, sum 334.3 -- no better overall and worse at c3 and c5. The reference runs FlashInfer's "
+        "`SparseMlaDecodeV3Runner` from a **pre-built autotune config** (`Config cache hit ... "
+        "source=config file`, `flashinfer_autotune_cache/0.6.15/...`), while this arm logged "
+        "`No FlashInfer SM120 sparse MLA DSv4 decode autotune cache entries found. Falling back to "
+        "FlashInfer's default tactic heuristic.` So the swap was tested in its worst configuration, and "
+        "the follow-up below tests the same arm with the cache the boot itself populated.",
+    ),
+    "proto2-attnfi-warm": (
+        "the identical arm, re-run after the previous boot wrote FlashInfer's sparse MLA DSv4 decode "
+        "autotune entries -- one variable (cache populated vs not), same image, same env",
+        "**negative, and it settles the attention family.** The cache loaded this time "
+        "(`FlashInfer SM120 sparse MLA DSv4 decode autotune cache loaded on rank 0`), and the result is "
+        "37.5 / 71.1 / 99.3 / 113.0, sum **320.9** -- slightly *worse* than the cold run's 328.1 and "
+        "clearly below `proto2`'s 334.3. The one real gain is stability: spreads of 3.2 / 4.4 / 2.3 / "
+        "2.0 % against the cold run's 7.3 / 5.8 / 4.0 / 7.0 %. Both FlashInfer configurations lose to "
+        "`B12X_MLA_SPARSE`, so the attention backend is not the gap either, and the reference's tuned "
+        "FlashInfer tactic does not transfer.",
+    ),
+    "proto2-dglin": (
+        "`proto2` with `LINEAR_BACKEND=deep_gemm`, i.e. the linear layer family set to the kernel the "
+        "reference engine actually selects",
+        "**negative, and it rules out the linear family.** The reference's own boot log shows it gets "
+        "`Selected DeepGemmFp8BlockScaledMMKernel for Fp8LinearMethod` while ours gets "
+        "`B12xFp8BlockScaledMMKernel`, and `_POSSIBLE_FP8_BLOCK_KERNELS` orders CUDA as FlashInfer-"
+        "DeepGEMM, DeepGemm, Cutlass, then B12x -- so the two arms really are running different linear "
+        "kernels. Forcing ours to the reference's choice booted, selected `DeepGemmFp8BlockScaledMMKernel`, "
+        "and passed both gates, but is **no better and far less stable**: 30.1 / 76.9 / 106.7 / 114.6, "
+        "sum 328.3, against `proto2`'s 35.4 / 78.9 / 103.0 / 117.0, sum 334.3, with a c6 spread of "
+        "**48.6 %** (one pass fell to 62.9) against `proto2`'s 0.3 %. Our own b12x block-scaled MM is not "
+        "the gap, and the reference's linear kernel is not transferable at a profit.",
+    ),
+    "proto2-skip-ffn": (
+        "`proto2` with `DISABLE_DSPARK=1` **and** `self.ffn(x, input_ids)` in the layer forward replaced "
+        "by `x = x` (bind-mounted `model.py`), so the FFN half is priced by removal",
+        "**the measurement the attribution needed, with one stated confound.** One token per step, so "
+        "per-stream tok/s is 1/step-time: 10.4 / 30.7 / 51.1 / 61.2 aggregate, i.e. **96.2 / 97.7 / 97.8 "
+        "/ 98.0 ms**, on spreads of 0.0-0.3 %. Against the unmodified `proto2-nodspark` (105.3 / 128.2 / "
+        "145.3 / 148.1 ms) the FFN costs **+9.1 ms at c1 rising to +50.1 ms at c6**. Two things follow. "
+        "First, **the FFN carries essentially all of the batch dependence**: with it removed the step is "
+        "flat at 96-98 ms across 8 to 48 rows, so the remaining ~96 ms is batch-independent work. Second, "
+        "the reference's *entire* c1 step is 69 ms, which is **below our batch-independent floor even "
+        "with the MoE deleted** -- that floor, not the MoE, is where the c1 deficit lives. Gates are "
+        "garbled by construction (the model has no FFN); the tokens still ran to full length in all "
+        "three passes (512/1536/2560/3072), which is what makes the timing usable. The confound: a "
+        "degenerate residual stream can also change the attention path, so read +50.1 ms as an upper "
+        "bound on the MoE rather than an exact price.",
+    ),
+    "proto2-mhctl": (
+        "`proto2` with `DISABLE_DSPARK=1` and the mHC prenorm GEMM forced onto its TileLang fallback "
+        "instead of DeepGEMM's tf32 kernel (`_USE_DEEP_GEMM = False`, bind-mounted `mhc/tilelang.py`)",
+        "**negative: mHC's GEMM implementation is worth ~1 %.** 9.6 / 23.6 / 34.7 / 41.1 aggregate on "
+        "spreads of 0.0-0.5 %, i.e. **104.2 / 127.1 / 144.1 / 146.0 ms** against `proto2-nodspark`'s "
+        "105.3 / 128.2 / 145.3 / 148.1 -- faster at every level by 1.1-2.1 ms, which is ~1 % and only "
+        "just outside the control's spread. Unlike the skip probes this arm is a real A/B: **both gates "
+        "pass** (`' Paris. The capital of Spain'`, `'72, 9x9'`), so the fallback is functionally correct "
+        "and the comparison is meaningful. mHC runs a per-layer, batch-independent GEMM and it was the "
+        "one per-layer component never priced; it is now priced at ~1 ms per step, so it is not the "
+        "batch-independent floor either. Not keepable as a lever -- 1 % against a 27 % gap.",
+    ),
+    "proto2-dgather2": (
+        "the identical `proto2-dgather` run repeated, to satisfy the loop's re-measure-before-believing "
+        "rule",
+        "**the confirmation, and it reproduces.** 55.1 / 98.2 / 129.7 / 139.6, sum **422.6**, against the "
+        "first run's 51.9 / 101.4 / 127.6 / 143.4, sum 424.3 -- a 0.4 % difference on the sum, inside both "
+        "runs' spreads (4.4 / 0.5 / 3.0 / 3.7 % here). Gates pass in all three passes; acceptance 52.4 / "
+        "53.6 / 50.8 % and tokens per step 4.655 / 4.732 / 4.538 are unchanged from `proto2`. **So the arm "
+        "is kept**: it passes both gates, does not lose acceptance, and beats `proto2` by ~27 % on the sum "
+        "and ~22 % at c6. It is now the best measured arm on this base.",
+    ),
+    "proto2-moetile": (
+        "the kept arm (`proto2-dg`) plus `B12X_DYNAMIC_TILE_MN=64x128`, the MoE tile-shape override b12x "
+        "documents as a benchmarking knob -- the first time any of the three tile knobs has been tried",
+        "**a wash, and inside the kept arm's own run-to-run range.** 58.2 / 96.8 / 126.4 / 144.3, sum "
+        "**425.7**, against `proto2-dg`'s 55.5 / 99.6 / 131.7 / 150.4, sum 437.2 -- better at c1 (+4.9 %), "
+        "worse at c3, c5 and c6 (-2.8, -4.0, -4.1 %), and -2.6 % on the sum. The three runs of the "
+        "unmodified kept arm span sums 422.6-437.2, so 425.7 sits inside that. Gates pass in all three "
+        "passes and acceptance (51.0-55.1 %) and tokens per step (4.555-4.830) are fine, so it is a "
+        "legitimate A/B rather than a correctness casualty -- it simply buys nothing. The MoE's remaining "
+        "+50.1 ms at c6 is not reachable by tile shape, at least not this one.",
+    ),
+    "proto2-dg": (
+        "the **stock** arm after `VLLM_B12X_INDEXER_DIRECT_GATHER=1` was promoted into "
+        "`configs/pin.main-029.env` and the serve forward list -- no extra env on the command line",
+        "**the promotion, verified: the switch reaches the container from the pin and the win "
+        "reproduces.** 55.5 / 99.6 / 131.7 / **150.4**, sum **437.2**, against `proto2-dgather`'s 424.3 "
+        "and `proto2-dgather2`'s 422.6. All three runs are the same configuration, so the spread across "
+        "them is the honest measure: c6 139.6-150.4 (a 7.8 % range) and the sum 422.6-437.2 (3.5 %). "
+        "Gates pass in all three passes, acceptance 50.8-52.7 % and tokens per step 4.531-4.669, both "
+        "unchanged from `proto2`. **This is now the standing configuration**, and `proto2`'s row below "
+        "describes the arm before the switch was kept.",
+    ),
+    "proto2-dgather": (
+        "`proto2` with `VLLM_B12X_INDEXER_DIRECT_GATHER=1` (via `SERVE_EXTRA_ENV`), the packed-indexer "
+        "gather that reads the KV cache directly instead of materialising a full-cache copy on every "
+        "layer of every decode step",
+        "**The biggest result of the run: +27 % on the sum, and it was already written down in our own "
+        "code.** 51.9 / 101.4 / 127.6 / 143.4, sum **424.3**, against `proto2`'s 35.4 / 78.9 / 103.0 / "
+        "117.0, sum 334.3 -- +46.6 % at c1, +28.5 % at c3, +23.9 % at c5, **+22.6 % at c6**, and +26.9 % "
+        "on the sum. Gates pass in all three passes. **Acceptance is 53.5 / 51.4 / 53.7 %, i.e. unchanged** "
+        "against `proto2`'s ~52 %, and tokens per step are 4.712 / 4.580 / 4.726 against 4.571 -- so the "
+        "condition that kept this switch off does not hold here. The docstring of `_indexer_direct_gather` "
+        "in `patches/files/sm12x_b12x_kernels.py` says the default path \"reshapes a strided slice of the "
+        "KV cache, which materialises a full-cache copy on every layer of every decode step (~57 ms/step at "
+        "1 row)\" and that the direct read \"measured 10.1 -> 25.5 tok/s on the no-spec arm, but draft "
+        "acceptance drops from ~60 % to ~41-50 %, so it stays off until that is understood\". Round 45 "
+        "named that copy independently from a shapes-recorded trace -- `aten::copy_ [17177, 64, 132]`, "
+        "1344 calls in a 16-token run, `64 x 132 = 8448` matching the packed-indexer sidecar width in our "
+        "own boot log -- and then measured the switch end to end with DSpark on, which is what had never "
+        "been done. The acceptance penalty does not reproduce on proto2. **This arm must still be "
+        "confirmed by a second identical run** before it is treated as standing, per the loop's "
+        "re-measure rule; `proto2-dgather2` is that run.",
+    ),
+    "proto2-nodspark": (
+        "`proto2` with `DISABLE_DSPARK=1`, i.e. speculative decoding off, so exactly one token is "
+        "produced per engine step and the meter's per-stream tok/s *is* 1/step-time",
+        "**Withdrawn as a draft-versus-target split (corrected in round 48); the step times themselves stand.** "
+        "With speculation off a step processes `concurrency` rows; with DSpark k=7 it processes `concurrency x 8`. "
+        "So the difference against `proto2` is the draft's work **plus** the target's own scaling from 6 rows to 48, and it cannot be separated inside the protocol, which fixes the levels at 1 3 5 6. The no-DSpark curve (+8.6 ms/row from 1 to 6 rows, then flattening) runs close to the DSpark points, so the +86.2 ms is mostly row scaling, not draft overhead. The measurement is still the cleanest of the run: "
+        "**it isolates the target model's forward.** 9.5 / 23.4 / "
+        "34.4 / 40.5 aggregate tok/s with spreads of 0.0 / 0.4 / 0.6 / 0.5 %, which in step time is "
+        "**105.3 / 128.2 / 145.3 / 148.1 ms**. Against `proto2` at 4.6 tokens per step (130 / 175 / 223 / "
+        "234 ms), the whole DSpark draft-plus-verification machinery costs **+24.7 ms at c1 rising to "
+        "+86.2 ms at c6** -- it grows with batch, as expected for a draft run k+1 times over a larger "
+        "batch. The target forward itself grows only 1.4x from 8 to 48 rows (105 -> 148 ms), so it is "
+        "dominated by batch-independent work. **Against the reference's entire c1 step of 69 ms, our "
+        "target forward alone at batch 8 is 105.3 ms -- 1.5x the reference's whole step**, and the "
+        "reference also has a draft on top. That is the gap, now derived from two interventions rather "
+        "than from profiler shares. Gates pass in all three passes.",
+    ),
+    "proto2-eager": (
+        "the `proto2` arm with `--enforce-eager` (`INSTANTTENSOR_MAX_FREE_MEM_USAGE=0.8` to boot), "
+        "i.e. CUDA graphs off",
+        "**negative, and it refutes the graph-split hypothesis.** Our own "
+        "`patch_tp_allreduce_eager_break` pulls the TP all-reduce out of the piecewise graph because an "
+        "in-graph PYNCCL all-reduce on 2-node GB10 produced 1e33 logits, and that break splits the graph "
+        "once per layer -- 87 all-reduce calls per step were measured -- which looked like a "
+        "batch-independent per-step cost and therefore like the ~60 ms constant in the step-time table. "
+        "It is not: turning the graphs off entirely is worse at every level (28.4 / 68.6 / 98.2 / 112.9, "
+        "sum 308.1, against `proto2`'s 35.4 / 78.9 / 103.0 / 117.0, sum 334.3), so the graphs save more "
+        "than the breaks cost and no graph configuration change is the fix. Worth keeping for a second "
+        "reason: the deficit widens at c1 when graphs are off, so part of the fixed cost is host-side "
+        "and the graphs are already hiding it.",
+    ),
+    "proto2": (
+        "`main-029-proto2` rebuilt from the phase-1 base with the stale SM12x fp8_einsum recipe "
+        "override removed from `apply_main`, `GPU_MEMORY_UTILIZATION=0.86`, k=7, capture 48, "
+        "`--async-scheduling`, page cache dropped on both nodes first",
+        "**the first proto2 arm from a real image, and the current best on this base.** Against the "
+        "same-day reference it is **27.3 % below at c6** (117.0 against 161.0) and **31.0 % below on "
+        "the sum** (334.3 against 484.8), both far outside the larger spread (26.0 %, the reference's "
+        "own c5). Acceptance and tokens per step are comparable, so the deficit is step time: c6 step "
+        "time is 234 ms against the reference's 177 ms. Against `protog` it is 122.3 -> 117.0 at c6 "
+        "while the reference rose 156.0 -> 161.0, so proto2 is also about 7 % slower relative to the "
+        "reference than proto was. The gap itself is unchanged: 234 ms here against `protog`'s 231.8 ms.",
+    ),
+    "proto5": (
+        "`NUM_SPECULATIVE_TOKENS=5` (k=5 instead of 7)",
+        "rejected as a lever: +8.7 % at c6 but -9.3 % at c5, level on the sum (349.7 against 346.7). "
+        "c5 is where k=7's capture size fits (5x8=40 in the captured list) and k=5's does not (5x6=30).",
+    ),
+    "attnfi": (
+        "`ATTENTION_BACKEND` and `DRAFT_ATTENTION_BACKEND` = `FLASHINFER_MLA_SPARSE_DSV4`, which is "
+        "also the only configuration that passes the sparse-MLA autotune gate",
+        "rejected: 37.8 / 78.5 / 104.6 / 119.8, inside `protog`'s spread. The attention implementation "
+        "is not the gap, and the reference's 24 tuned configs are not what earns its step time.",
+    ),
+    "moe_humming": (
+        "`MOE_BACKEND=humming`",
+        "best sum measured (353.2), but not earned: +9.4 % at c1 against `protog`'s own 9.4 % c1 spread, "
+        "and +0.4 % at c6. Needs a longer run before it can be kept.",
+    ),
+    "cgfull": (
+        "`CUDAGRAPH_MODE=FULL`",
+        "rejected: worse at every level and unstable, with a 74 % c1 spread and truncated generations "
+        "(1381 tokens at c3 where 1536 were asked for).",
+    ),
+    "stockops2": (
+        "our WO-projection and sparse-indexer overlays off (`VLLM_USE_B12X_WO_PROJECTION=0`, "
+        "`VLLM_USE_B12X_SPARSE_INDEXER=0`), with `MAX_MODEL_LEN=32768` so the KV pool fits",
+        "rejected, and informative: -34 % at c6. Our per-layer overlays are load-bearing, not a cost. "
+        "The higher context of the first attempt needs 9.48 GiB of KV against 9.32 GiB available.",
+    ),
+    "deeplinear": (
+        "`LINEAR_BACKEND=auto VLLM_USE_DEEP_GEMM_E8M0=1`",
+        "**crash**, no numbers: DeepGEMM assert `sf.size(-2) == ceil_div(mn, gran_mn)` at "
+        "`csrc/utils/layout.hpp:97`, the ue8m0 scale layout.",
+    ),
+    "dglinear": (
+        "`LINEAR_BACKEND=auto`, which selects `DeepGemmFp8BlockScaledMMKernel`, the kernel the "
+        "reference uses for its fp8 linears",
+        "**numerically dead**: both gates return garbage, `accept_rate 0.0 %`, `tokens_per_step 1.002`. "
+        "So `b12x` linear is the only working option on this pin, not a preference.",
+    ),
+    "lin_cutedsl": (
+        "`LINEAR_BACKEND=flashinfer_cutedsl`, which logs `has no kernel for this linear layer type` and "
+        "falls back to automatic selection, i.e. to the same DeepGEMM path",
+        "**numerically dead** for the same reason as `dglinear`. With it, every fp8 linear route that is "
+        "not `b12x` has now been measured.",
+    ),
+    "prof2": (
+        "decode profiler armed, default 12-step window (`VLLM_PROFILE_DECODE=1 VLLM_PROFILE_CAPTURE=1`)",
+        "diagnostic. The window is 12 steps, all of them c1, because the limit never reached the worker; "
+        "throughput here is profiler-distorted and is not evidence about performance.",
+    ),
+    "prof3": (
+        "same profiler with `VLLM_PROFILE_DECODE_STEPS=900`, still defeated by capture mode",
+        "diagnostic, same window problem as `prof2`.",
+    ),
+    "prof4": (
+        "same profiler, region and per-layer marks read",
+        "diagnostic: produced the c1 region table (ffn/MoE 1.84 ms of a 2.83 ms layer, 65 %) and the "
+        "per-layer average used in the attribution.",
+    ),
+    "prof6": (
+        "same profiler with `VLLM_PROFILE_DECODE_STEPS=1250`",
+        "diagnostic. This is the run whose samples were misread as a c6 split; they carry `tok=8`, "
+        "one sequence, so they are c1. Superseded by `p6c`.",
+    ),
+    "prof6b": (
+        "same profiler with capture mode off and `VLLM_PROFILE_DECODE_STEPS=1250`",
+        "diagnostic: capture mode was what defeated the limit, so with it off the window is still 12, "
+        "which located the real cause at the SERVE_EXTRA_ENV boundary.",
+    ),
+    "p6c": (
+        "the profiler with both settings passed through `SERVE_EXTRA_ENV`, so the 1250-step window "
+        "actually applied",
+        "diagnostic, and the run that produced the real c6 split: target 99.1 to 104.5 ms gpu against "
+        "draft+sampler 21.2 to 21.9 ms.",
+    ),
+}
+
+# Kind decides which table an arm appears in. Diagnostic arms run the decode
+# profiler, so their throughput is profiler-distorted and belongs nowhere near a
+# candidate ranking.
+KIND: dict[str, str] = {
+    "refg": "reference",
+    "refg-now": "reference",
+    "proto2-skip-ffn": "diagnostic",
+    "proto2-recipe2": "diagnostic",
+    "prof2": "diagnostic",
+    "prof3": "diagnostic",
+    "prof4": "diagnostic",
+    "prof6": "diagnostic",
+    "prof6b": "diagnostic",
+    "p6c": "diagnostic",
+    "profcap-rc2": "diagnostic",
+    "profeager-rc2": "diagnostic",
+    "ncclinfo-rc2": "diagnostic",
+    "torchc6": "diagnostic",
+}
+
+# Arms that never produced a median log, so they appear only here. Their launcher
+# and engine logs are in harness/.
+FAILED_ARMS: list[tuple[str, str, str]] = [
+    (
+        "hum-k5-rc2",
+        "`hum-k6-rc2b` (humming, WO off) with `NUM_SPECULATIVE_TOKENS=5` and "
+        "`MAX_CUDAGRAPH_CAPTURE_SIZE=48` unchanged, five passes. One variable: "
+        "speculative depth 5 vs 6, continuing the ladder that worked at k=6.",
+        "**degenerate, do not use.** 29.7 / 76.5 / 75.4 / **93.5**, sum "
+        "**275.1**, worst spread **83.3 %** (c1 30.6 %, c3 50.3 %, c5 83.3 %, "
+        "c6 33.9 %): -42.4 % on the sum and -41.8 % at c6 against the standing "
+        "`hum-k6-rc2b` (477.5 / 160.6). Tokens per step ranged 4.071-6.250, so "
+        "the floor is breached too. Pass 5's final `/metrics` snapshot was "
+        "refused (`ConnectionRefusedError`), i.e. the API was unavailable at "
+        "the end of the run. All five passes are degraded, not just the last, "
+        "so this is not a single flaky pass. k=6 stays the default; the k "
+        "ladder is not monotone and k=5 is below the cliff.",
+    ),
+    (
+        "stepc6-rc2",
+        "corrected c6 step profile: `B12X_PROFILE_*` alias plus a bind-mounted "
+        "patched `sm12x_b12x_kernels.py`, the protocol config "
+        "(`NUM_SPECULATIVE_TOKENS=7 MAX_CUDAGRAPH_CAPTURE_SIZE=48`) and CUDA "
+        "graphs on, level 6 only. Intended to measure the real c6 "
+        "`execute_model` and `sample_tokens` device time, which the retracted "
+        "'host-bound' claim in `docs/UPSTREAM.md` had assumed instead of "
+        "measured.",
+        "**no profiler output, no tok/s.** The mount and the module are correct "
+        "(`grep -c B12X_PROFILE` = 5 in-container, decorator present in "
+        "`vllm/v1/worker/gpu/model_runner.py`) and the served config is right "
+        "(`num_spec_tokens=7`, `cudagraph_capture_sizes` includes 48), but the "
+        "GPU worker still comes up without the alias in its environment, so "
+        "the wrapper returns the bare function and nothing prints. Runner: "
+        "`configs/examples/stepc6-rc2.sh`.",
+    ),
+    (
+        "prof6e-rc2",
+        "the same alias route in the regime where it previously worked: "
+        "`ENFORCE_EAGER=1`, `B12X_PROFILE_DECODE_STEPS=60`, level 6 only "
+        "(`drive-median.sh prof6e-rc2 1 512 6`). Re-run of `profeager-rc2` at "
+        "c6 token counts.",
+        "**no profiler output.** Served and metered (c6 **146.3** tok/s) but "
+        "printed no `b12x step` or `b12x region` lines at all, including no "
+        "region table, so the route that produced the c1 table on 2026-09-20 "
+        "no longer arms. Runner: `configs/examples/prof6e-rc2.sh`.",
+    ),
+    (
+        "nsysc6-rc2",
+        "`nsys profile --attach-pid <Worker_TP0> --cuda-graph-trace=node "
+        "--duration 12` on the standing pin during a c6 window. One "
+        "variable: profiler only. Intended as the ground-truth kernel table "
+        "for a graph-replayed c6 step, because the overlay's region marks "
+        "only collect under CUDA-graph capture and capture mode dies.",
+        "**no report, no tok/s.** `nsys --attach-pid` cannot enable CUDA "
+        "tracing on a process that was not launched under nsys (no CUPTI "
+        "injection), so no `.nsys-rep` was written. Runner: "
+        "`harness/profile-c6-nsys.sh`. Not a performance result.",
+    ),
+    (
+        "nnoop-rc2",
+        "`proto2-030-rc2` plus `PASS_CONFIG={\"eliminate_noops\":false}`. "
+        "One variable: disable inductor noop elimination (default True). "
+        "Distinct from fusion flags (`fnormq`/`factq`/`fattnq`, hang). "
+        "Confirmed `eliminate_noops': False` and `Enabled custom fusions: "
+        "norm_quant, act_quant`.",
+        "**hangs at EngineCore init, no tok/s.** Same class as the fusion "
+        "flags: any non-empty `pass_config` enables custom fusions and "
+        "never reaches health. Standing empty `pass_config` is "
+        "load-bearing. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/nnoop-rc2-fail.log`.",
+    ),
+    (
+        "fattnq-rc2",
+        "`proto2-030-rc2` plus `PASS_CONFIG={\"fuse_attn_quant\":true}`. "
+        "One variable: force Attention/MLA+quant fusion (standing "
+        "empty/False). Distinct from `fnormq-rc2`/`factq-rc2` (norm/act "
+        "fusion, same hang class). Confirmed `fuse_attn_quant': True` "
+        "and `Enabled custom fusions: norm_quant, act_quant, attn_quant, "
+        "rope_kvcache_cat_mla`.",
+        "**hangs at EngineCore init, no tok/s.** Same class as "
+        "`fnormq-rc2`/`factq-rc2`: fusion enable then EngineCore "
+        "`Initializing a V1 LLM engine` and never reaches health. Any "
+        "forced fusion flag hangs this pin. Standing arm remains "
+        "`proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fattnq-rc2-fail.log`.",
+    ),
+    (
+        "factq-rc2",
+        "`proto2-030-rc2` plus `PASS_CONFIG={\"fuse_act_quant\":true}`. "
+        "One variable: force SiluMul+quant fusion (standing empty/False). "
+        "`fnormq-rc2` set fuse_norm_quant and still logged both "
+        "norm_quant and act_quant then hung. This arm sets only "
+        "fuse_act_quant. Confirmed `fuse_act_quant': True` and "
+        "`Enabled custom fusions: norm_quant, act_quant`.",
+        "**hangs at EngineCore init, no tok/s.** Same class as "
+        "`fnormq-rc2`: fusion enable then EngineCore `Initializing a V1 "
+        "LLM engine` and never reaches health. Either fusion flag "
+        "enables both and hangs. Standing arm remains `proto2-030-rc2`. "
+        "Log: `outputs/driver/one-off/factq-rc2-fail.log`.",
+    ),
+    (
+        "fnormq-rc2",
+        "`proto2-030-rc2` plus `PASS_CONFIG={\"fuse_norm_quant\":true}`. "
+        "One variable: force RMSNorm+quant fusion (standing empty/False). "
+        "Distinct from `ensp-rc2` (SP+DSpark incompatible). Confirmed "
+        "`fuse_norm_quant': True` and `Enabled custom fusions: "
+        "norm_quant, act_quant`.",
+        "**hangs at EngineCore init, no tok/s.** APIServer logs fusion "
+        "enable then EngineCore `Initializing a V1 LLM engine` and never "
+        "reaches health. Same class as compile-path hangs, not a tok/s "
+        "arm. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fnormq-rc2-fail.log`.",
+    ),
+    (
+        "ensp-rc2",
+        "`proto2-030-rc2` plus `PASS_CONFIG={\"enable_sp\":true,"
+        "\"sp_min_token_num\":1}`. One variable: force sequence "
+        "parallelism. Standing `pass_config` is empty. SP_MIN_HIDDEN_SIZE "
+        "is keyed 90/100 only, so SM121 auto-disables SP. Plumbing added "
+        "in `scripts/05-serve.sh`. Confirmed `pass_config': {'enable_sp': "
+        "True, 'sp_min_token_num': 1}`.",
+        "**dies at VllmConfig, no tok/s.** "
+        "`ValidationError: Model Runner V1 does not support: dspark "
+        "speculative decoding`. Forced SP on this pin is incompatible "
+        "with DSpark. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/ensp-rc2-fail.log`.",
+    ),
+    (
+        "kvlbnhc-rc2",
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_KV_CACHE_LAYOUT=LBNHC`. "
+        "One variable: force layer-compact LBNHC vs standing auto (BLHNC). "
+        "`nohma-rc2` fail text named LBNHC as the compact layout. Same "
+        "image, only this env.",
+        "**dies at EngineCore init, no tok/s.** "
+        "`ValueError: VLLM_KV_CACHE_LAYOUT=LBNHC does not satisfy every "
+        "supported set; valid layouts: ['BLHNC', 'BLNHC']`. LBNHC is not "
+        "legal for this `nvfp4_ds_mla` + DSV4 indexer pair. Standing auto "
+        "BLHNC stays. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/kvlbnhc-rc2-fail.log`.",
+    ),
+    (
+        "nohma-rc2",
+        "`proto2-030-rc2` plus `ARM_EXTRA_ARGS=--disable-hybrid-kv-cache-manager`. "
+        "One variable: explicit hybrid KV cache manager off vs standing auto. "
+        "DSV4 has MLA plus a Lightning Indexer cache, so HMA can split the "
+        "pool. Confirmed `disable_hybrid_kv_cache_manager': True`.",
+        "**dies at worker init, KV layout, no tok/s.** "
+        "`ValueError: The resolved KV cache layout (BLHNC) does not store "
+        "blocks as dense, unpadded pages (block stride 83889984 != page "
+        "149504), so a manager block cannot be split into 4 kernel blocks "
+        "of 64 tokens.` Standing auto-HMA is load-bearing for "
+        "`nvfp4_ds_mla` block 256 on SM120. Explicit disable is not the "
+        "remaining gap. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/nohma-rc2-fail.log`.",
+    ),
+    (
+        "fiw31-rc2",
+        "`proto2-030-rc2` plus one-off bind-mount of "
+        "`outputs/driver/one-off/fused_moe_b12x_fiswizzle.py` so MXFP4 "
+        "`w4a8_mx` apply goes through FlashInfer `b12x_fused_moe` after "
+        "an in-place w31 [gate;up] to [up;gate] flip, then "
+        "`swizzle_block_scale` and `convert_sf_to_mma_layout(..., "
+        "sf_vec_size=32)`. New hypothesis vs `fiswizzle-rc2` (scale "
+        "layout only): native b12x flips vLLM fused [gate;up] to kernel "
+        "[up;gate] once at prepare. Stock "
+        "`patches/files/fused_moe_b12x.py` stays stock. Confirmed "
+        "`b12x MoE MXFP4 using FlashInfer b12x_fused_moe "
+        "w31-flip-then-swizzle-mma k32`.",
+        "**dies at profile_run, CUDA error, no tok/s.** Overlay logged, "
+        "then `RuntimeError: CUDA error: CUBLAS_STATUS_INTERNAL_ERROR` "
+        "in `cublasGemmEx` during `determine_available_memory` / "
+        "`profile_run` (`CUDA_ERROR_ILLEGAL_ADDRESS` also present). Same "
+        "live-weight failure class as `fistat`/`fifunc`/`fiswizzle-rc2`. "
+        "w31 flip plus swizzle is not the remaining gap. Standing arm "
+        "remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fiw31-rc2-fail.log`.",
+    ),
+    (
+        "cuteopt2-rc2",
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DIRECT_CUTE_OPTIONS=--opt-level=2`. "
+        "One variable: CuteDSL OptLevel 2 on the micro-direct compile path. "
+        "Dynamic W4A8 already hardcodes OptLevel(2) because ptxas -O3 "
+        "register-starves that mainloop. Micro-direct still defaulted to "
+        "OptLevel(3). Protocol c1 is the only micro level. Equals form so "
+        "SERVE_EXTRA_ENV word-split stays one kv.",
+        "**dies at KV floor, no tok/s.** `_check_enough_kv_cache_memory`: "
+        "9.46 GiB available vs 9.48 GiB needed at util 0.8389 / "
+        "`max_model_len` 65536. OptLevel 2 on micro-direct is hungrier than "
+        "standing. Raising util or cutting `max_model_len` would be a "
+        "second variable. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/cuteopt2-rc2-fail.log`.",
+    ),
+    (
+        "fiswizzle-rc2",
+        "`proto2-030-rc2` plus one-off bind-mount of "
+        "`outputs/driver/one-off/fused_moe_b12x_fiswizzle.py` so MXFP4 "
+        "`w4a8_mx` apply goes through FlashInfer `b12x_fused_moe` after "
+        "`swizzle_block_scale` then `convert_sf_to_mma_layout(..., "
+        "sf_vec_size=32)`. New hypothesis vs `fistat`/`fifunc` (name-only "
+        "`quant_mode=\"mxfp4\"`): linear e8m0 has the same numel as MMA, so "
+        "convert without swizzle is a silent wrong layout. Stock "
+        "`patches/files/fused_moe_b12x.py` stays stock. Confirmed "
+        "`b12x MoE MXFP4 using FlashInfer b12x_fused_moe swizzle-then-mma "
+        "k32`.",
+        "**dies at profile_run, IMA, no tok/s.** Overlay logged, then "
+        "`cutlass.base_dsl.common.DSLCudaRuntimeError: "
+        "CUDA_ERROR_ILLEGAL_ADDRESS (error code: 700)` in "
+        "`gpu_worker.determine_available_memory` / `profile_run`. Same "
+        "live-weight IMA as `fistat`/`fifunc`. Swizzle-before-convert is "
+        "not the remaining gap. Dummy zeros compiled `static_m8`; live "
+        "weights still IMA. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fiswizzle-rc2-fail.log`.",
+    ),
+    (
+        "profcap-rc2",
+        "`proto2-030-rc2` plus capture-mode decode profiler "
+        "(`VLLM_PROFILE_DECODE=1 VLLM_PROFILE_CAPTURE=1 "
+        "VLLM_PROFILE_DECODE_STEPS=12`) via `SERVE_EXTRA_ENV`. Diagnostic: "
+        "record region marks as CUDA-graph nodes for a 1-row replay.",
+        "**dies at graph capture, no tok/s.** `RuntimeError: Worker failed "
+        "with error 'CUDA error: invalid argument'`. Region CUDA events "
+        "cannot become graph nodes on this pin. Capture-mode profile is "
+        "closed. Use eager (`profeager-rc2`) instead. Log: "
+        "`outputs/driver/one-off/profcap-rc2-fail.log`.",
+    ),
+    (
+        "bs128-rc2",
+        "`proto2-030-rc2` plus `BLOCK_SIZE=128`. One variable: manager "
+        "block size. Pin and anemll use 256. SM120 DSV4 kernel page is 64; "
+        "256 splits into four kernel pages, 128 into two.",
+        "**dies at worker init, no tok/s.** "
+        "`ValueError: Misaligned Tensor data on argument #6` when calling "
+        "`host_entrypoint(... cos_sin_cache: Tensor([n2, 64], float32), "
+        "k_cache: Tensor([n3, n4, n5], uint8) ...)`, expected alignment 16 "
+        "bytes. Manager 128 is not a legal `nvfp4_ds_mla` layout on this "
+        "pin. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/bs128-rc2-fail.log`.",
+    ),
+    (
+        "moetilem-rc2",
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_MOE_TILE_MN=128x128`. "
+        "One variable: micro MoE tile. `B12X_MOE_TILE_MN` gates "
+        "`_select_micro_mma_tiler_mn` (c1, below the 64-row cutover), not "
+        "the dynamic planner. Default micro tile is 64x128.",
+        "**dies at KV floor, no tok/s.** `_check_enough_kv_cache_memory`: "
+        "9.44 GiB available vs 9.48 GiB needed at util 0.8389 / "
+        "`max_model_len` 65536. Micro 128x128 workspace is hungrier than "
+        "standing. Raising util or cutting `max_model_len` would be a "
+        "second variable. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/moetilem-rc2-fail.log`.",
+    ),
+    (
+        "fusedq-rc2",
+        "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=B12X_DENSE_FUSED_QUANT=1`. "
+        "One variable: dense GEMM fused BF16 quant on m=1 decode (default "
+        "0). Producer warp amax-scans and quantizes K-tiles into sA/sSFA "
+        "smem, skipping the separate quant kernel.",
+        "**dies at KV floor, no tok/s.** `_check_enough_kv_cache_memory`: "
+        "9.47 GiB available vs 9.48 GiB needed at util 0.8389 / "
+        "`max_model_len` 65536. Fused-quant workspace is hungrier than "
+        "standing. Raising util or cutting `max_model_len` would be a "
+        "second variable. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fusedq-rc2-fail.log`.",
+    ),
+    (
+        "fifunc",
+        "`proto2-030-rc2` plus bind-mount of `patches/files/fused_moe_b12x.py` "
+        "so MXFP4 `w4a8_mx` apply goes through FlashInfer `b12x_fused_moe` "
+        "(functional API, auto static at routed_pairs<=640 / dynamic at "
+        "profile 12288, module-level workspace). New hypothesis vs "
+        "`fistat`–`fistat4` (`B12xMoEWrapper`). Confirmed "
+        "`b12x MoE MXFP4 using FlashInfer b12x_fused_moe`. Overlay reverted.",
+        "**dies at first launch, IMA, no tok/s.** Prepare logged, then "
+        "`CUDALaunch Error: CUDA_ERROR_ILLEGAL_ADDRESS` during engine "
+        "init. Same live-weight IMA as `fistat`. Functional API does not "
+        "fix the live MXFP4 path. Dummy zeros compiled `static_m8`; live "
+        "weights still IMA. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/fifunc-fail.log`.",
+    ),
+    (
+        "moefic-rc2",
+        "`proto2-030-rc2` plus `MOE_BACKEND=flashinfer_cutlass`. Re-measure "
+        "of rc1 `moefic` (ninja FAILED on FlashInfer 0.7.0 floating main) "
+        "on tagged FlashInfer `v0.7.0rc3`. One variable: CUTLASS MXFP4 MoE.",
+        "**dies at JIT compile, no tok/s.** Engine selected "
+        "`FLASHINFER_CUTLASS_MXFP4_MXFP8`, then ninja failed building "
+        "`fused_moe_120` "
+        "`cutlass_kernel_file_gemm_grouped_sm120_M128_BS_group5` for "
+        "`sm_121a` (`FAILED: [code=4]`, `RuntimeError: Ninja build failed`). "
+        "Same failure as rc1. SM120 CUTLASS MoE does not compile on this "
+        "FlashInfer `v0.7.0rc3` / CUDA 13.3.1 stack. Standing arm remains "
+        "`proto2-030-rc2`. Log: `outputs/driver/one-off/moefic-rc2-fail.log`.",
+    ),
+    (
+        "moemar-rc2",
+        "`proto2-030-rc2` plus `MOE_BACKEND=marlin`. Re-measure of rc1 "
+        "`moemar` (455.3 / 154.8) on `v0.30.0rc2`. One variable: Marlin "
+        "MXFP4 MoE. Same util 0.8389 / max_model_len 65536.",
+        "**dies at KV floor, no tok/s.** `ValueError: 9.48 GiB KV cache is "
+        "needed, which is larger than the available KV cache memory "
+        "(9.27 GiB)`. Do not raise util as a second variable. rc1 `moemar` "
+        "served; this pin's extra tagged deps (FlashInfer `v0.7.0rc3` etc.) "
+        "leave less KV room. Standing arm remains `proto2-030-rc2`. Log: "
+        "`outputs/driver/one-off/moemar-rc2-fail.log`.",
+    ),
+    (
+        "fistat4",
+        "`proto2-030` plus FlashInfer-static overlay with one shared "
+        "`B12xMoEWrapper(max_num_tokens=12288)` for all layers. Isolates "
+        "`fistat3` (profile 12288 vs wrapper 48) vs `fistat2` (43 wrappers "
+        "at 12288).",
+        "**hangs after weight load, no tok/s.** Confirmed "
+        "`b12x MoE MXFP4 using FlashInfer MoEStaticKernel`, loaded 79.34 GiB, "
+        "then GPU 96 % with no CuTe compile line — same hang as `fistat2`. "
+        "One shared 12288 workspace still does not come up. Dummy zeros "
+        "compiled `static_m8`; live path does not. Standing arm remains "
+        "`proto2-030`. Log: `outputs/driver/one-off/fistat4-fail.log`.",
+    ),
+    (
+        "fistat3",
+        "`proto2-030` plus FlashInfer-static overlay with one shared "
+        "`B12xMoEWrapper(max_num_tokens=48)` for all layers. Isolates the "
+        "`fistat2` hang: 43 wrappers at `max_num_tokens=12288` allocating "
+        "static workspaces. Dummy compiled at m=8; capture size is 48.",
+        "**dies at engine start, no tok/s.** Confirmed "
+        "`b12x MoE MXFP4 using FlashInfer MoEStaticKernel`, then "
+        "`ValueError: num_tokens (12288) exceeds max_num_tokens (48)` during "
+        "KV-cache profile. Profile batch is max-num-batched-tokens, not "
+        "capture 48. Shared wrapper at 48 cannot profile. Standing arm "
+        "remains `proto2-030`. Log: `outputs/driver/one-off/fistat3-fail.log`.",
+    ),
+    (
+        "fistat2",
+        "`proto2-030` plus the same FlashInfer-static overlay as `fistat`, with "
+        "contiguous stashed `w13`/`w2` and warmup skipped. One variable: live "
+        "MXFP4 weights into image `B12xMoEWrapper(quant_mode=\"mxfp4\")` without "
+        "the warmup IMA. Confirmed `b12x MoE MXFP4 using FlashInfer "
+        "MoEStaticKernel`.",
+        "**hangs after weight load, no tok/s.** Worker logged FI prepare, loaded "
+        "79.34 GiB, then GPU sat at 96 % for 20+ min with no CuTe compile line "
+        "and repeating `No available shared memory broadcast block found in 60 "
+        "seconds`. Health never 200. Dummy zeros compiled; live checkpoint "
+        "hangs in `B12xMoEWrapper` construction / first graph capture. Standing "
+        "arm remains `proto2-030`. Log: `outputs/driver/one-off/fistat2-fail.log`.",
+    ),
+    (
+        "fistat",
+        "`proto2-030` plus bind-mount of `patches/files/fused_moe_b12x.py` so MXFP4 "
+        "`w4a8_mx` apply goes through image FlashInfer `B12xMoEWrapper(quant_mode="
+        "\"mxfp4\")`. One variable: overlay MoE kernel, same image. Dummy "
+        "`b12x_fused_moe` on protocol shapes compiled "
+        "`static_m8_k6144_n1024_t6_r48`. Source MXFP4 layout matches "
+        "`[E, 2n, k/2]` packed uint8 plus K32 e8m0 scales converted with "
+        "`sf_vec_size=32`.",
+        "**dies at engine start, no tok/s.** Worker IMA during KV-cache "
+        "sizing: `RuntimeError: Triton Error [CUDA]: an illegal memory access "
+        "was encountered` in `triton/compiler/compiler.py:468 _init_handles`. "
+        "Dummy zeros compiled; live checkpoint weights plus warmup did not. "
+        "Weight-view / e8m0 MMA conversion on real tensors is still unproven. "
+        "Standing arm remains `proto2-030`. Log: "
+        "`outputs/driver/one-off/fistat-fail.log`.",
+    ),
+    (
+        "nomg",
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_MLA_SM120_PREFILL_MG=0`. One variable: MLA "
+        "prefill-MG off (default 1). Overlay `B12X_MLA_SPARSE` reuses the prefill MG kernel "
+        "for decode when `rows>=16`. Confirmed in the worker error "
+        "(`B12X_MLA_SM120_PREFILL_MG=0`).",
+        "**dies at engine start, no tok/s.** `ValueError: SM120 sparse MLA prefill: "
+        "unsupported shape (model_type=0, heads=32, topk=512, ..., "
+        "B12X_MLA_SM120_PREFILL_MG=0). ... No decode-reuse fallback.` DSV4 requires MG. "
+        "Standing arm remains `proto2-030`. Log: `outputs/driver/one-off/nomg-fail.log`.",
+    ),
+    (
+        "nochunk",
+        "`proto2-030` plus `--no-enable-chunked-prefill` via `ARM_EXTRA_ARGS`. One variable: "
+        "chunked prefill off. vLLM default is True; the anemll recipe also enables it. "
+        "`05-serve.sh` does not pass the flag. BooleanOptionalAction last-flag wins. "
+        "Confirmed `enable_chunked_prefill: False`.",
+        "**dies at engine start, no tok/s.** Warning: `This model does not officially "
+        "support disabling chunked prefill. Disabling this manually may cause the engine "
+        "to crash or produce incorrect outputs.` Container exited 1 during init. DSV4 "
+        "requires chunked prefill. Standing arm remains `proto2-030`. Log: "
+        "`outputs/driver/one-off/nochunk-fail.log`.",
+    ),
+    (
+        "detout",
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_DETERMINISTIC_OUTPUT=1`. One "
+        "variable: force deterministic MoE output (default False). When True, W4A8 "
+        "shared-input decode regime is skipped (`not deterministic_output`). Same image, "
+        "no second variable.",
+        "**dies at engine start, no tok/s.** `ValueError: To serve at least one request "
+        "with the model's max seq len (65536), (9.48 GiB KV cache is needed, which is "
+        "larger than the available KV cache memory (9.24 GiB)`. Estimated max model "
+        "length 24400. Raising util or cutting `max_model_len` would be a second "
+        "variable. Standing arm remains `proto2-030`. Log: "
+        "`outputs/driver/one-off/detout-fail.log`.",
+    ),
+    (
+        "util082",
+        "`proto2-030` plus `GPU_MEMORY_UTILIZATION=0.82`. One variable: match the anemll "
+        "recipe util. `run-arm.sh` hardcodes 0.8389; EXTRA overrides it. `util8663` went "
+        "the other way (0.8663) and sat in pin noise. Same image, no second variable.",
+        "**dies at engine start, no tok/s.** Profiler maps util 0.8200 -> effective 0.7944. "
+        "Available KV 7.87 GiB vs 9.48 GiB needed for max seq len 65536 (estimated max "
+        "model length 20784). Cutting `max_model_len` or turning the profiler off would be "
+        "a second variable. Reference fits 0.82 because its image/workspace is different. "
+        "Standing arm remains `proto2-030`. Log: `outputs/driver/one-off/util082-fail.log`.",
+    ),
+    (
+        "noidx",
+        "`proto2-030` plus `VLLM_USE_B12X_SPARSE_INDEXER=0`. One variable: overlay scores "
+        "DSA indexer logits with b12x `logits_paged`; =0 returns None and the caller falls "
+        "back to stock. Direct gather stays on. `stockops2` mixed this with WO-off and "
+        "`MAX_MODEL_LEN=32768`. Never isolated on `main-030-rc1`.",
+        "**dies at engine start, no tok/s.** `ValueError: To serve at least one request with "
+        "the model's max seq len (65536), (9.48 GiB KV cache is needed, which is larger than "
+        "the available KV cache memory (9.46 GiB)`. Overlay-off is hungrier than the pin. "
+        "Raising util or cutting `max_model_len` would be a second variable. Standing arm "
+        "remains `proto2-030`. Log: `outputs/driver/one-off/noidx-fail.log`.",
+    ),
+    (
+        "linmar",
+        "`proto2-030` plus `LINEAR_BACKEND=marlin`. One variable: FP8 linear via Marlin. MoE "
+        "marlin was the same-image ceiling (`moemar` 455.3) but not a keep. Linear humming died "
+        "on O-proj shapes; linear deep_gemm was a protocol negative. Linear marlin was untested",
+        "**dies at worker init, no tok/s.** Selected `MarlinFP8ScaledMMLinearKernel` then "
+        "`RuntimeError: Expected size for first two dimensions of batch2 tensor to be: "
+        "[4, 4096] but got: [4, 1024]`. Same O-proj (`o_lora_rank` 1024 vs hidden 4096) as "
+        "`proto2-linhum`. Linear family on this pin: `b12x` works, `deep_gemm` worse/unstable, "
+        "`humming`/`marlin` cannot load, FlashInfer linear has no kernel. Standing arm remains "
+        "`proto2-030`. Log: `outputs/driver/one-off/linmar-fail.log`.",
+    ),
+    (
+        "moefic",
+        "`proto2-030` plus `MOE_BACKEND=flashinfer_cutlass`. One variable: the MXFP4 oracle's "
+        "FlashInfer CUTLASS expert path. `FlashInferExperts` claims SM90/SM100/SM120. Prior "
+        "`moe_cutlass` never became healthy on the old pin; reason not captured. Retry on this "
+        "image",
+        "**dies at JIT compile, no tok/s.** Engine selected "
+        "`FLASHINFER_CUTLASS_MXFP4_MXFP8` / `FlashInferExperts`, then ninja failed building "
+        "FlashInfer fused_moe_120 kernels (`FAILED: [code=4]` on "
+        "`120_cutlass_kernel_file_gemm_grouped_sm120_M128_BS_group*.generated.cuda.o`). "
+        "`RuntimeError: Ninja build failed`. SM120 CUTLASS MoE does not compile on this "
+        "FlashInfer 0.7.0 / CUDA 13.3.1 stack. Standing arm remains `proto2-030`. Log: "
+        "`outputs/driver/one-off/moefic-fail.log`.",
+    ),
+    (
+        "moedg",
+        "`proto2-030` plus `MOE_BACKEND=deep_gemm`. One variable: the MXFP4 oracle's DeepGEMM "
+        "expert path (`DEEPGEMM_MXFP4` / `DeepGemmFP4Experts`, SM100 and SM120). Linear "
+        "`deep_gemm` was already a protocol negative (`proto2-dglin`); MoE was untested on this "
+        "pin. `assert_stack` only warns on unknown names, so the arm reached worker init",
+        "**dies at KV accounting, no tok/s.** Engine selected the backend "
+        "(`Using 'DEEPGEMM_MXFP4' Mxfp4 MoE backend`) then failed "
+        "`_check_enough_kv_cache_memory`: 8.79 GiB available vs 9.48 GiB needed at "
+        "`gpu_memory_utilization=0.8389`. DeepGEMM's workspace is ~0.6 GiB hungrier than b12x "
+        "(b12x at the same util had 9.39 GiB). Raising util would be a second variable. Standing "
+        "arm remains `proto2-030`. Log: `outputs/driver/one-off/moedg-fail.log`.",
+    ),
+    (
+        "moeready",
+        "`proto2-030` plus `SERVE_EXTRA_ENV=B12X_DYNAMIC_WORK_SOURCE=ready_queue`. One variable: "
+        "the remaining b12x dynamic work source after `moework` (`persistent_grid`) was a protocol "
+        "negative. Library default is `materialized_queue`; `ready_queue` is the experimental "
+        "overlapped publisher",
+        "**dies at profile_run, no tok/s.** Cutlass DSL rejects the publisher loop: "
+        "`cutlass.base_dsl.common.DSLUserCodeError: PHASE_DYNAMIC_TO_STATIC_BOOL` at "
+        "`b12x/moe/_shared/kernels/dynamic.py:2001` (`while g < num_groups` in "
+        "`_publish_ready_tasks`). Experimental path is not JIT-clean on this b12x. Standing arm "
+        "remains `proto2-030`. Log: `outputs/driver/one-off/moeready-fail.log`.",
+    ),
+    (
+        "cgstock",
+        "`proto2-030` plus `VLLM_USE_BREAKABLE_CUDAGRAPH=0`, no overlay mounts. One variable: lift "
+        "`CompilationMode.NONE`. Tests whether `v0.30.0rc1` (#56904 GPU-sync-under-compile) can "
+        "compile DSv4 stock, without the proto-era 13-break port",
+        "**dies at the first Dynamo break, no tok/s.** Mode did lift: engine log shows "
+        "`CompilationMode.VLLM_COMPILE: 3`. Failure is `torch._dynamo.exc.Unsupported: Attempted "
+        "to call function marked as skipped` on "
+        "`vllm.third_party.deep_gemm._C...tf32_hc_prenorm_gemm` (pybind, no source file). Same "
+        "class as proto-era break 5 / the parked `patch_mhc_tf32_*` overlays. `#56904` does not "
+        "clear custom-op graph breaks. Compile on this pin still needs the overlay port, which "
+        "rounds 55-72 already closed inside vLLM piecewise machinery. Standing arm remains "
+        "`proto2-030`. Log: `outputs/driver/one-off/cgstock-fail.log`.",
+    ),
+    (
+        "fb12x",
+        "`proto2-030` with `MOE_BACKEND=flashinfer_b12x`, no rebuild. The one-variable arm the "
+        "comparator's recipe names (`--moe-backend flashinfer_b12x`) and that round 10 recorded as "
+        "untested on our stack",
+        "**rejected at worker init, no tok/s.** "
+        "`ValueError: moe_backend='flashinfer_b12x' is not supported for MXFP4 MoE. Expected one of "
+        "['b12x', 'deep_gemm', 'flashinfer_trtllm', ...]`. The checkpoint's experts are MXFP4 "
+        "(`expert_dtype: fp4` in `assert_0731`); `flashinfer_b12x` is an NVFP4-experts path "
+        "(`FlashInferB12xExperts`). The reference can name it because its fork aliases that string "
+        "onto a different kernel. On this pin the name is not an alias, so the comparator's MoE "
+        "backend is not a configuration we can opt into. Log: "
+        "`outputs/driver/one-off/fb12x-fail.log`. Standing arm remains `proto2-030`.",
+    ),
+    (
+        "proto2-cg18",
+        "`proto2-cg17` + `dynamic_shapes.op.py` gating `compilation/decorators.py:416 "
+        "_mark_dynamic_inputs` behind `VLLM_B12X_STATIC_SHAPES=1`, forwarded via `SERVE_EXTRA_ENV`",
+        "**static shapes removes the assert and hits a second wall.** `assert_size_stride` occurrences drop "
+        "to **0**, independently confirming round 71's diagnosis that the mismatch was the symbolic `s72` "
+        "and not the strides. The new failure is `KeyError: 't0'` at "
+        "`compilation/piecewise_backend.py:266 compile_all_ranges` (via `backends.py:353 -> "
+        "compiler_interface.py:376`): **vLLM's piecewise splitter indexes the graph by the symbolic names "
+        "`_mark_dynamic_inputs` creates**, so removing the symbols removes the keys it looks up. Both shape "
+        "modes therefore fail inside vLLM's own piecewise machinery. **This vindicates upstream:** "
+        "`DEFAULT_BREAKABLE_CUDAGRAPH_ARCHITECTURES` containing `DeepseekV4ForCausalLM` is not an obstacle "
+        "to route around, it is upstream stating that this path does not work for this model -- and the "
+        "reference compiles only because its DSv4 stack is structurally different and far less "
+        "Dynamo-clean-hostile. **Workstream closed:** no compile arm served, no tok/s, and no measurement "
+        "showing compilation is faster. `proto2-dg` stands at sum 426.4-437.2 against 473.1-484.8.",
+    ),
+    (
+        "proto2-cg17",
+        "`proto2-cg16` + `attention.op.py`, making the attention output contiguous under "
+        "`is_compiling()` because the generated code showed `o = o_padded[:, : n_local_heads, :]`",
+        "**failed identically -- and that is the measurement that resolved round 70's ambiguity.** "
+        "`.contiguous()` is a no-op when the slice is already contiguous, so `padded_heads == "
+        "n_local_heads == 32` and `o` already had strides `(16384, 512, 1)`: a tensor that already "
+        "satisfies the guard cannot be failing it. **The mismatch is therefore the symbolic `s72` "
+        "(`s72 = arg1_1`, a separate graph argument), not the strides** -- the opposite of every note "
+        "written between rounds 67 and 70. It is vLLM's piecewise symbolic-shape plumbing. "
+        "**Round 66's decision criterion is met** (five rounds, still no booting compiled arm and not one "
+        "tok/s from any compile arm), so the port is recorded as the negative. Qualification: it is no "
+        "longer an architectural wall -- the arm clears 13 Dynamo breaks, builds a complete Inductor "
+        "graph (315 mHC, 231 all_reduce, 131 fused_inv_rope, 113 b12x_fp8_einsum, 98 fused_q_kv_rmsnorm, "
+        "88 moe_forward_shared, 62 indexer), and executes it. Resume path: gate "
+        "`vllm/compilation/decorators.py:416 _mark_dynamic_inputs` off for static shapes "
+        "(`wrapper.py:150` already passes `dynamic=False`; the symbols come from `mark_dynamic`, and "
+        "`DynamicShapesType` has no STATIC). No tok/s, and no evidence compilation is faster.",
+    ),
+    (
+        "proto2-cg16",
+        "`proto2-cg15` + `$M/torch_compile_cache:/root/.cache/vllm/torch_compile_cache`, so the generated "
+        "Inductor code survives the container",
+        "**not a behaviour change -- a diagnostic breakthrough.** The same `assert_size_stride` failure, "
+        "but now the generated file is readable on the host (20 `.py` files, four carrying the guard). It "
+        "identifies the partition: `arg0_1` is `o`, `(s72, 32, 512)` with `32 = n_groups * "
+        "heads_per_group = 4 * 8` and `head_dim = 512`, expected contiguous `(16384, 512, 1)`. The "
+        "partition does `zero_`, then `torch.ops.vllm.fused_inv_rope_fp8_quant_kernel`, then our "
+        "`torch.ops.vllm.b12x_fp8_einsum`, then `per_token_group_fp8_quant`. **Correction to four rounds "
+        "of notes:** the assert compares against the symbolic `s72`, which is a separate graph argument "
+        "(`arg1_1`), so a failure is equally consistent with a token-count mismatch as with a stride "
+        "mismatch -- previously described only as strides. Also, our `_o_ws[:tokens]` slice has strides "
+        "`(16384, 512, 1)` for these dimensions, i.e. exactly what the assert expects. No tok/s.",
+    ),
+    (
+        "proto2-cg14 / proto2-cg15",
+        "`proto2-cg13` + a `multi_stream_utils.op.py` guard taking the sequential path under "
+        "`is_compiling()` (cg14); then the same with `CUDAGRAPH_MODE=NONE` (cg15)",
+        "**cg14: the guard was aimed at the wrong place.** The `Index not registered in "
+        "index_to_user_object_weakref` chain runs `model_runner.py:1943 -> model.py:1506 -> "
+        "compilation/caching.py:225 -> compilation/cuda_graph.py:256 -> "
+        "compilation/piecewise_backend.py:380 -> streams.py:77 _get_stream_by_index`, i.e. vLLM's own "
+        "**piecewise cudagraph machinery**, not `execute_in_parallel`. The guard is kept as correct "
+        "behaviour but is not a fix. **cg15: `CUDAGRAPH_MODE=NONE` removes the stream error and the "
+        "stride assert returns**, which **downgrades round 68's causal claim** -- `custom_ops: [\"all\"]` "
+        "changed which failure fired first, it did not cause the assert, since the assert appears with "
+        "`custom_ops` unset once capture is off. Two independent faults: (A) stream external-object index, "
+        "only with capture on; (B) a stride mismatch `(s72, 32, 512)` independent of both. No tok/s.",
+    ),
+    (
+        "proto2-cg13",
+        "`proto2-cg12` minus `CUSTOM_OPS='[\"all\"]'` -- a single-variable bisect of the knob added the "
+        "round before",
+        "**the stride assert was caused by `custom_ops: [\"all\"]`, which was my own change from round "
+        "67.** With it: 2 occurrences of `assert_size_stride` and a failure at `wrong number of "
+        "dimensions1 for op: input`. Without it: **0 occurrences**, and the failure moves to `Index not "
+        "registered in index_to_user_object_weakref` (`torch/_dynamo/variables/streams.py:131 "
+        "record_event`). So routing vLLM's registered `CustomOp` classes through their torch ops activates "
+        "fake impls whose strides do not match the real implementations, and the compiled graph bakes in "
+        "the difference; `align_inputs_from_check_idxs` then fails its own guard. **The knob is reverted "
+        "and stays unset.** Round 67 called it a near-miss; it was harmful. Separately, "
+        "`fused_q_kv_rmsnorm`'s fake impl was fixed to allocate with `torch.empty` instead of "
+        "`empty_like` (which copies the input's strides) -- a real defect, but not the cause.",
+    ),
+    (
+        "proto2-cg11",
+        "`proto2-cg8` + `fused_indexer_q.op.py` (an opaque custom op for "
+        "`fused_indexer_q_rope_quant`, fp8 branch only) + `CUSTOM_OPS='[\"all\"]'`",
+        "**THE FIRST ARM THROUGH DYNAMO.** It compiled and reached execution: the trace now runs through "
+        "`/root/.cache/vllm/torch_compile_cache/torch_aot_compile/<hash>/inductor_cache/.../*.py`, i.e. "
+        "**Inductor's own generated code**, and fails there on `assert_size_stride(arg0_1, (s72, 32, "
+        "512), (16384, 512, 1), 'input')` during `profile_run`. That is a shape mismatch in the compiled "
+        "graph, a correctness problem rather than a tracing blocker -- a much better class of problem and "
+        "the first the port has produced. Two schema lessons: `infer_schema` demands an explicit return "
+        "annotation on both `op_func` and `fake_impl` (its absence surfaces as `Model architectures "
+        "[...] failed to be inspected`), and one schema cannot express the fp8 and fp4 return structures, "
+        "so only the fp8 branch is registered (`use_fp4` is a Python literal, so Dynamo prunes the other). "
+        "`custom_ops: [\"all\"]` is settable via the new `CUSTOM_OPS` knob in `scripts/05-serve.sh` and "
+        "took effect, but did NOT clear break 17: `fused_indexer_q_rope_quant` is called directly, not "
+        "through a `CustomOp` class. Next: bisect the eleven mounts; the shape looks like attention `q`.",
+    ),
+    (
+        "proto2-cg7",
+        "`proto2-cg6` + `import_utils.op.py` (capability probes folded to a pre-warmed dict) and "
+        "`gpu_worker.op5.py` (which warms it)",
+        "**break 16 cleared; break 17 is a CuTeDSL kernel and the port is now bounded.** `_has_module` "
+        "and `_has_module_spec` lost their `@cache` decorators -- Dynamo traces the wrapped body, so a "
+        "memoised probe is still fatal -- and read `_MODULE_RESULTS` under `is_compiling()`, raising "
+        "LOUDLY for an unwarmed name rather than defaulting to False (a silent False would change which "
+        "kernels run and still pass both gates). The arm then stopped at `fused_indexer_q.py:680 "
+        "_INDEXER_Q_FP8_KERNEL(` -> `jit_warmup_cutedsl_helper.py:64 self.compile(...)` -- a CuTeDSL "
+        "kernel being compiled during tracing, because the warmup that would populate its cache runs "
+        "after profile_run. Counting the kernel singletons on this path gives **19, of which the 5 mHC "
+        "ones are cleared**, so ~13 entry points remain, each needing a real custom op: none of the "
+        "other DSv4 op modules registers anything upstream, so the mHC rebind trick does not generalise. "
+        "**Caveat recorded:** fourteen rounds in, no arm has produced a tok/s number and there is still "
+        "no measurement showing compiling makes our stack faster. Decision criterion set: if ~13 more "
+        "entry points do not yield a booting compiled arm within ~5 rounds, the port is recorded as the "
+        "negative and the consolidated attribution stands.",
+    ),
+    (
+        "proto2-cg6",
+        "`proto2-cg5` + `sm12x.op4.py` (the runtime-flag probes read a frozen snapshot under compile) and "
+        "`gpu_worker.op4.py` (which retakes that snapshot in the pre-profile hook)",
+        "**break 15 cleared; break 16 is the same class.** `b12x_skip_flag` no longer calls "
+        "`os.path.exists` on the traced path -- the eager path is unchanged so skip flags can still be "
+        "toggled while serving -- and `_indexer_direct_gather` got the same treatment. The arm then "
+        "stopped at `attention.py:1166 wq_b_and_q_quant` -> `fused_indexer_q.py:674 if has_cutedsl():` "
+        "-> `import_utils.py:601 _has_module(\"cutlass\")`. **Breaks 15 and 16 are one class: a static "
+        "process-lifetime capability probe evaluated inside the traced forward**, bottoming out in a "
+        "skip-listed `os` or `importlib` call. This is the third appearance of the "
+        "fold-the-probe-to-a-constant fix shape (`is_current_stream_capturing` round 54, runtime flags "
+        "round 65, capability probes next). Safety note recorded: the capability cache must RAISE "
+        "loudly for an unwarmed name, never default to False, or it would silently change which kernels "
+        "run while still passing gates. No tok/s.",
+    ),
+    (
+        "proto2-cg5",
+        "`proto2-cg4` + `tilelang.op3.py`, which adds four module-level rebinds so the mHC names point at "
+        "the custom ops upstream already registers",
+        "**the entire mHC family cleared in one small patch.** Upstream `mhc/tilelang.py` already ends "
+        "with six `direct_register_custom_op` calls **and already contains the fake impls**, but "
+        "`direct_register_custom_op` only does `define` + `impl` + `_register_fake` -- it never repoints "
+        "the Python name, and `grep torch.ops.vllm` over the file returns nothing, so `model.py` imports "
+        "the raw function and Dynamo dies on TileLang's compiled callable. Four two-line wrappers fixed "
+        "five entry points, replacing four hand-derived fake impls. Recorded as an upstream-bug "
+        "candidate; **no upstream contact made**, per the contract. The break moved to the attention "
+        "path: **break 15** is `attention.py:1131 b12x_skip_flag(\"indexer_all\")` -> "
+        "`sm12x_b12x_kernels.py:1396 os.path.exists(...)` -- this repo's own skip-flag removal "
+        "instrument, a skip-listed builtin, called inside the traced forward. No tok/s.",
+    ),
+    (
+        "proto2-cg4",
+        "`proto2-cg3` + the mHC TileLang warmup moved into the pre-profile hook "
+        "(`gpu_worker.op3.py` calls `deepseek_v4_mhc_layer_warmup` alongside the wo_a pre-pack)",
+        "**the break class changed, which is the point.** `tilelang/jit/__init__.py:392 _is_lazy_style` is "
+        "gone: `_infer_jit_mode` short-circuits on a plain attribute read (`if self.mode in (\"lazy\", "
+        "\"eager\")`), so priming `self.mode` before the first traced forward removes the break -- unlike "
+        "the round-55 `cached_property`, where warming could never help because Dynamo traces the "
+        "`except` branch anyway. The repo already had this warmup but wired it into `kernel_warmup`, "
+        "which runs after `profile_run` has compiled, so it fired too late. The new break is "
+        "`jit_warmup_tilelang_helper.py:142 jit_impl(*args, **call_kwargs)`, "
+        "`call to a callable object with no traceable __call__` -- the compiled TileLang callable "
+        "itself, the same class as break 9's ctypes `_FuncPtr`, so the four remaining mHC entry points "
+        "do need custom ops after all. Pre-pack and mHC warmup both confirmed in the log. No tok/s.",
+    ),
+    (
+        "proto2-cg3",
+        "a **real** compile arm (no enumeration stub, no eager backend): "
+        "`VLLM_USE_BREAKABLE_CUDAGRAPH=0` plus nine mounts -- `vllm_init.fold.py`, `sm12x.op.py`, "
+        "`b12x_sparse.op.py`, `tilelang.op2.py` (break 5 merged with the parked tf32 custom op), "
+        "`qk.op.py`, `jitw.op.py`, `gpu_worker.prepackonly.py`, `dsv4_warmup_ext.op.py`, `o_proj.op2.py` "
+        "(the `data_ptr` sentinel fix merged with a new `fp8_einsum` custom op)",
+        "**the furthest any compile config has got.** Advanced four breaks: the `fp8_einsum` "
+        "`marked as skipped` failure is gone (the opaque custom op works -- `mutates_args=[\"out\"]`, "
+        "pairs flattened, `torch.empty_like(out)` fake impl), `deep_gemm.py:1153` `tf32_hc_prenorm_gemm` "
+        "is gone (the merged tilelang overlay), `sm12x_b12x_kernels.py:1144` is gone, and the wo_a "
+        "pre-pack still succeeds (43 packed). It stops at **break 13**: `model.py:1343 "
+        "mhc_fused_post_pre_tilelang` -> `tilelang.py:1042` -> `tilelang/jit/__init__.py:392 "
+        "is_lazy_style`, the same class as break 5 and the 2nd of the five mHC entry points. No tok/s.",
+    ),
+    (
+        "proto2-dg-nocar",
+        "`proto2-dg` + `--disable-custom-all-reduce`",
+        "**ran and was metered; a negative.** The reference runs `disable_custom_all_reduce: True`, we "
+        "run `False`, so this was the last untested difference in the two engines' startup dumps: c1 "
+        "55.5->54.9, c3 99.6->100.8, c5 131.7->129.1, c6 150.4->144.3, sum 437.2->429.1. c1/c3 are a wash "
+        "and c5/c6 are worse, including the level the contract weights most. The custom all-reduce kernel "
+        "is at least as good as NCCL here. **Closes the config-difference list:** compilation mode, "
+        "`moe_backend`, `linear_backend`, `ir_op_priority.rms_norm`, `cudagraph_capture_sizes`, "
+        "`disable_custom_all_reduce`, spec tokens and `max_model_len` are now all matched or measured. "
+        "Required a `harness/run-arm.sh` change: it forced `SERVE_EXTRA_ARGS` itself and its `${EXTRA}` is "
+        "word-split, so a second serve flag could not be passed; it now honours an optional "
+        "`ARM_EXTRA_ARGS`, defaulting to empty so every earlier arm is unchanged.",
+    ),
+    (
+        "proto2-dg-cgfull",
+        "`proto2-dg` + `CUDAGRAPH_MODE=FULL` (one graph for the whole decode step, no piecewise splits)",
+        "**ran and was metered; a large negative.** The direct test of \"the c1/c3 gap is capture "
+        "completeness\": c1 55.5->31.5, c3 99.6->74.6, c5 131.7->97.0, c6 150.4->121.9, sum 437.2->325.0. "
+        "Worse at every level and worse than `cgnone` (405.1), which removed capture entirely. Spreads "
+        "75.6 %/79.9 % at c1/c3 mean the arm is unstable, not merely slower -- consistent with capture "
+        "failing or re-capturing. `FULL_AND_PIECEWISE` stands. With this and `cg24`, both directions "
+        "around capture are now measured negatives.",
+    ),
+    (
+        "proto2-dg-cgnone",
+        "`proto2-dg` + `CUDAGRAPH_MODE=NONE`",
+        "**ran and was metered; kept as the price of capture, not as an arm.** Both gates pass on every "
+        "pass. c1 55.5->32.7, c3 99.6->88.8, c5 131.7->135.9, c6 150.4->147.7, sum 437.2->405.1. In step "
+        "time: capture is worth **-56.5 ms/step at c1** (86.5 against 143.1), -11.4 ms at c3, and at c5/c6 "
+        "the apparent +5.8/+7.2 ms is inside the ~6 % pass-to-pass spread and is not claimed.",
+    ),
+    (
+        "proto2-dg-cg24",
+        "`proto2-dg` + `MAX_CUDAGRAPH_CAPTURE_SIZE=24`",
+        "**ran and was metered; a negative.** Captures 8/24 rows, drops 40/48. Worse at every level: c1 "
+        "51.7, c3 96.5, c5 130.8, c6 147.5, sum 426.5 against 437.2. c6 147.5 matches `cgnone`'s 147.7, so "
+        "dropping the 48-row capture does not recover `cgnone`'s c6 step time and lands below capture-on "
+        "because the uncaptured runs also needed more steps. The capture ceiling is not a lever; "
+        "`MAX_CUDAGRAPH_CAPTURE_SIZE=48` stands.",
+    ),
+    (
+        "proto2-cg2",
+        "`proto2-cg` + three more mounts: `jit_warmup_triton_helper.py` warming `_kernel_arg_names` at "
+        "construction, `dsv4_warmup_ext.py` gaining a wo_a DeepGEMM einsum pre-pack plus a DeepGEMM "
+        "`allow_in_graph` registration, `gpu_worker.py` calling both at the top of "
+        "`determine_available_memory`, and `ops/o_proj.py` with the `data_ptr()` sentinel kept off the graph",
+        "died at worker init on break 12. The pre-pack worked (`DSv4 wo_a DeepGEMM einsum pre-pack: 43 "
+        "packed, 0 skipped, 1.75 s`), clearing breaks 9 and 10; the `_kernel_arg_names` warm cleared the "
+        "`hasattr(TritonKernelVariable)` class across all 7 candidate files; `allow_in_graph` cleared "
+        "break 11 but turned it into break 12: `Dynamo failed to run FX node with fake tensors ... Cannot "
+        "access data pointer of Tensor (e.g. FakeTensor) ... wrap the custom kernel into an opaque custom "
+        "op`. No tok/s: no compile arm has been metered yet.",
+    ),
+    (
+        "proto2-cgfg0",
+        "`proto2-dg` + `VLLM_USE_BREAKABLE_CUDAGRAPH=0` + a bind-mounted `compilation/wrapper.py` with "
+        "`fullgraph=True` relaxed to `False`",
+        "died at worker init: `Graph breaks are not supported with aot compile. Please use "
+        "torch.compile(fullgraph=True).` The pin runs `VLLM_USE_AOT_COMPILE=1`, and AOT needs a single "
+        "graph, so the two knobs are coupled: graph breaks or AOT, not both.",
+    ),
+    (
+        "proto2-cgfg0aot0",
+        "`proto2-cgfg0` + `VLLM_USE_AOT_COMPILE=0`",
+        "died at worker init: `AssertionError: VllmBackend can only be called once`. With the break "
+        "allowed, Dynamo calls the backend once per graph fragment and vLLM's backend supports exactly "
+        "one. `fullgraph=False` is therefore not a supported configuration in any of the four "
+        "`CompilationMode` values, and every graph break is fatal.",
+    ),
+    (
+        "proto2-cg",
+        "`proto2-dg` + `VLLM_USE_BREAKABLE_CUDAGRAPH=0` + five mounts: `vllm/__init__.py` folding "
+        "`torch.cuda.is_current_stream_capturing`, `utils/sm12x_b12x_kernels.py` with the `DBG wo_proj` "
+        "prints removed, `b12x_sparse.py` skipping `logger.info_once` while compiling, and the "
+        "`mhc_pre_broadcast_tilelang` / `fused_q_kv_rmsnorm` custom ops",
+        "died at worker init on break 9: `call to a callable object with no traceable __call__`, "
+        "`object=<_FuncPtr object>`, from `ops/o_proj.py:99 deepgemm_post_process_fp8_weight_block` -> "
+        "`utils/deep_gemm.py:536`, a ctypes call into a one-time weight repack running lazily inside "
+        "`forward` during `profile_run`. No tok/s: no compile arm has been metered yet.",
+    ),
+    (
+        "deeplinear",
+        "`LINEAR_BACKEND=auto VLLM_USE_DEEP_GEMM_E8M0=1`",
+        "died at worker init: DeepGEMM assert `sf.size(-2) == ceil_div(mn, gran_mn)` at "
+        "`csrc/utils/layout.hpp:97`, the ue8m0 scale layout.",
+    ),
+    (
+        "dglinear",
+        "`LINEAR_BACKEND=auto`",
+        "started but is numerically dead; see its row above.",
+    ),
+    (
+        "stockops",
+        "our WO-projection and sparse-indexer overlays off, at the default 65536 context",
+        "died before health: with the stock paths the engine needs 9.48 GiB of KV at 65536 context "
+        "against 9.32 GiB available. Retried as `stockops2` with `MAX_MODEL_LEN=32768`.",
+    ),
+    (
+        "moe_trtllm",
+        "`MOE_BACKEND=flashinfer_trtllm`",
+        "died at worker init: `Mxfp4 MoE backend 'FLASHINFER_TRTLLM_MXFP4_MXFP8' does not support the "
+        "deployment configuration since kernel does not support current device cuda`.",
+    ),
+    (
+        "moe_cutlass (probe)",
+        "`MOE_BACKEND=flashinfer_cutlass`",
+        "never became healthy; the reason line was not captured. Part of the MoE sweep, which found "
+        "only `humming` runnable.",
+    ),
+    (
+        "proto2-compile-op1",
+        "`proto2` + `VLLM_USE_BREAKABLE_CUDAGRAPH=0` + a bind-mounted `mhc/tilelang.py` that registers "
+        "`mhc_pre_broadcast_tilelang` as a custom op with an explicit fake impl",
+        "**not a measurement, and it cleared break 5.** The skip error drops to 0 and the TileLang frame "
+        "is gone; compilation advances to break 6, a `hasattr(TritonKernelVariable, arg_names)` in "
+        "`attention.py:544 _split_qkv_and_norm`. Two requirements were learned: the wrapper's signature "
+        "must mirror the original's defaults exactly (`infer_schema` puts them in the schema, and the "
+        "first attempt died on `missing value for argument 'n_splits'`), and `torch.Tensor | None` is "
+        "accepted and becomes `Tensor?`. Rebinding the public name means `model.py` needs no patch, "
+        "because it imports the name at module load.",
+    ),
+    (
+        "proto2-nodg",
+        "the kept arm with `is_deep_gemm_supported()` forced False on device family 120, i.e. "
+        "`patch_deep_gemm_sm12x_guard` applied globally via a bind-mounted `utils/deep_gemm.py`",
+        "**never became healthy, and the reason vindicates the overlay being parked.** The guard is "
+        "effective -- the `DeepGEMM E8M0 enabled on current platform` line stops appearing -- but the "
+        "engine dies at worker init with `Assertion error (.../deepgemm-src/csrc/utils/layout.hpp:113): "
+        "sf.size(-2) == ceil_div(mn, gran_mn)`, the **same** assertion round 26 fixed from the other side. "
+        "The coupling is identical: `deep_gemm_fp8_o_proj`'s recipe selection reads the DeepGEMM support "
+        "and E8M0 state, so reporting DeepGEMM unsupported flips the scale layout to one the "
+        "*still-running* DeepGEMM FP8 einsum rejects. Round 42's ~1 % gain came from switching only the "
+        "mHC prenorm GEMM off DeepGEMM, which is a different, local change; doing it globally is not "
+        "available. `patch_deep_gemm_sm12x_guard` is applied by `apply()` and correctly not by "
+        "`apply_main`.",
+    ),
+    (
+        "proto2-skip-attn",
+        "`proto2` with `DISABLE_DSPARK=1` and `self.attn(positions, x, None)` replaced by `x = x`",
+        "**not a usable measurement, recorded so nobody retries it.** Removing attention collapses the "
+        "residual stream: the runs produced short generations (toks 601/761/75/1230 at c3 instead of the "
+        "expected 1536, and varying per pass), spreads blew out to 9.7-15.1 %, and the implied step time "
+        "was ~17 ms -- a 6x speedup from deleting half the layer, which is not credible. The gates are "
+        "garbage (`' a =  image:ife'`, `' 组合内~| '`). The likely mechanism is routing collapse: with "
+        "degenerate hidden states the MoE routes far fewer distinct experts, so the arm prices attention "
+        "*and* a crippled MoE together. **Removal is only a clean instrument when the removed stage does "
+        "not feed the selector of another** -- which is why the all-reduce skip (0.3 ms) and the FFN skip "
+        "worked while this one does not.",
+    ),
+    (
+        "proto2-linhum",
+        "`LINEAR_BACKEND=humming`, the only untried linear backend (the profile puts the linear family "
+        "at ~44 % of CUDA time)",
+        "died at worker init: `RuntimeError: Expected size for first two dimensions of batch2 tensor to "
+        "be: [4, 4096] but got: [4, 1024]`. The humming linear kernel cannot handle this model's "
+        "O-projection shapes -- `o_lora_rank` 1024 against hidden 4096. **The linear family is therefore "
+        "exhausted**: `b12x` is the current best, `deep_gemm` (the reference's own choice) measured worse "
+        "and unstable, `humming` cannot load, and `cutlass`/`marlin` are in the NVFP4 clamp set this rig "
+        "rejects.",
+    ),
+    (
+        "proto2-compile-customop",
+        "`proto2` + `VLLM_USE_BREAKABLE_CUDAGRAPH=0` + a bind-mounted "
+        "`model_executor/kernels/mhc/tilelang.py` that registers `tf32_hc_prenorm_gemm` as a custom op "
+        "and hoists the three local import blocks",
+        "**not a measurement, but it cleared the break.** Compilation got past the pybind GEMM -- the "
+        "`tf32_hc_prenorm_gemm` frame is gone from the traceback -- and died at the next one, TileLang's "
+        "`_MHC_PRE_BIG_FUSE_TILELANG_KERNEL` -> `tilelang/jit/__init__.py:527 __call__` -> "
+        "`_infer_jit_mode` -> a TVM source introspection Dynamo skips. Reproducible as "
+        "`patches/apply_overlays.py --only mhc-tf32-customop`.",
+    ),
+    (
+        "proto2-break0",
+        "`proto2` with `VLLM_USE_BREAKABLE_CUDAGRAPH=0`, which is what lifts the `CompilationMode.NONE` "
+        "override and lets the model actually compile (our overlay puts `@support_torch_compile` on it)",
+        "**died at worker init, but this is the most informative failure of the round**: the config "
+        "really did resolve to `CompilationMode.VLLM_COMPILE` and compilation began. It stopped at "
+        "`torch._dynamo.exc.Unsupported: Attempted to call function marked as skipped`, naming "
+        "`vllm.third_party.deep_gemm._C...tf32_hc_prenorm_gemm`, reached from `model.py:1543` -> "
+        "`model.py:1284 mhc_pre_broadcast_tilelang` -> `tilelang.py:760 _hc_prenorm_gemm_outputs` -> "
+        "`tilelang.py:61`. That is exactly the break the repo catalogued on 2026-09-13 and never "
+        "cleared. **`patch_mhc_tf32_uncaptured` and `patch_mhc_tf32_call_redirect` exist but are "
+        "deliberately parked from `apply_main`** (their call-site needle predates `pr-53055.diff`, which "
+        "folded the local import into a guarded `is_deep_gemm_supported, tf32_hc_prenorm_gemm` line, so "
+        "the needle is gone and the overlay's `SystemExit` would cut off every later overlay), and the "
+        "route they implement is one this torch rejects anyway. The sanctioned route is vLLM's own "
+        "`direct_register_custom_op`, which the parked patch already imports.",
+    ),
+    (
+        "proto2-pcie-ar",
+        "`proto2` with `tensor_model_parallel_all_reduce` routed through b12x's `PCIeAllReduce` "
+        "(`single_channel=True`) by bind-mounting a patched `communication_op.py`",
+        "not a measurement: the runtime is CUDA-IPC based and fails across hosts with "
+        "`failed to open CUDA IPC handle for peer`, so every call fell back to PYNCCL and the arm is "
+        "just `proto2` again. Its `*.median.log` is deliberately left on the rig and not pulled. An "
+        "earlier attempt that used the wrapper's own `should_allreduce` died on a library "
+        "`AttributeError` before reaching the collective.",
+    ),
+    (
+        "proto-b12x015",
+        "the proto base with the reference's `b12x 0.15.3` in place of ours "
+        "(`vllm-spark-0731:main-029-proto-b12x015`, finally copied to spark2 so this arm could run)",
+        "died at worker init: `ValueError: Failed to find a kernel that can implement the ScaledMM "
+        "linear layer`. `b12x 0.15.3` does not ship the ScaledMM linear that `LINEAR_BACKEND=b12x` "
+        "resolves to, so the two generations are not drop-in. **Retired deliberately**: the rule for "
+        "this repo is the current base, the current `b12x 1.2.6`, and patches on top -- never a "
+        "regression to an older library to recover one missing kernel.",
+    ),
+    (
+        "proto-b12x015-linauto",
+        "the same image with `LINEAR_BACKEND=auto`, the linear selection the reference itself uses, "
+        "leaving `MOE_BACKEND=b12x` to isolate the MoE kernel",
+        "never became healthy either; the ScaledMM selection is not the only incompatibility. Recorded "
+        "and abandoned with `proto-b12x015` for the same reason: an older `b12x` generation is not the "
+        "route. The route is the current library's own unused fast paths, of which the PCIe all-reduce "
+        "in `b12x.comm.pcie` is the strongest lead found so far.",
+    ),
+    (
+        "b12x015",
+        "a derivative image with the reference's `b12x-0.15.3` in place of ours",
+        "not a performance result: the image existed only on spark1, so spark2's worker could not "
+        "start (`pull access denied`) and the head blocked waiting for rank 1. Superseded by the "
+        "side-by-side `b12xref` build.",
+    ),
+]
+
+TABLE_HEADER = re.compile(r"^\s*level\s+n\s+median agg tok/s\s+spread\s+values")
+ROW = re.compile(r"^\s*(\d+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)%\s+(.*)$")
+HEADER = re.compile(r"^== (\S+): (\d+) passes at max_tokens=(\d+), levels ([0-9 ]+), start (\S+)")
+PORT = re.compile(r"^== port holder: (.*)$")
+CONT = re.compile(r"^== container: (.*)$")
+ENGINE = re.compile(r"^== engine: (.*)$")
+TAGLINE = re.compile(r"^tag (\S+), (\d+) passes")
+MET_C = re.compile(r"^c(\d+)\s+per-stream=\s*([\d.]+) tok/s\s+agg=\s*([\d.]+)\s+wall=\s*([\d.]+)s")
+GATE = re.compile(r"^== (gate_\w+) '(.*)'$")
+
+
+def parse_median(path: Path) -> dict:
+    arm: dict = {"tag": path.name[: -len(".median.log")], "levels": {}, "gates": {}}
+    guard = {"port_holder": None, "container": None, "engine": None}
+    in_table = False
+    for line in path.read_text(errors="replace").splitlines():
+        if m := HEADER.match(line):
+            arm["passes"] = int(m.group(2))
+            arm["max_tokens"] = int(m.group(3))
+            arm["start"] = m.group(5)
+        elif m := PORT.match(line):
+            guard["port_holder"] = m.group(1).strip()
+        elif m := CONT.match(line):
+            guard["container"] = m.group(1).strip()
+        elif m := ENGINE.match(line):
+            guard["engine"] = m.group(1).strip()
+        elif m := GATE.match(line):
+            arm["gates"].setdefault(m.group(1), set()).add(m.group(2))
+        elif TABLE_HEADER.match(line):
+            in_table = True
+        elif in_table:
+            if m := ROW.match(line):
+                level = int(m.group(1))
+                arm["levels"][level] = {
+                    "n": int(m.group(2)),
+                    "median": float(m.group(3)),
+                    "spread": float(m.group(4)),
+                    "values": [float(v) for v in m.group(5).split()],
+                }
+            elif line.strip() and not line.startswith(" "):
+                in_table = False
+    arm["guard"] = guard
+    arm["guarded"] = bool(guard["container"])
+    arm["sum"] = round(sum(v["median"] for v in arm["levels"].values()), 1)
+    arm["worst_spread"] = max((v["spread"] for v in arm["levels"].values()), default=0.0)
+
+    passes = sorted(
+        (int(p.name[len(arm["tag"]) + 1 : -len(".meter.txt")]), p)
+        for p in DRIVER.rglob(f"{arm['tag']}-*.meter.txt")
+        if p.name[len(arm["tag"]) + 1 : -len(".meter.txt")].isdigit()
+    )
+    if passes:
+        arm["detail_pass"] = passes[-1][0]
+        arm["detail"] = parse_meter(passes[-1][1])
+    return arm
+
+
+def parse_meter(path: Path) -> dict:
+    out: dict = {"levels": {}}
+    lines = path.read_text(errors="replace").splitlines()
+    for i, line in enumerate(lines):
+        if m := MET_C.match(line):
+            level = int(m.group(1))
+            out["levels"][level] = {
+                "per_stream": float(m.group(2)),
+                "agg": float(m.group(3)),
+                "wall_s": float(m.group(4)),
+            }
+        elif line.startswith("-- level "):
+            level = int(line.split()[2])
+            block = lines[i : i + 9]
+            entry = out["levels"].setdefault(level, {})
+            for part in block:
+                if part.startswith("tokens_per_step"):
+                    entry["tokens_per_step"] = float(part.split()[1])
+                elif part.startswith("accept_rate"):
+                    entry["accept_rate"] = float(part.split()[1])
+                elif part.startswith("drafts_per_req"):
+                    entry["drafts_per_req"] = int(part.split()[1])
+    return out
+
+
+# Offline probes: no serve, no protocol. Hand-annotated like NOTES, because the
+# numbers come from a microbenchmark rather than from a driver median log.
+PROBES: list[dict] = [
+    {
+        "name": "tight same-session pair (ours then reference, back to back)",
+        "command": "`.scratch/arm-pair.sh` -- `harness/run-arm.sh proto2-dg-pair` immediately followed "
+        "by `harness/run-refg.sh`, no idle gap",
+        "log": "outputs/driver/proto2-dg-pair.median.log",
+        "table": "\n".join(
+            [
+                "| level | ours | spread | reference | spread | gap |",
+                "|---|---|---|---|---|---|",
+                "| c1 | 53.9 | 7.6 % | 65.3 | 4.0 % | -17.5 % |",
+                "| c3 | 98.6 | 3.3 % | 110.1 | 4.6 % | -10.4 % |",
+                "| c5 | 129.9 | 0.2 % | 138.6 | 16.1 % | -6.3 % |",
+                "| c6 | 144.0 | 6.7 % | 159.1 | 2.1 % | -9.5 % |",
+                "| **sum** | **426.4** | | **473.1** | | **-9.9 %** |",
+                "",
+                "Step time: +11.5 / +19.2 / +17.6 / +18.1 ms, median **+17.8 ms**, over a step time that",
+                "more than doubles (86.8 -> 193.5 ms). Gates pass on every pass in both legs.",
+                "Reference logs: `outputs/driver/refg.median.log` and `outputs/driver/refg-{1,2,3}.meter.txt`.",
+            ]
+        ),
+        "result": "**The attribution now rests on a back-to-back measurement.** Every earlier comparison "
+        "paired our arm with a reference run 7.5 h earlier; this one finished at 02:18 for ours and 02:27 "
+        "for the reference. The sum gap reproduces at -9.9 % against -9.8 %, so it is not time-of-day "
+        "drift, and the flat per-step delta reproduces at +17.8 ms median against +15.5 ms. Both arms "
+        "came in lower than their earlier runs, so the honest ranges are ours 422.6-437.2 and the "
+        "reference's 473.1-484.8 -- the gap is what is stable, not either absolute.",
+        "verdict": "**Both arms must be measured together.** This is cheaper than it looks (two arms, "
+        "~40 min) and it removes the one objection that cannot be answered after the fact. Do this "
+        "whenever a final claim is being made.",
+    },
+    {
+        "name": "proto2-enum",
+        "command": "`VLLM_USE_BREAKABLE_CUDAGRAPH=0` + `fullgraph=False` with an **eager** backend + "
+        "`TORCH_LOGS=+graph_breaks` + an `fp8_einsum` stub that returns the caller's own `out`",
+        "log": "outputs/driver/one-off/proto2-enum-breaks.log",
+        "result": "**Diagnostic, not a measurement -- no tok/s and none is possible.** One boot logged "
+        "**23 distinct graph-break sites** over the whole forward path, where the previous method found "
+        "one per boot. On the forward path: `sm12x_b12x_kernels.py:330/807/1093` are our own `print()` "
+        "calls (Dynamo cannot trace the builtin); `jit_warmup_triton_helper.py:232` is "
+        "`hasattr(TritonKernelVariable, 'arg_names')`; `b12x/.../mla/merge.py:84/85/92` is third-party; "
+        "`deep_gemm.py:1153` is `tf32_hc_prenorm_gemm`, which is PR #53055's target; "
+        "`multi_stream_utils.py:56` is `torch.fx.traceback.annotate`. The `print` class is closed by "
+        "shadowing the builtin behind `B12X_DEBUG`. The run also **refuted the round-55 fix** for "
+        "`_kernel_arg_names`: warming a `functools.cached_property` cannot work, because Dynamo traces "
+        "the `except KeyError` branch and that is where the `getattr` lives. The run never became "
+        "healthy -- it died at worker init on `RuntimeError: An event was recorded on a stream where a "
+        "graph input was previously mutated` (`model.py:1517`), a cudagraph-tree complaint that follows "
+        "from the eager backend plus capture rather than from a Dynamo break. The break list was "
+        "complete by then.",
+        "table": "\n".join(
+            [
+                "| forward-path site | reason | owner |",
+                "|---|---|---|",
+                "| `sm12x_b12x_kernels.py:330,807,1093` | Dynamo cannot trace builtin `print` | ours (cleared) |",
+                "| `sm12x_b12x_kernels.py:1144` | non-contiguous `out=` in `torch.bmm` | ours (cleared) |",
+                "| `jit_warmup_triton_helper.py:232` | `hasattr(TritonKernelVariable, 'arg_names')` | upstream (cleared) |",
+                "| `b12x/.../mla/merge.py:84,85,92` | `torch.* op returned non-Tensor` | third-party |",
+                "| `deep_gemm.py:1153` | `tf32_hc_prenorm_gemm` pybind call | upstream (PR #53055) |",
+                "| `multi_stream_utils.py:56` | `torch.fx.traceback.annotate` | upstream |",
+                "| `attention.py:852`, `import_utils.py:427` | untraceable call / do-not-trace import | upstream |",
+                "",
+                "23 sites in total; the remainder are warmup/JIT/import noise (`pynvml`, `tvm_ffi`,",
+                "`tilelang`, `nvidia_cutlass_dsl`, `inspect`).",
+            ]
+        ),
+        "verdict": "**Enumeration works; keep it, and it was used to verify two fixes.** The re-run "
+        "after round 59 confirms `jit_warmup_triton_helper.py:232` is gone and that the `print` breaks "
+        "are gone, and it surfaced a new one in our own code (`sm12x_b12x_kernels.py:1144`, a "
+        "non-contiguous `out=` in `torch.bmm`), now fixed. One boot replaces one-break-per-boot and it "
+        "immediately refuted a fix from round 55. It is not a measurement and must never be quoted as "
+        "one -- the eager backend gives no speedup and the `fp8_einsum` stub is wrong on purpose.",
+    },
+    {
+        "name": "`b12x_ref` WO projection against our `b12x`, on the GPU",
+        "command": "docker run --rm --gpus all --entrypoint python3 "
+        "-v ~/bench:/bench vllm-spark-0731:main-029-proto-b12xref /bench/bench_b12x_wo.py",
+        "log": "outputs/driver/one-off/b12x-wo-headtohead.log",
+        "table": "\n".join(
+            [
+                "| tokens | b12x (ours) | b12x_ref | delta |",
+                "|---|---|---|---|",
+                "| 1 | 0.374 | 0.331 | ref -0.042 |",
+                "| 2 | 0.372 | 0.336 | ref -0.036 |",
+                "| 4 | 0.387 | 0.337 | ref -0.050 |",
+                "| 8 | 0.381 | 0.344 | ref -0.037 |",
+                "| 16 | 0.381 | 0.396 | ours -0.015 |",
+                "| 32 | 0.410 | 0.426 | ours -0.015 |",
+                "| 48 | 0.405 | 0.446 | ours -0.042 |",
+                "| 64 | 0.417 | 0.479 | ours -0.063 |",
+                "",
+                "Median of 50 CUDA-event timings per cell, ms. Both kernels were driven with the same",
+                "FP8 block-scaled weights and the same input; relative difference 1e-6 at 1 token and",
+                "0.0 at 8 and 64 tokens, so the two are computing the same thing and the timings are",
+                "comparable. Shapes: hidden 4096, groups 8, group_width 4096, rank 1024 (DSV4-Flash).",
+            ]
+        ),
+        "verdict": "**rejected as a lever.** The reference's WO kernel is faster only at or below 8 "
+        "tokens, by at most 0.050 ms; from 16 tokens up ours is faster, by 0.063 ms at 64. A decode "
+        "step at c6 runs roughly 48 rows, where ours is already 0.042 ms ahead, and the best case for "
+        "a port is 0.05 ms against a 38.65 ms c6 step, 0.13 %. The 0.60 ms the profiler attributes to "
+        "the WO region is the live path (fused inverse-RoPE quant, dequant, grouped `bmm`, `wo_b` "
+        "linear), not this native kernel, so this closes the `b12x_ref` generation as the source of "
+        "the WO cost and does not show the region itself is optimal.",
+    },
+    {
+        "name": "`b12x_ref` compressed sparse MLA against our `b12x`, on the GPU",
+        "command": "docker run --rm --gpus all --entrypoint python3 "
+        "-v ~/bench:/bench vllm-spark-0731:main-029-proto-b12xref /bench/bench_b12x_mla.py",
+        "log": "outputs/driver/one-off/b12x-mla-headtohead.log",
+        "table": "\n".join(
+            [
+                "| library | run 1 | run 2 | run 3 | median | vs pure-torch reference |",
+                "|---|---|---|---|---|---|",
+                "| `b12x` (ours) | 0.2236 | 0.2238 | 0.2257 | **0.224** | 0.50 % |",
+                "| `b12x_ref` | 0.6138 | 0.6105 | 0.6319 | 0.614 | 0.50 % |",
+                "",
+                "Median of 30 CUDA-event timings per run, ms, DSV4-Flash decode: 48 query rows,",
+                "32 local q heads (TP=2), head_dim 512, SWA window 128, indexed topk 512 pages,",
+                "584 B/token packed page. Inputs built with the reference package's own",
+                "`pack_compressed_mla_kv_cache_reference`, and the pure-torch",
+                "`compressed_sparse_mla_reference` is carried as ground truth. Both kernels sit",
+                "0.50 % from that reference, and agree with each other to 0.10 %, so they compute",
+                "the same thing.",
+            ]
+        ),
+        "verdict": "**the reference's attention generation is a regression, not a prize.** Our kernel "
+        "is **2.7x faster** (0.224 ms against 0.614 ms) on the same contract and the same inputs. "
+        "There is nothing to port here. Two consequences: attention is not where the anemll engine "
+        "earns its step time, so the remaining gap has to be in the region the profiler prices "
+        "highest, ffn/MoE at 1.84 ms of the 2.83 ms target layer (65 %), not in attention at 0.94 ms; "
+        "and the `b12x_ref` generation is now closed for both surfaces measured, WO and MLA. Caveat "
+        "recorded with the number: this compares each stack's public decode entry point, and "
+        "`compressed_mla_decode_forward` splits into chunks and merges where ours is a single fused "
+        "call, so part of the 2.7x is entry-point design rather than kernel throughput. Both are what "
+        "their own engine calls, which is what makes the comparison the relevant one.",
+    },
+    {
+        "name": "MoE decode regime coverage: our `b12x` against the reference's",
+        "command": "docker run --rm --gpus all --entrypoint python3 "
+        "-v ~/bench:/bench vllm-spark-0731:main-029-proto-b12xref /bench/probe_moe_tuning.py",
+        "log": "outputs/driver/one-off/moe-tuning-coverage.log",
+        "table": "\n".join(
+            [
+                "| routed rows | ours micro | ours dynamic | ref micro | ref **static** | ref dynamic |",
+                "|---|---|---|---|---|---|",
+                "| 8 | 107 | 188 | 107 | 148 | 188 |",
+                "| 20 | 84 | 188 | 84 | 148 | 188 |",
+                "| 24 | - | 188 | - | 148 | 188 |",
+                "| 48 | - | 188 | - | 149 | 188 |",
+                "| 96 | - | 188 | - | 171 | 188 |",
+                "| 144 | - | 188 | - | 130 | 188 |",
+                "| 240 | - | 188 | - | 141 | 188 |",
+                "| 288 | - | 188 | - | 175 | 188 |",
+                "| 384 | - | 188 | - | 175 | 188 |",
+                "| 640 | - | 188 | - | 188 | 188 |",
+                "| 1024 | - | 147 | - | - | 147 |",
+                "",
+                "**Structure, not throughput.** Our package exposes no `static` MoE backend at all",
+                "(`b12x.moe.fused_moe` has no `static` module; the tuning registry has no",
+                "`decode/static` policy), while the reference's has `MoEStaticKernel` plus a generated",
+                "`static` ladder. Our side's only applicable policy above 20 routed rows is `dynamic`,",
+                "whose ladder is flat at 188 until 640.",
+                "",
+                "Where a DSV4-Flash decode step lands (`docs/knowledge/02-model.md`: 256 routed",
+                "experts, 6 per token; `q_rows = c * 8`):",
+                "",
+                "| level | q rows | routed rows | our policy | reference policy |",
+                "|---|---|---|---|---|",
+                "| c1 | 8 | 48 | dynamic, cap 188 | static, cap 149 |",
+                "| c3 | 24 | 144 | dynamic, cap 188 | static, cap 130 |",
+                "| c5 | 40 | 240 | dynamic, cap 188 | static, cap 141 |",
+                "| c6 | 48 | 288 | dynamic, cap 188 | static, cap 175 |",
+            ]
+        ),
+        "verdict": "**leading attribution for the ffn/MoE region, and still structural.** The "
+        "profiler puts 65 % of a target layer in ffn/MoE (1.84 ms of 2.83 ms), and the MLA result "
+        "already ruled attention out as the reference's source of speed, so this is where its lead "
+        "has to live. The probe shows our kernel generation has no mid-regime MoE backend: every "
+        "level in the protocol, c1 through c6, runs the `dynamic` kernel with a flat cluster cap of "
+        "188, while the reference runs a different `static` kernel whose cap is tuned per row count. "
+        "**No throughput number is claimed here**: this is a coverage and configuration finding, and "
+        "the next measurement is an MoE kernel head-to-head at these shapes to convert it into "
+        "milliseconds. If it holds, a fix is in scope under goal item 4 (third-party kernel "
+        "generation) or item 3 (our own configuration), depending on where the choice is made.",
+    },
+    {
+        "name": "MoE cluster-cap sweep on our `b12x`, DSV4-Flash decode shape",
+        "command": "docker run --rm --gpus all --entrypoint python3 "
+        "-v ~/bench:/bench vllm-spark-0731:main-029-proto-b12xref /bench/bench_moe_clusters.py",
+        "log": "outputs/driver/one-off/moe-cluster-cap.log",
+        "table": "\n".join(
+            [
+                "Three reps of the whole sweep, cleanest pair (reps 1 and 2; rep 0 was taken while the",
+                "host was compiling at load average 16):",
+                "",
+                "| `max_active_clusters` | rep 1 | rep 2 | spread | vs cap 188 |",
+                "|---|---|---|---|---|",
+                "| 188 (our flat default) | 11.557 | 11.761 | 1.8 % | 1.000 |",
+                "| 175 | 10.880 | 10.896 | 0.1 % | **0.941** |",
+                "| 149 | 11.582 | 11.632 | 0.4 % | 0.995 |",
+                "| 141 | 10.839 | 10.891 | 0.5 % | **0.938** |",
+                "| 130 | 11.635 | 11.591 | 0.4 % | 0.993 |",
+                "| 96 | 10.889 | 10.841 | 0.4 % | **0.939** |",
+                "",
+                "Median of 30 CUDA-event timings per cell, 48 tokens x topk 6 = 288 routed rows, 256",
+                "routed experts, hidden 4096, intermediate 2048, one GB10. Weights synthetic but packed",
+                "in the real contract: uint8 FP4 `[E, 2*inter, hidden/2]` and `[E, hidden, inter/2]` with",
+                "E8M0 `[E, rows, K/32]` grids, A8 activation, unit global scales. Same activations and",
+                "routing at every cap, fresh weight copy per cap.",
+                "",
+                "**Output sums agree to 0.005 %** across all 18 cells (516314.3 to 516340.0), which is",
+                "FP32 atomic-accumulation order, so the kernel computes the same thing everywhere.",
+                "",
+                "**Rep 0 is discarded and the reason recorded.** The whole sweep ran while the phase-1",
+                "proto2 build was compiling vLLM's CUDA extensions (`ninja -j 16`, load average 16.0,",
+                "sixteen `cicc` processes at 100 %). Rep 0 is uniformly inflated (13.121 at cap 188",
+                "against 11.557 and 11.761 later) and cannot be compared with reps 1 and 2. Lesson for",
+                "the trap list: do not put a GPU measurement on this rig while the host is compiling.",
+                "",
+                "**The bug that caused the earlier divergence, for the record.**",
+                "`fused_moe.prepare_weights` repacks the packed weight tensors *in place*",
+                "(`_logical_weight_to_w4a8_rp_inplace`, `_e8m0_scale_to_w4a8_sfb_inplace`), so passing",
+                "the same `PackedWeights` tensors into a second build feeds it already-repacked data.",
+                "Only the first build in a process is correct. Diagnostic:",
+                "`harness/diag_moe_divergence.py`.",
+            ]
+        ),
+        "verdict": "**kernel-level effect is now reproducible; still not a protocol result.** Across two "
+        "clean reps the caps group consistently: 175, 141 and 96 land at 10.84-10.90 ms while our flat"
+        "default of 188 and the caps 149 and 130 land at 11.56-11.64 ms, a **6 % separation reproducible"
+        "to 0.5 % between reps**. Against the repo's own keep rule that now holds: cap 175 beats cap"
+        "188 by 5.9-6.3 % while 188's own rep-to-rep spread is 1.8 %. The effect is non-monotonic in the"
+        "cap value, so the mechanism is not simply fewer clusters, and the two groups being stable while"
+        "the ordering within each is noise suggests a grid/tiling threshold rather than a smooth cost."
+        "**Two things still stop this being a protocol win.** The whole sweep ran under host load"
+        "average 16 from the concurrent proto2 build, so absolute values are not trustworthy and rep 0"
+        "had to be discarded; and 10.4-11.7 ms for one MoE at 288 routed rows remains about an order of"
+        "magnitude above what a 43-layer step of 38.65 ms can contain, so this single-GPU 256-expert"
+        "execution plan is still not the path the engine runs. **Next**: repeat the sweep on an idle host"
+        "to confirm the 6 % without contention, then reshape to the served configuration (TP sharding,"
+        "real routing skew, tuned plan) before anything is claimed on the protocol."
+    },
+    {
+        "name": "Real NVFP4 KV writer: what width does the reference actually allocate?",
+        "command": "docker run --rm --entrypoint python3 -v ~/bench:/probe "
+        "ghcr.io/anemll/dspark-vllm-gx10:0.1.1 /probe/probe_nvfp4_kv_width.py",
+        "log": "outputs/driver/one-off/nvfp4-kv-width-ref.log",
+        "table": "\n".join(
+            [
+                "Read from the reference image's own source, not inferred:",
+                "",
+                "| reference file | dtype test | width returned |",
+                "|---|---|---|",
+                "| `vllm/v1/kv_cache_interface.py:381-386` | `fp8_ds_mla` **and** `nvfp4_ds_mla` | `storage_block_size * 584` |",
+                "| `vllm/v1/attention/backends/mla/sparse_swa.py:151-154` | `fp8_ds_mla` **and** `nvfp4_ds_mla` | 584 |",
+                "| `vllm/models/deepseek_v4/sparse_mla.py:104-107` | `fp8_ds_mla` **and** `nvfp4_ds_mla` | `(num_blocks, block_size, 584)` |",
+                "| `vllm/models/deepseek_v4/attention.py:619-620` | both | 584-byte DSpark envelope |",
+                "",
+                "The reference's own comments, verbatim:",
+                "",
+                "- `attention.py`: \"fp8_ds_mla/nvfp4_ds_mla are padded uint8 layouts. Keep the upstream",
+                "  FP8 alignment and use the proven 584-byte DSpark NVFP4 envelope.\"",
+                "- `kv_cache_interface.py`: \"DeepseekV4 uses the padded 584-byte sparse-MLA envelope for",
+                "  **both** fp8_ds_mla and nvfp4_ds_mla. head_size stays semantic (512); bytes are",
+                "  determined by the backend layout here.\"",
+                "- `sparse_mla.py`: \"DeepseekV4 main MLA: 584B per token (448 NoPE + 128 RoPE + 8 fp8",
+                "  scale).\" 448 + 128 + 8 = 584, which is the same arithmetic our own",
+                "  `_DSV4_TOKEN_BYTES = 584` uses.",
+                "",
+                "Seven modules in the reference name both dtypes; two of them are the KV-width",
+                "decisions above and both return the identical number for the two.",
+            ]
+        ),
+        "verdict": "**closed: there is no real NVFP4 KV writer to port, on either side.** Goal item 1's"
+        "premise, that our `nvfp4_ds_mla` is an envelope alias while the reference has a real writer, is"
+        "false in the reference's own source: anemll's `nvfp4_ds_mla` allocates the *same* 584 B/token"
+        "envelope as `fp8_ds_mla`, by the same 448 + 128 + 8 arithmetic we use. **The number that closes"
+        "it: 584 B/token on both engines**, read from the reference image rather than from our notes. The"
+        "7,650 B/token figure in the goal text is a whole-model footprint that counts the indexer and SWA"
+        "caches, not a narrower per-layer dtype, so it is not evidence of a writer we lack. This agrees"
+        "with the 2026-08-26 correction already in `docs/knowledge/04-quantization-kv.md`, now confirmed"
+        "against the live image. **What remains real is not a writer but capacity**: anemll reaches a"
+        "~2.0M-token KV pool against our ~97k at similar utilisation, which that doc attributes to"
+        "runtime and weights footprint rather than dtype width, and which the serving protocol measures"
+        "directly. One honest limit on this closure: the widths are verified from the Python-side"
+        "decision functions and their stated byte composition; the reference's writer kernel was not"
+        "byte-compared, and the comments plus the independent FlashMLA README cross-check in"
+        "`04-quantization-kv.md` are what stand in for that.",
+    },
+    {
+        "name": "MoE backend: what the comparator actually runs against what we run",
+        "command": "docker run --rm --entrypoint python3 ghcr.io/anemll/dspark-vllm-gx10:0.1.1 "
+        "/probe/probe_nvfp4_kv_width.py  # plus a read of harness/ref-base0731.yaml",
+        "log": "outputs/driver/one-off/moe-backend-comparator.log",
+        "table": "\n".join(
+            [
+                "The comparator's recipe, `harness/ref-base0731.yaml`, is the authority on what the",
+                "reference arm runs. Its serve command ends:",
+                "",
+                "```",
+                "    --moe-backend flashinfer_b12x \\",
+                "    --speculative-config '{\"method\":\"dspark\",\"num_speculative_tokens\":7,"
+                "\"draft_sample_method\":\"probabilistic\"}}'",
+                "```",
+                "",
+                "Our pin, `configs/pin.main-029.env`:",
+                "",
+                "```",
+                'MOE_BACKEND="${MOE_BACKEND:-b12x}"',
+                "```",
+                "",
+                "The reference's oracle says `flashinfer_b12x` is **excluded from auto-selection** and",
+                "must be asked for by name (`oracle/nvfp4.py` lines 175-178):",
+                "",
+                "```",
+                "    # NOTE: the kernels are selected in the following order.",
+                "    # FLASHINFER_B12X is intentionally excluded from auto-selection until",
+                "    # the upstream CUTLASS SM121 MMA op guard is resolved; use",
+                "    # moe_backend=\"flashinfer_b12x\" to opt in explicitly.",
+                "```",
+                "",
+                "So the comparator is not running a default. It is explicitly opting in to a kernel the",
+                "upstream oracle refuses to pick on its own, which is a deliberate authorial choice.",
+                "",
+                "A caveat that falls out of the same file: `select_nvfp4_moe_backend` narrows the",
+                "candidate list to `NVFP4_BACKENDS_WITH_CLAMP = {FLASHINFER_TRTLLM, FLASHINFER_CUTLASS,",
+                "MARLIN}` whenever `config.swiglu_limit is not None`, and `FLASHINFER_B12X` **is not in",
+                "that set**. DeepSeek-V4-Flash sets `swiglu_limit 10.0`, so the explicit opt-in may be",
+                "bypassing clamp handling that the auto-selected backends would have applied. Both",
+                "protocol gates exist precisely to catch that kind of difference, and they must be read",
+                "on this arm rather than assumed.",
+                "",
+                "What the two names dispatch to, from the reference image's own source:",
+                "",
+                "| name | implementation |",
+                "|---|---|",
+                "| `flashinfer_b12x` (reference) | `FlashInferB12xExperts` in `fused_moe/experts/flashinfer_b12x_moe.py` |",
+                "| `b12x` (ours) | `B12X_MXFP4`, the b12x package's own MoE |",
+                "",
+                "`FlashInferB12xExperts`' docstring: \"Uses `b12x_fused_moe` from FlashInfer PR #3080",
+                "which fuses token dispatch, two GEMMs, SwiGLU activation, and topk-weight reduction",
+                "into a **single kernel call**. Input quantization (BF16->FP4) is performed inside the",
+                "kernel so BF16 hidden states are passed directly.\" It asserts",
+                "`quant_config.quant_dtype == \"nvfp4\"` and supports only that.",
+                "",
+                "Availability checked in both images (so this is not a missing package):",
+                "",
+                "| image | flashinfer | `b12x_fused_moe` | `has_flashinfer_b12x_moe()` |",
+                "|---|---|---|---|",
+                "| reference `0.1.1` | 0.6.15 | present | True |",
+                "| ours `main-029-proto-b12xref` | 0.7.0 | present, plus `B12xNvfp4Config/Runner`, `B12xW4A16Config/Runner` | True |",
+
+                "Correction, same day: the first pass scanned `/usr/local/lib/python3.12/dist-packages/vllm` and",
+                "found no `flashinfer_b12x`, and nearly recorded that as our stack missing the backend. vLLM is",
+                "installed editable from `/opt/vllm` (`vllm.__file__` is `/opt/vllm/vllm/__init__.py`), and that",
+                "tree has 6 files naming the backend, including `experts/flashinfer_b12x_moe.py` and the nvfp4",
+                "oracle's `FLASHINFER_B12X`. Both images also answer `has_flashinfer_b12x_moe() is True` and",
+                "`map_nvfp4_backend(\"flashinfer_b12x\")` returns `NvFp4MoeBackend.FLASHINFER_B12X`. Anyone",
+                "repeating this check must read the path from `vllm.__file__`, not assume dist-packages."
+            ]
+        ),
+        "verdict": "**the sharpest lead of the session, and it is untested.** The comparator routes"
+        "ffn/MoE through `flashinfer_b12x`, a single fused FlashInfer kernel that does dispatch, both"
+        "GEMMs, SwiGLU and topk reduction in one call; our measured arms run `MOE_BACKEND=b12x`, a"
+        "different implementation. ffn/MoE is the region the profiler prices at 65 % of a target layer,"
+        "and attention has already been ruled out as the source of the reference's lead, so this is"
+        "where the gap has to be. **`flashinfer_b12x` has never been measured in this repo**: the MoE"
+        "sweep in `docs/EXPERIMENTS.md` tried `b12x`, `humming`, `flashinfer_trtllm` (died at worker"
+        "init: kernel does not support current device cuda) and `flashinfer_cutlass` (never healthy),"
+        "and not this one. Our own stack supports it: `patches/assert_stack.py` has"
+        "`ALLOWED_MOE = (\"b12x\", \"flashinfer_b12x\")`, `configs/pin.golden.env` already sets it, and the"
+        "FlashInfer wheels in both images expose `b12x_fused_moe`. So this is a one-variable arm: set"
+        "`MOE_BACKEND=flashinfer_b12x`, rebuild nothing, run the protocol. **First arm after the proto2"
+        "rebuild lands.** One caveat to carry: `FlashInferB12xExperts` asserts NVFP4 expert weights, and"
+        "`docs/knowledge/04-quantization-kv.md` records NVFP4 *weight* attempts as a dead end on this"
+        "model, though `02-model.md` says the checkpoint's experts ship as fp4 and the MXFP4 oracle maps"
+        "`flashinfer_b12x` to `B12X_MXFP4`, so the MXFP4 route may reach the same kernel. Expect it"
+        "either to run and be measurable, or to be rejected at load — both are results. Two further"
+        "facts sharpen it. The reference is not running a default: `oracle/nvfp4.py` states that"
+        "FLASHINFER_B12X is \"intentionally excluded from auto-selection until the upstream CUTLASS SM121"
+        "MMA op guard is resolved\", so the comparator deliberately opts in to a kernel upstream will not"
+        "choose by itself — somebody measured it and preferred it. And the same file excludes"
+        "FLASHINFER_B12X from `NVFP4_BACKENDS_WITH_CLAMP`, which DeepSeek-V4-Flash's `swiglu_limit 10.0`"
+        "would otherwise narrow to `{TRTLLM, CUTLASS, MARLIN}`; since our own sweep found TRTLLM dies at"
+        "worker init on this device and CUTLASS never became healthy, the clamp-restricted set is"
+        "exactly the set that does not work here. That is a coherent story for why the reference runs"
+        "this backend and why we never did. The clamp caveat is why the arm must be judged on both"
+        "gates, not only on throughput."
+    },
+    {
+        "name": "MoE kernel head-to-head: our b12x against FlashInfer's fused b12x_fused_moe",
+        "command": "docker run --rm --gpus all --entrypoint python3 -v ~/bench:/bench "
+        "vllm-spark-0731:main-029-proto-ccompile /bench/bench_moe_headtohead.py",
+        "log": "outputs/driver/one-off/moe-kernel-headtohead.log",
+        "table": "\n".join(
+            [
+                'Same image, same process, same GPU, same routing, one DSV4-Flash c6 decode shape (48 tokens,',
+                'topk 6 = 288 routed rows, 256 experts, hidden 4096, intermediate 2048). Median of 30 CUDA-event',
+                'timings per rep, five reps:',
+                '',
+                '| library | rep medians (ms) | clean median | output sanity |',
+                '|---|---|---|---|',
+                '| `b12x` (ours, `b12x.moe.fused_moe`) | 10.108 / 10.075 / 10.058 / 10.069 / 10.063 | **10.066** | finite, mean abs 2.54 |',
+                '| `flashinfer_b12x` (`flashinfer.fused_moe.b12x_fused_moe`) | 134.500 / 127.521 / 127.613 / 127.792 / 127.991 | **127.729** | finite, mean abs 2.55 |',
+                '',
+                'Reproduced across two independent runs (the first: 10.67 against 133.72). FlashInfer selected',
+                'its `static` backend by itself, which the JIT name records:',
+                '`static_m48_k4096_n2048_t6_r288_...`. That is the regime its own tuning registry uses for',
+                '20 < routed rows <= 640, so it is the backend the reference would run at this shape.',
+                '',
+                'Weight construction mirrors `FlashInferB12xExperts.process_weights_after_loading` in the',
+                'reference image: NVFP4 with **vec-16 E4M3** scales (`k1 = k1_sf * 16`; `fp4_quantize` refuses',
+                "ue8m0 at vec 16, so the working path is E4M3 rather than the checkpoint's e8m0), the scale stack",
+                'reshaped to `[E*N, K/16]` and converted once with `num_groups=E`, per-expert alphas of 1.0 with',
+                'the global scale baked into the block scales, and `fc2_input_scale` forced to 1.0 - all of which',
+                'is what that method does.',
+                '',
+                '**The magnitude is not believable and must not be quoted as a win.** 127.7 ms for one MoE layer',
+                'cannot sit inside a 43-layer decode step measured at 38.65 ms, so the reference is not running',
+                'this kernel the way this probe drives it. Candidate causes, in order of suspicion: (1) the real',
+                'engine runs TP=2 with experts sharded, so each rank sees far fewer experts and more rows per',
+                'expert, while this probe puts all 256 experts and all 288 rows on one GPU - a fixed-m48 static',
+                'tile over 256 experts pads every expert to 48 rows and wastes most of the work; (2) the real path',
+                'reuses a cuda-graph-captured workspace and this probe rebuilds the binding per rep; (3) the',
+                'alpha/scale convention here is accepted but may select a slower code path inside the kernel.',
+                'Until one of those is eliminated, the honest reading is: at this shape and routing, with all',
+                "experts local to one rank, FlashInfer's fused kernel is ~13x slower than ours - which is a",
+                "statement about this configuration, not about the comparator's engine.",
+            ]
+        ),
+        "verdict": "**measured, and deliberately not claimed.** The two MoE implementations the two engines use now run side by side in one process at the DSV4 c6 decode shape: ours at **10.066 ms**, FlashInfer's fused `b12x_fused_moe` at **127.729 ms**, a **13x** separation that reproduced across two runs with both outputs finite and of the same magnitude. If it holds, the comparator's `--moe-backend flashinfer_b12x` is not where its speed comes from - but it almost certainly does not hold as stated, because the number is an order of magnitude larger than the whole reference step can contain. The most likely explanation is sharding: the real engine runs TP=2 with experts split across ranks and a captured workspace, while this probe puts 256 experts and 288 rows on one GPU, where a fixed-m48 static tile pads every expert to 48 rows. **Next**: repeat with the served sharding (num_local_experts = 128, and 64 for a 4-way split) and with a prewarmed, captured binding, and only then decide whether the comparator's MoE backend is a lead or a red herring. The probe is `harness/bench_moe_headtohead.py`; log `outputs/driver/one-off/moe-kernel-headtohead.log`.",
+    },
+    {
+        "name": "FlashInfer `b12x_fused_moe` in our wheel against the reference's wheel",
+        "command": "docker run --rm --gpus all --entrypoint python3 -v ~/bench:/bench "
+        "<image> /bench/bench_flashinfer_moe.py  # run once per image",
+        "log": "outputs/driver/one-off/flashinfer-moe-versions.log",
+        "table": "\n".join(
+            [
+                'The same FlashInfer kernel (`flashinfer.fused_moe.cute_dsl.b12x_moe` in both wheels), the same',
+                'probe, the same inputs, run in each image. Median of 30 CUDA-event timings, three reps each;',
+                'reported per rep.',
+                '',
+                '| local experts | flashinfer 0.7.0 (ours) | flashinfer 0.6.15 (reference) | ratio | `mean_abs` output |',
+                '|---|---|---|---|---|',
+                '| 256 | 150.170 / 148.978 / 150.477 | 12.291 / 12.408 / 12.430 | **12.1x** | 2.6049 vs 2.6049 |',
+                '| 128 | 71.779 / 72.158 / 71.806 | 7.672 / 7.770 / 7.672 | **9.4x** | 2.6084 vs 2.6086 |',
+                '| 64 | 38.214 / 37.795 / 37.798 | 4.464 / 4.417 / 4.424 | **8.5x** | 2.6007 vs 2.6000 |',
+                '',
+                '**The outputs are identical between the wheels** (agreeing to the fourth decimal in `mean_abs` at',
+                'every expert count), so this is the same computation, not a different kernel or a different',
+                'precision. Only the speed differs, and ours is the slow one.',
+                '',
+                "The 0.6.15 signature has no `input_global_scale` - the call is filtered to each build's accepted",
+                'parameters, and that is the only argument dropped, so the comparison is like for like.',
+                '',
+                "Also recorded: the same standalone probe in our image reproduces the head-to-head's FlashInfer",
+                'numbers (150.2 / 71.8 / 38.2 here against 142.0 / 79.7 / 44.4 there), which confirms the earlier',
+                '13x was measuring this kernel and not a mis-built weight path.',
+                '',
+                '**The absolute values still do not reconcile with the served engine, and that must be said.** At',
+                '128 local experts the *faster* wheel still spends 7.67 ms on one MoE layer, so 43 layers would be',
+                '~330 ms inside a step measured at 38.65 ms. The profiler attributes 1.84 ms per layer to ffn/MoE at',
+                "c1. So this probe's geometry is probably not the served one - most likely the expert dimensions -",
+                "and no absolute number from it should be read as the engine's cost. The version comparison is",
+                'unaffected, because both wheels were handed identical inputs and produced identical outputs.',
+            ]
+        ),
+        "verdict": "**A library regression, and the strongest item-4 finding of the session.** Our FlashInfer 0.7.0 builds the same `b12x_fused_moe` kernel **8.5x to 12.1x slower** than the reference's 0.6.15, at three expert counts, with **bit-identical outputs**. This is the shape of a finding goal item 4 was written for: the comparator opts into `flashinfer_b12x` by name, its wheel runs that kernel an order of magnitude faster than ours does, and attention has already been ruled out as the source of its lead. **It also refutes the sharding explanation** for the earlier 13x: the ratio holds flat across 64, 128 and 256 local experts, so the gap is not about how experts are split across ranks. **What must not be claimed yet**: any absolute cost. At 128 local experts even the fast wheel spends 7.67 ms per layer, so 43 layers would exceed the whole 38.65 ms step, which means this probe's geometry is probably not the served one - the expert dimensions were the prime suspect -- **since checked against the checkpoint and found correct, so that caveat is retracted; see the expert-traffic probe below**. The relative version result is safe from that, since both wheels saw identical inputs and outputs. **Next**: fix the probe geometry against the checkpoint's real expert shape, then decide whether 0.6.15's kernel should be backported or our wheel pinned down - and check with the owner before any upstream contact, as the contract requires.",
+    },
+    {
+        "name": "Expert traffic and measured bandwidth: what a full pass can cost",
+        "command": "python3 config.json dump, then: docker run --rm --gpus all --entrypoint python3 -v ~/bench:/bench vllm-spark-0731:main-029-proto-ccompile /bench/bwprobe.py",
+        "log": "outputs/driver/one-off/gb10-bandwidth.log",
+        "table": "\n".join(
+            [
+                'Checked against the checkpoint rather than the docs. `config.json` for',
+                '`deepseek-ai/DeepSeek-V4-Flash-0731` (snapshot `7872f01b1d1f`):',
+                '',
+                '| key | value |',
+                '|---|---|',
+                '| `n_routed_experts` | 256 |',
+                '| `num_experts_per_tok` | 6 |',
+                '| `moe_intermediate_size` | 2048 |',
+                '| `hidden_size` | 4096 |',
+                '| `num_hidden_layers` | 43 |',
+                '| `expert_dtype` | fp4 |',
+                '',
+                'Those are exactly the numbers both MoE probes used, so the geometry was right and the caveat',
+                'that it might not be is **retracted**: the version comparison was measured on the served shape.',
+                '',
+                'What the geometry implies, with a measured bandwidth to pin it down. A 1 GiB device copy on this',
+                'GB10 moves 1.074 GB in 4.955 ms, so **216.7 GB/s effective** (spec is ~273; a copy reaches about',
+                '80 %). Expert traffic at the real shape:',
+                '',
+                '| quantity | value |',
+                '|---|---|',
+                '| params per expert | 25,165,824 |',
+                '| GB of expert weights per layer (fp4, 0.5 B/param) | 3.22 |',
+                '| GB of expert weights across 43 layers | 138.5 |',
+                '| ms per layer at measured bandwidth | 14.87 |',
+                '| ms per full 43-layer pass, one rank | 639.2 |',
+                '| ms per full pass, TP=2 | 319.6 |',
+                '',
+                '**A hard constraint follows: a full 43-layer forward pass must stream ~138.5 GB of expert weights**',
+                '(the checkpoint is 155-167 GB in total and the experts are all but all of it), so at the measured',
+                '216.7 GB/s no full pass can complete faster than about **320 ms across two ranks**. Any step-time',
+                'figure materially below that is not a full-model pass. The MoE probes run close to that bound and',
+                'confirm it: at 128 local experts (one TP rank) ours measures 7.03 ms against a 7.43 ms traffic',
+                'estimate, and FlashInfer 0.6.15 measures 7.67 ms - both essentially at the streaming floor. Our',
+                "own kernel is therefore not leaving bandwidth on the table, and FlashInfer 0.7.0's 71.78 ms is",
+                'about **9.7x off the floor** for the same work.',
+            ]
+        ),
+        "verdict": "**a measured constraint, and it reframes the attribution.** The MoE geometry in both probes is confirmed against the checkpoint, so the probe geometry caveat is retracted. With the bandwidth measured on this part (216.7 GB/s for a 1 GiB copy) and the checkpoint's own expert shape, a full 43-layer pass has to stream 138.5 GB of expert weights, which is **>=320 ms at TP=2 and >=639 ms on one rank**. So the repo's quoted c6 step time of 38.65 ms cannot be a full 43-layer forward pass, and neither can the profiler's 1.84 ms per layer for ffn/MoE be reconciled with one - the two figures describe different things, and the arithmetic that matters (how many milliseconds a full pass owes to memory) has been missing from the attribution. **Useful consequence for the kernel question**: both good kernels sit at the streaming floor (ours 7.03 ms against 7.43 ms of traffic at 128 experts; FlashInfer 0.6.15 7.67 ms), so the MoE layer is bandwidth-bound, our implementation is not wasting bandwidth, and the 8.5-12x gap to FlashInfer 0.7.0 is a real defect in that wheel rather than a property of the shape. **Next**: reconcile the step-time basis before doing more attribution, since every per-layer budget in the docs was derived from a number that cannot be a full pass.",
+    },
+    {
+        "name": "Step-time basis: the quoted figures are 6x too small (concurrency missing)",
+        "command": "cat outputs/driver/refg-3.meter.txt outputs/driver/protog-3.meter.txt  # arithmetic, no GPU run",
+        "log": "outputs/driver/refg-3.meter.txt",
+        "table": "\n".join(
+            [
+                'Derived from the meter logs already in this repo, plus the measured bandwidth. The quoted step times',
+                'divide wall time by `drafts_per_req`, but that counter is per sequence: 512 tokens at 4.676',
+                'tokens/step is 109.5 forward passes for one sequence, and 657 = 6 x 109.5. The forward pass serves',
+                'all six. Dividing by 6 instead:',
+                '',
+                '| level | tag | wall s | tokens/step | steps per sequence | step ms | drafts/wall (what was quoted) |',
+                '|---|---|---|---|---|---|---|',
+                '| c6 | `refg` (reference) | 19.33 | 4.676 | 109.5 | **176.5** | 29.4 |',
+                '| c6 | `protog` (ours) | 25.89 | 4.585 | 111.7 | **231.8** | 38.7 |',
+                '| c1 | `refg` | 7.79 | 4.923 | 104.0 | **74.9** | 13.35 |',
+                '| c1 | `protog` | 12.49 | 5.069 | 101.0 | **123.7** | 8.09 |',
+                '',
+                'The factor is exactly the concurrency: 29.4 x 6 = 176.4, and 38.65 x 6 = 231.9. Independent check',
+                'that the corrected basis is the right one - the step-time ratio matches the throughput ratio:',
+                '176.5 / 231.8 = 0.761 against 118.64 / 158.93 = 0.747, where the quoted pair implies 38.65 / 29.4 =',
+                '1.31, the inverse.',
+                '',
+                'Against the memory floor from the expert-traffic probe (138.5 GB of expert weights per pass, 216.7',
+                'GB/s measured for a copy, >=320 ms at TP=2): the measured 176.5 ms is the same order and *below*',
+                'it, which is consistent rather than contradictory - a read-heavy stream beats a copy, and at 288',
+                'routed rows over 256 experts about a third of experts receive no rows at all and are skipped under',
+                'Poisson(1.125) routing. The important part is that the step is the order of the weight traffic, so',
+                'the step is memory-bound on expert weights and MoE really is the whole game.',
+            ]
+        ),
+        "verdict": '**The step-time basis in this repo is wrong by exactly the concurrency, and it is why the attribution never closed.** `HANDOVER.md`\'s "step time is 38.65 ms against 29.4 ms at c6", and every per-layer budget derived from it including `docs/knowledge/05-performance.md`, divides wall time by `drafts_per_req`. That counter is per sequence, while the forward pass serves all six, so the quoted figures are 6x too small: the real c6 step is **176.5 ms for the reference and 231.8 ms for ours**. Two independent checks agree - the factor is exactly 6 (29.4 x 6 = 176.4), and the corrected ratio 0.761 matches the throughput ratio 0.747 while the quoted ratio is its inverse. Against the expert-traffic floor of >=320 ms at TP=2 the measured 176.5 ms is the same order, and lower for reasons that make sense (reads beat a copy, and roughly a third of experts take no rows under Poisson routing). **Consequence: the step is memory-bound on expert weights, MoE is the whole game, and any per-layer attribution built on the old numbers has to be redone** - including the claim that the WO and MLA kernels are small components, which was computed from the same wrong basis. This does not change the version-regression finding, which is a direct kernel-to-kernel comparison.',
+    },
+    {
+        "name": "Streaming bandwidth and the expert-bytes gap: 0.916 GB per layer against 1.202 GB",
+        "command": "docker run --rm --gpus all --entrypoint python3 -v ~/bench:/bench vllm-spark-0731:main-029-proto-ccompile /bench/bwprobe3.py",
+        "log": "outputs/driver/one-off/gb10-gemv-bandwidth.log",
+        "table": "\n".join(
+            [
+                'Streaming bandwidth on this part, measured three ways (`/bench/bwprobe3.py`):',
+                '',
+                '| pattern | working set | GB/s |',
+                '|---|---|---|',
+                '| device copy (read+write) | 1 GiB | 223.2 |',
+                "| GEMV (streams a weight matrix once, the MoE's pattern) | 128 MiB | 201.0 |",
+                '| GEMV | 512 MiB | 198.9 |',
+                '| GEMV | 32 MiB | 156.6 |',
+                '',
+                'So ~200 GB/s is what streaming reads actually achieve; the 273 GB/s on the spec sheet is not',
+                'reachable in practice, and the earlier copy figure (216.7) was within 3 % of the repeat (223.2).',
+                '',
+                'Expert traffic at the confirmed shape is 3.22 GB per layer and 138.5 GB over 43 layers. Against the',
+                'corrected c6 step times:',
+                '',
+                '| arm | c6 step ms | ms per layer | GB a rank streams at 223 GB/s | as a fraction of a full layer |',
+                '|---|---|---|---|---|',
+                '| reference `refg` | 176.5 | 4.10 | 0.916 | **28.4 %** |',
+                '| ours `protog` | 231.8 | 5.39 | 1.202 | 37.3 % |',
+                '',
+                "**The reference's whole step is accounted for by expert streaming, and only about 28 % of a full",
+                'expert layer fits in its per-layer budget.** With expert parallelism across the two ranks - 128 local',
+                'experts each, half the 288 row-expert pairs per rank - and empty-expert skipping, the predicted',
+                'fraction touched is 1 - exp(-144/128) = 67.5 % of the local 128, which is 33.6 % of the full 256,',
+                'very close to the 28.4 % the timing implies. So the model is: experts sharded across ranks, only the',
+                'experts that receive tokens are read, and the step is memory-bound on exactly that traffic.',
+                '',
+                '**And the same arithmetic prices the gap.** Our step implies 1.202 GB streamed per layer against the',
+                "reference's 0.916, so **we move about 31 % more expert bytes per layer for the same work**. That is",
+                'the whole 55.3 ms difference, and it is a single measurable quantity rather than a spread of',
+                'suspects. The candidates are concrete: a different expert sharding (reading more experts per rank),',
+                'or failing to skip experts that receive no tokens. The kernel itself is not the suspect: at 128 local',
+                "experts our MoE measured 7.03 ms against FlashInfer 0.6.15's 7.67 ms, so the two are comparable.",
+            ]
+        ),
+        "verdict": '**The gap is expert bytes streamed, and it is now a number.** Measured streaming bandwidth on this part is ~200-223 GB/s, not the 273 GB/s the spec sheet implies. At the corrected c6 step times the reference has 4.10 ms per layer, in which a rank can stream 0.916 GB, and a full expert layer is 3.22 GB - so the reference reads about **28 %** of the expert weights per layer, which is what expert sharding plus empty-expert skipping predicts (33.6 %). Ours implies 1.202 GB per layer, i.e. **~31 % more expert bytes for the same work**, which is the entire 55.3 ms difference between a 231.8 ms step and a 176.5 ms one. This is the sharpest attribution the session has produced: not a list of suspect regions but one quantity, expert bytes streamed per layer per rank, and it says the step is memory-bound with no room left for anything else to matter. **What it does not yet say** is which mechanism costs the 31 % - expert sharding that reads more experts per rank, or a failure to skip experts with no tokens. Both are testable at the kernel or config level without touching the reference, and a fix would sit under goal item 3 (our own configuration). **Caveat on the model, extended after testing it.** The 31 % assumed every layer is MoE and that the step is the target pass alone, so the per-layer budget is an upper bound and the 28/37 % fractions move if the draft model, attention or collectives take a share. Both mechanisms that could be tested directly came back negative: the kernel skips untouched experts at 88 % of the streaming bound, and both arms run EP = 1 so neither splits the expert set. Routing distribution is the last candidate, and it is weakened too - both arms run the same checkpoint and therefore the same router, so for the same token stream they should select nearly the same experts, and a difference there would require the numerics of the two engines to diverge enough to change expert selection. **So read 31 % as a difference in the step that is not yet decomposed, not as a proven expert-byte count**, and settle it by re-running the region profiler on the corrected step basis. Routing is measurable on our side at least: `enable_return_routed_experts` defaults off and `--enable-return-routed-experts` adds a base64 numpy `routed_experts` field to the chat response, which `harness/capture_routing.py` decodes; both images support the flag, but the reference configuration is read-only by contract, so a symmetric comparison is not available.',
+    },
+    {
+        "name": "Does our MoE skip experts with no tokens? Yes, at 88 % of the streaming bound",
+        "command": "docker run --rm --gpus all --entrypoint python3 -v ~/bench:/bench vllm-spark-0731:main-029-proto-ccompile /bench/bench_moe_skipping.py",
+        "log": "outputs/driver/one-off/moe-skipping.log",
+        "table": "\n".join(
+            [
+                'Weights, shapes and routed rows held fixed (256 experts resident, 288 routed rows, one MoE layer);',
+                'only the number of distinct experts the routing targets changes. Median of 30 CUDA-event timings,',
+                'three reps, clean median across the last two shown.',
+                '',
+                '| distinct experts touched | clean median ms |',
+                '|---|---|',
+                '| 174 | 13.29 |',
+                '| 116 | 9.67 |',
+                '| 61 | 6.13 |',
+                '| 32 | 4.19 |',
+                '| 8 | 2.72 |',
+                '',
+                'A straight line fits: 0.0637 ms per touched expert plus about 2.21 ms of fixed cost',
+                "(8 x 0.0637 + 2.21 = 2.72, and 174 x 0.0637 + 2.21 = 13.29). One expert's fp4 weights are",
+                '3.22 GB / 256 = 12.6 MB, which at the measured 223 GB/s costs 0.0564 ms, so the marginal cost is',
+                '**88 % of the streaming bound** - the kernel is reading the experts it touches at near-peak',
+                'bandwidth.',
+                '',
+                '**So the kernel does skip untouched experts**, and it is not wasting bandwidth on them. The first',
+                'run of this probe was wrong and is not evidence: its routing pool was `randperm(active)[:topk]`, so',
+                'every case targeted only 6 distinct experts. That accidentally showed 6 experts at 2.1 ms against',
+                '~232 experts at 10.9 ms in the head-to-head probe, which is the same conclusion by a different',
+                'route, but the curve above is the measurement.',
+                '',
+                '**What this does to the attribution**: the ~31 % expert-byte gap cannot be a skipping failure and',
+                "cannot be the kernel's efficiency, because both are now measured. It must be the **number of experts",
+                'each rank touches**, which is a configuration matter - expert parallelism, or how routing is',
+                'distributed per rank - and therefore goal item 3 rather than item 4.',
+            ]
+        ),
+        "verdict": "**Hypothesis refuted, and that narrows the target.** Our MoE kernel's cost is linear in the number of distinct experts the routing touches, at 0.0637 ms per expert against a 0.0564 ms streaming bound, i.e. **88 % of achievable bandwidth** with a 2.21 ms fixed cost. So it skips experts that receive no tokens and it streams the ones it does touch at near-peak. The ~31 % expert-byte gap priced in the bandwidth probe therefore cannot come from a skipping failure or from kernel inefficiency; it has to come from the number of experts each rank touches, which is expert parallelism or routing distribution - a configuration question under goal item 3, not a library regression under item 4. **Honest limits**: this measures one layer in isolation at 288 routed rows with synthetic weights, so the absolute fixed cost and the per-expert slope are properties of this probe; and the served routing is skewed where this probe is close to uniform, so the real experts touched per rank is unknown until it is read off the engine. **Next**: read the served configuration for its expert parallelism and routing, which decides whether the 31 % is addressable at all.",
+    },
+    {
+        "name": "Served MoE configuration: both arms run EP = 1, so sharding is not the gap",
+        "command": "grep -iE 'expert|moe|parallel' harness/logs/attnfi-engine.log ; docker run --rm --entrypoint python3 <image> -c \"import inspect; from vllm.model_executor.layers.fused_moe.config import FusedMoEParallelConfig as C; print(inspect.getsource(C.make))\"",
+        "log": "harness/logs/attnfi-engine.log",
+        "table": "\n".join(
+            [
+                'Our served configuration, read from our own engine log (`harness/logs/attnfi-engine.log`) and from',
+                "vLLM's source in the image:",
+                '',
+                '| item | value | source |',
+                '|---|---|---|',
+                '| `tensor_parallel_size` | 2 | engine config line |',
+                '| `data_parallel_size` | 1 | engine config line |',
+                '| `enable_expert_parallel` | not set anywhere in `scripts/`, `configs/` or `patches/` | grep |',
+                '| MoE parallel outcome | **EP = {1, 0} on both devices** | `FusedMoEParallelConfig.make` docstring |',
+                '| MoE backend | `B12X_MXFP4_MXFP8`, then `Using B12xExperts` | engine log |',
+                '| `kv_cache_dtype` | `nvfp4_ds_mla`, "Using DeepSeek V4 padded nvfp4_ds_mla KV cache format" | engine log |',
+                '| `quantization` | `deepseek_v4_fp8` | engine config line |',
+                '| capture sizes | [1, 2, 4, 8, 16, 24, 32, 40, 48] | engine config line |',
+                '| `enable_return_routed_experts` | **False** | engine config line |',
+                '',
+                "The decisive line is vLLM's own docstring for `FusedMoEParallelConfig.make`, identical in both",
+                'images: "When TP = 2, DP(PCP) = 1 and EP = False ... device 0: TP = {2, 0} DP = {1, 0} **EP =',
+                '{1, 0}** ... device 1: TP = {2, 1} DP = {1, 0} EP = {1, 0} - Comment: Tensors are sharded across 2',
+                'devices." The reference recipe also sets no expert-parallel flag, and its vLLM 0.25.2 prints the same',
+                'table. So **both arms run EP = 1**: neither splits the expert set across ranks, and both shard inside',
+                'each expert along TP.',
+                '',
+                '**So expert parallelism is not the 31 % either.** With equal local expert sets and equal topk, the',
+                'bytes each rank reads are decided by *which* experts the router picks and how many rows land per',
+                'step. Both are unmeasured today, and the engine can be asked: `enable_return_routed_experts` is False',
+                'in this arm, and flipping it reports the routed expert ids per request - a config-level measurement',
+                'under goal item 3, no reference contact needed.',
+            ]
+        ),
+        "verdict": "**Closed: expert parallelism is the same on both arms.** vLLM's own `FusedMoEParallelConfig.make` docstring, identical in both images, gives EP = {1, 0} per device when TP = 2, DP = 1 and EP = False, and neither arm sets an expert-parallel flag (`--enable-expert-parallel` appears nowhere in `scripts/`, `configs/` or `patches/`, and the comparator recipe does not pass it either). So both shard inside each expert along TP rather than splitting the expert set, both ranks hold the same expert set, and the ~31 % expert-byte gap cannot come from the sharding arrangement. **That leaves routing distribution as the only candidate**: which experts the router picks and how many rows land per step, neither measured today. Both are cheap to obtain because the engine can report them - `enable_return_routed_experts` is False in this arm and flipping it is a config change, not a rebuild, which makes it the next measurement under goal item 3. **Also recorded from the same log** because it was unrecorded: our MoE really is `B12X_MXFP4_MXFP8` with `B12xExperts`, the KV dtype really resolves to the 584-byte padded envelope, the model quantisation is `deepseek_v4_fp8`, and the graph capture sizes are [1..48].",
+    },
+    {
+        "name": "Why the layer profiler printed n=3: it was reporting the draft model, not the target",
+        "command": "grep -nE '_LAYER_EVENTS|b12x_profile_decode_once|b12x_profile_layer' patches/files/sm12x_b12x_kernels.py patches/apply_overlays.py  # code reading, no GPU run",
+        "log": "patches/files/sm12x_b12x_kernels.py",
+        "table": "\n".join(
+            [
+                'The puzzle in `HANDOVER.md` was "the profiler prints `n=3` layer events, not 43, and that why is not',
+                'established". It is established, and the profiler has been reporting the wrong model.',
+                '',
+                'Three separate hooks share one event list, `_LAYER_EVENTS[0]` in `patches/files/sm12x_b12x_kernels.py`:',
+                '',
+                '| hook | applied to | does what |',
+                '|---|---|---|',
+                '| `b12x_profile_decode_once` | the **DSpark draft** `DFlashSpeculator._run_model` (`patches/apply_overlays.py:287-308`) | sets `_PROFILING_STEP[0]=True`, **resets** `_LAYER_EVENTS[0]=[]`, runs the draft, then **prints the layer summary from that list** |',
+                '| `b12x_profile_layer` | `DeepseekV4DecoderLayer.forward` (the target, 43 layers) | appends `(e0, e1)` to the same list |',
+                '| `b12x_profile_target_step` | the target runner `execute_model` | sets the flag and resets the list again |',
+                '',
+                "The draft hook resets the list and prints from it, so what gets printed is the **draft model's**",
+                'layer timing, and everything the target recorded earlier is discarded. DSpark carries three MTP',
+                'blocks, which is exactly the `n=3` that was observed.',
+                '',
+                '**Second defect in the same function**: it is documented as "One-shot timing for the first real DSpark',
+                'decode step" but has no one-shot guard - only the `is_current_stream_capturing()` path returns early.',
+                'On the non-capturing path it prints on **every** draft forward, up to `k+1` times per engine step.',
+                '',
+                "**Consequence for this repo's attribution, and it is retroactive.** The per-layer and per-region",
+                'shares in `HANDOVER.md` (`ffn/MoE 1.84 ms of a 2.83 ms layer`, WO `0.60 ms`, MLA `0.20 ms`) came from',
+                'an instrumentation that shares the flag `_PROFILING_STEP[0]` across the draft and the target, so which',
+                'model the numbers describe depends on which hook ran last. The `n=3` observation is the proof that the',
+                'layer summary came from the draft. That is a second, independent reason the old attribution did not',
+                'reconcile with the corrected step basis.',
+                '',
+                '**Fix direction, not yet applied**: give the draft hook its own event list (or stop printing layers',
+                'there and leave that to the target hook), and add the one-shot guard the docstring already promises.',
+                'Both are small edits in `patches/files/sm12x_b12x_kernels.py`. They are deliberately **not** applied',
+                'this round: the proto2 build is running from this exact `patches/` tree, and changing it now would',
+                'either desync the build or force another one. The fix belongs in the next rebuild, bundled with any',
+                'other patch change.',
+            ]
+        ),
+        "verdict": '**Root-caused, and it invalidates the old per-layer attribution rather than just explaining a puzzle.** `b12x_profile_decode_once` hooks the DSpark draft (`DFlashSpeculator._run_model`) yet resets and then prints from `_LAYER_EVENTS[0]`, the list the target\'s 43 `DeepseekV4DecoderLayer.forward` calls write into. The printed `n=3` is the draft\'s three MTP blocks, which is proof that the layer summary came from the draft and not from the target. Two defects: the shared list and flag across two models, and a missing one-shot guard despite the docstring claiming one. **What this changes**: the per-layer and per-region numbers in `HANDOVER.md` and `docs/knowledge/05-performance.md` cannot be assumed to describe the target model, which is a second independent reason they failed to reconcile with the corrected step basis - and it means the "ffn/MoE is 65 %" claim, which the whole remaining attribution has leaned on, is unverified. **What it does not change**: the direct kernel measurements (WO, MLA, the FlashInfer version regression, the skipping curve, the bandwidth numbers), none of which used this profiler. **Next**: apply the fix in the next rebuild, then re-measure the region shares on the corrected basis before using any region percentage again. **Fix written, not yet active.** `patches/files/sm12x_b12x_kernels.py` now keeps the draft\'s events in their own list: a `_DRAFT_PHASE` flag is set around the draft\'s `_run_model`, `b12x_profile_layer` routes each `(e0, e1)` pair to `_DRAFT_LAYER_EVENTS` or `_LAYER_EVENTS` accordingly, the draft hook no longer resets or prints the target\'s list, and `_DECODE_PROFILED` gives it the one-shot behaviour its docstring already claimed. Its prints are relabelled `b12x draft step` / `b12x draft layers` so the two models are distinguishable in a log. It is deliberately not synced to the rig: the proto2 build is running from this exact `patches/` tree and editing it mid-build would either desync the image or force another build. It lands in the next rebuild, and the check is the profile print itself - the target summary must read `n=43` (the decoder layers) with the draft\'s three reported separately.',
+    },
+    {
+        "name": "the target's per-layer and per-region breakdown, and the indexer skip A/B",
+        "command": "SERVE_SKIP=headless bash ~/serve-prof3.sh  # --enforce-eager + VLLM_PROFILE_DECODE=1, "
+        "skip flag under VLLM_SKIP_FLAG_DIR",
+        "log": "outputs/driver/one-off/proto2-region-control.log, "
+        "outputs/driver/one-off/proto2-region-skip-indexer.log",
+        "table": "\n".join(
+            [
+                "| region | control n | control gpu_sum | skip_indexer_all gpu_sum |",
+                "|---|---|---|---|",
+                "| attn | 43 | 80.3 ms | 49.0 ms |",
+                "| ffn | 43 | 65.2 ms | **86.2 ms** |",
+                "| indexer | 21 | 52.0 ms | **0.0 ms** |",
+                "| mla | 43 | 2.0 ms | 16.7 ms |",
+                "| wo_b12x | 43 | 17.4 ms | 22.4 ms |",
+                "| allreduce | 87 | 5.7 ms | 8.0 ms |",
+                "| **layers (43, enclosing)** | 43 | **148.0 ms** | **137.4 ms** |",
+            ]
+        ),
+        "verdict": "**The target breakdown now prints, and it says the region table must not be "
+        "summed.** With `--enforce-eager` the per-layer marks finally run, so the pending check is "
+        "closed: `b12x layers: n=43 sum=148.0ms avg=3.44ms`, and the layers are flat - the top layer is "
+        "L2 at 4.61 ms against a 3.44 ms average, so no layer family is the gap at this batch. The "
+        "regions are a different story. Removing the indexer entirely (`skip_indexer_all`, correctness "
+        "deliberately lost) takes `indexer` from 52.0 ms to **0.0 ms** while `ffn` *rises* from 65.2 to "
+        "86.2 ms and the enclosing layer total falls only 148.0 -> 137.4 ms. The region marks record "
+        "CUDA events on a stream that is still draining earlier queued work and nothing synchronizes "
+        "between them, so `gpu_sum` is queue-drain time, not that region's compute. **The indexer's true "
+        "net cost is therefore ~10.6 ms per step, about 7 % of this step, not the 52 ms (35 %) the raw "
+        "table suggests** - and the `mla` rise from 2.0 to 16.7 ms shows why the A/B cannot be read "
+        "further: replacing the index leaves the sparse MLA attending to different keys. Every region "
+        "percentage quoted elsewhere in this repo, including the old 'ffn/MoE is 65 %' attribution, is "
+        "unusable for the same reason. Only the enclosing per-layer total is additive, and it is flat.",
+    },
+    {
+        "name": "`vllm._deepselect_C` in both images (negative)",
+        "command": "docker run --rm --entrypoint python3 <image> -c 'import vllm._deepselect_C'",
+        "log": "documented here; the check is one import in each image",
+        "table": "\n".join(
+            [
+                "| image | `vllm._deepselect_C` |",
+                "|---|---|",
+                "| `vllm-spark-0731:main-029-proto2` | **absent** |",
+                "| `ghcr.io/anemll/dspark-vllm-gx10:0.1.1` | **absent** |",
+            ]
+        ),
+        "verdict": "**Negative, and it closes an attractive hypothesis.** Both images boot with "
+        "`WARNING [indexer_topk.py:29] Failed to import the DeepSelect extension (vllm._deepselect_C): "
+        "No module named 'vllm._deepselect_C'`, which looks like a missing fast top-k path we could "
+        "build. The reference image is missing it too, and this repo contains no reference to "
+        "`deepselect` anywhere, so it cannot explain any part of the gap. Nothing to build.",
+    },
+
+    {
+        "name": "the b12x MoE policy ladder, ours against the reference's (from the coverage probe)",
+        "command": "python3 harness/probe_moe_tuning.py  # needs an image carrying both b12x and "
+        "b12x_ref; the table is in the saved log",
+        "log": "outputs/driver/one-off/moe-tuning-coverage.log",
+        "table": "\n".join(
+            [
+                "| | ours (`b12x 1.2.6`) | reference (`b12x 0.15.3`) |",
+                "|---|---|---|",
+                "| decode policies | `dynamic`, `dynamic_w4a8_decode`, `micro` | `dynamic`, `micro`, "
+                "**`static`** |",
+                "| rows covered by cheap policy | micro ends at 20 routed rows | **static covers "
+                "20 < rows <= 640** |",
+                "| time at 48 routed rows (= c1) | 188 | **149** |",
+                "| time at 144 (= c3) | 188 | ~130-166 |",
+                "| time at 240 (= c5) | 188 | ~130-166 |",
+                "| time at 288 (= c6) | 188 | ~141-175 |",
+            ]
+        ),
+        "verdict": "**The gap is in a third-party kernel generation, and the measurement that says so "
+        "was already taken and never acted on.** Our decode runs at 48-288 routed rows "
+        "(`routed_rows = q_rows * topk`, `q_rows = c * (k+1)`, topk 6). Across that whole band our only "
+        "policy is `decode/dynamic`, flat at 188, because our `micro` band ends at 20 rows. The "
+        "reference's b12x carries a `decode/static` kernel for 20 < rows <= 640 -- exactly this band -- "
+        "at 130-175, so it is 7-31 % faster than our kernel at every operating point the protocol "
+        "measures, and `ours.micro` matches `ref.micro` exactly wherever both exist. The libraries are "
+        "different generations, not configurations: our image ships `b12x 1.2.6` with no "
+        "`b12x.moe.tuning` module and no `static` symbol under `b12x.moe.fused_moe`; the reference ships "
+        "`b12x 0.15.3`. This is goal item 4's trigger condition met on the MoE half, and the first "
+        "instance is the pre-built `vllm-spark-0731:main-029-proto-b12x015` image, which puts the "
+        "reference's b12x under our stack. That arm previously died for an infrastructure reason only "
+        "-- the image existed on spark1 alone, so spark2's worker could not start and the head blocked "
+        "on rank 1 -- and it is being copied to spark2 now.",
+    },
+
+    {
+        "name": "b12x's PCIe all-reduce as the TP transport (negative: intra-host only)",
+        "command": "bind-mount a patched `vllm/distributed/communication_op.py` that routes "
+        "`tensor_model_parallel_all_reduce` through "
+        "`PCIeAllReduce.from_process_group(process_group=tp.device_group, device=tp.device, "
+        "single_channel=True)`, then `harness/run-arm.sh proto2-pcie-ar`",
+        "log": "documented here; the decisive lines are the worker's own prints",
+        "table": "\n".join(
+            [
+                "| step | result |",
+                "|---|---|",
+                "| construction, default call | `AttributeError(\'PCIeOneshotAllReducePool\' object has "
+                "no attribute \'should_allreduce\')` -- the wrapper delegates to a pool that lacks it |",
+                "| construction, `single_channel=False` | `RuntimeError(\'distributed PCIe oneshot eager "
+                "use requires an explicit semantic channel_id shared by every rank\')` |",
+                "| construction, `single_channel=True` | **succeeds**: `algorithm=oneshot` |",
+                "| first collective | `RuntimeError(\'PCIe shared buffer CUDA IPC import open failed: "
+                "failed to open CUDA IPC handle for peer\')` on both ranks |",
+            ]
+        ),
+        "verdict": "**Decisive negative: the transport is intra-host and cannot carry a 2-node TP.** The "
+        "runtime is CUDA-IPC based (`_RetryableIPCExport`, `IPC_SLAB_ALIGNMENT`, the shared-buffer IPC "
+        "import path), and CUDA IPC handles are host-local -- rank 0 on spark1 cannot open rank 1's "
+        "handle on spark2. `b12x/comm` contains exactly one module and its docstring states the scope: "
+        "\"``pcie``: collectives for consumer PCIe fabrics (no NVLink) -- one-shot and DMA/CE-ring "
+        "all-reduce\", i.e. several consumer cards in one box. b12x ships no inter-node alternative, so "
+        "the 87 per-step all-reduces stay on PYNCCL and the fixed-per-step-cost search must move on-node. "
+        "Two library defects were found on the way and are worth reporting upstream: the broken "
+        "`should_allreduce` delegation, and the undocumented `single_channel=True` requirement for eager "
+        "use. The patch was never baked into the image and is not in `apply_overlays.py`.",
+    },
+    {
+        "name": "the `B12X_*` flag surface, surveyed against defaults",
+        "command": "grep each flag in `/usr/local/lib/python3.12/dist-packages/b12x --include=*.py`",
+        "log": "documented here; the check is one grep per flag",
+        "table": "\n".join(
+            [
+                "| flag | default | verdict |",
+                "|---|---|---|",
+                "| `B12X_W4A8_TINY_DECODE` | on | already active |",
+                "| `B12X_FUSED_INDEXER` | on | already active |",
+                "| `B12X_INDEXER_DIRECT_K` | on | already active |",
+                "| `B12X_PAGED_MSA` | on | the env is only a `=0` disable |",
+                "| `B12X_PAGED_INDEX_SUPERTILE_K` | 32768 | already large |",
+                "| `B12X_TURBO_ATTN` | off | gated on `plan.kv_dtype == torch.float8_e4m3fn` in the "
+                "generic paged forward; our attention is `B12X_MLA_SPARSE`, so it does not apply |",
+                "| `B12X_W4A16_SMALL_M_DIRECT/SPLITK` | on / off | W4A16 path, not our `MXFP4_MXFP8` MoE |",
+                "| `B12X_MOE_TILE_MN`, `B12X_DYNAMIC_TILE_MN`, `B12X_DYNAMIC_SWAP_AB` | unset | "
+                "**testable**, documented as benchmarking knobs |",
+            ]
+        ),
+        "verdict": "**Mostly a negative: the flags that matter here are already at their useful value.** "
+        "This closes the round-26 framing that '90-plus `B12X_*` flags are an untested surface' -- tiny "
+        "decode, the fused indexer and the direct-K indexer path are all on by default, and turbo "
+        "attention does not apply to the MLA-sparse backend this arm uses. What remains genuinely "
+        "unset are the MoE tile-shape overrides, which are single-node microbenchmarks rather than full "
+        "arms.",
+    },
+
+    {
+        "name": "the kernel-level composition of our step, from vLLM's own torch profiler",
+        "command": "serve with `--enforce-eager --profiler-config "
+        "{\"profiler\":\"torch\",\"torch_profiler_dir\":\"/root/.cache/vllm/prof\"}`, then "
+        "`POST /start_profile`, one request, `POST /stop_profile`, and sum `cat == \"kernel\"` events "
+        "by name",
+        "log": "documented here; traces under spark1:~/.cache/vllm/prof/ (gzipped chrome trace)",
+        "table": "\n".join(
+            [
+                "| ms | % | calls | kernel |",
+                "|---|---|---|---|",
+                "| 2088.22 | **30.0 %** | 7140 | "
+                "`at::native::elementwise_kernel<...gpu_kernel_impl_nocast<...direct...` |",
+                "| 1490.73 | **21.4 %** | 3196 | `ncclDevKernel_AllReduce_bf16_RING` |",
+                "| 1419.60 | 20.4 % | 1564 | `...b12xmoe...siluMoEDynamicKernelSilu...` |",
+                "| 285.01 | 4.1 % | 1521 | `nvjet_sm121_tst_mma_112x64x64...` |",
+                "| 252.01 | 3.6 % | 3567 | `cutlass_80_wmma_tensorop_s161616gemm_bf16_16x16_128x2` |",
+                "| 205.05 | 2.9 % | 3042 | `...b12x_libdense_gemmDenseGemmKernel...` |",
+                "| 60.52 | 0.9 % | 2975 | `mhc_fused_tilelang_kernel` |",
+                "| 57.88 | 0.8 % | 7752 | `per_token_group_quant_8bit_kernel<BFloat16, Float8_e4m3fn...` |",
+                "| 37.53 | 0.5 % | 1353 | `...b12xattention_sharedmlakernelUnifiedDecodeKernel...` |",
+                "| 18.55 | 0.3 % | 1462 | `_dsv4_topk_kernel` |",
+                "",
+                "108493 kernel events, 117 distinct, 6951 ms total CUDA time over the window.",
+            ]
+        ),
+        "verdict": "**This is the first attribution the profiler can actually support, and it redirects "
+        "the search.** Three things carry the step: unfused pointwise work (30.0 %), the TP all-reduce "
+        "(21.4 %), and the MoE (20.4 %). Everything this repo has spent rounds tuning is in the noise by "
+        "comparison -- the linear GEMMs together are 4.1 + 3.6 + 2.9 = 10.6 %, the sparse MLA decode "
+        "kernel is 0.5 %, the indexer top-k is 0.3 %. That is exactly why every family swap measured as a "
+        "wash or worse. **Two corrections follow.** The all-reduce is ~0.47 ms per call, so two per layer "
+        "is ~0.93 ms against the ~1.45 ms per layer that the flat step penalty implies: the collective is "
+        "plausibly most of the fixed per-layer cost, and the 5.7 ms the region marks reported for "
+        "`allreduce` was queue-drain and low by 260x. And the 30 % pointwise block is what an uncompiled "
+        "forward looks like -- 7140 calls of one elementwise template plus 7752 quantisation kernels -- so "
+        "the compilation path is now the only remaining lever with a mechanism behind it.",
+    },
+    {
+        "name": "the compile path: which Dynamo breaks stand between us and a compiled forward",
+        "command": "`VLLM_USE_BREAKABLE_CUDAGRAPH=0` plus "
+        "`patches/apply_overlays.py --only mhc-tf32-customop`, bind-mounting the patched files; watch "
+        "`docker logs` for `torch._dynamo.exc.Unsupported`",
+        "log": "documented here; the patched file is regenerable from the overlay",
+        "table": "\n".join(
+            [
+                "| break | construct | state |",
+                "|---|---|---|",
+                "| gate | model not torch-compiled | cleared: `@support_torch_compile` on the NVIDIA "
+                "model, via `patch_nvidia_support_torch_compile` (in `apply_main`) |",
+                "| 1 | bool `is_current_stream_capturing()` in the ar-static-ws guard | cleared |",
+                "| 2 | ctypes `_FuncPtr` via `is_deep_gemm_supported()` | cleared |",
+                "| 3 | `importlib.import_module` via `_lazy_init()` | cleared |",
+                "| **4** | pybind11 `tf32_hc_prenorm_gemm` (3 call sites, 3 local import blocks) | "
+                "**cleared 2026-09-17** by `direct_register_custom_op` + hoisting; `torch.compiler.disable` "
+                "is rejected by this torch |",
+                "| **5** | TileLang `_is_lazy_style` -> `_infer_jit_mode` | "
+                "open, and **provably** needs TileLang kept out of Dynamo. All three routes are closed by "
+                "measurement: pre-resolving the mode at import is impossible (the mode-bearing object is "
+                "created inside the call); un-patching `inspect.getfile` lands on `linecache.checkcache`, "
+                "since `/usr/lib/python3.12/` is itself a skip directory; and bypassing the source scan "
+                "(`has_internal_prim_func` -> False) makes Dynamo trace the kernel body into TVM IR "
+                "construction (`tvm_ffi.core.CObject.__new__`, `Unsupported method call`). Only remaining "
+                "fix: a custom op at the mhc call site. `torch._dynamo.allow_in_graph` was tried as the "
+                "cheap substitute and fails: it still *runs* the function, on FakeTensors, where "
+                "TileLang's kernel cache raises `TypeError(\"unhashable type: non-nested SymInt\")`. A "
+                "real custom op with an explicit `fake_impl` is required -- Dynamo then calls the fake "
+                "impl and never runs the kernel during tracing |",
+            ]
+        ),
+        "verdict": "**The compile path is now the best-understood route to the gap, and it is finite "
+        "work rather than a research question.** Compilation is worth having because the round-30 kernel "
+        "profile puts 30 % of CUDA time in unfused pointwise kernels and 0.8 % in 7752 quantisation "
+        "launches -- the signature of an uncompiled forward. The path is gated by our own default "
+        "(`configs/env.spark.sh:47` forces `VLLM_USE_BREAKABLE_CUDAGRAPH=1`, and `config/vllm.py:786` "
+        "turns that into `CompilationMode.NONE`, while all four of this repo's own example recipes set "
+        "it to 0). Breaks 1-4 are cleared; break 5 has a located one-line-per-kernel fix. What is left "
+        "is mechanical: pin the TileLang kernel modes, re-run, repeat until the traced forward is "
+        "clean.",
+    },
+
+    {
+        "name": "CUDA time by innermost Python frame, on the arm that actually runs",
+        "command": "serve with `--profiler-config "
+        "{\"profiler\":\"torch\",\"torch_profiler_dir\":\"/root/.cache/vllm/prof2\","
+        "\"torch_profiler_with_stack\":true}`, `POST /start_profile`, one request, "
+        "`POST /stop_profile`, then attribute each kernel to its innermost `python_function` ancestor",
+        "log": "documented here; trace under spark1:~/.cache/vllm/prof2/ (132 MB gzipped)",
+        "table": "\n".join(
+            [
+                "| ms | share | innermost Python frame |",
+                "|---|---|---|",
+                "| 242.79 | **36.0 %** | `<built-in function linear>` |",
+                "| 203.66 | **30.2 %** | `tp_moe_dynamic_launch` (our b12x MoE) |",
+                "| 55.65 | 8.2 % | `blockscaled_serialized` (b12x block-scaled linear) |",
+                "| 54.94 | 8.1 % | `all_reduce` |",
+                "| 44.72 | 6.6 % | `reshape` |",
+                "| 27.73 | 4.1 % | `bmm` |",
+                "| 10.05 | 1.5 % | `mm` |",
+                "| 6.92 | 1.0 % | `copy_` |",
+                "| 3.68 | 0.5 % | `per_token_group_fp8_quant` |",
+                "| 0.96 | 0.1 % | `sm12x_b12x_kernels.py(255): sync_packed_indexer_k` (ours) |",
+            ]
+        ),
+        "verdict": "**Withdrawn as a share of the step, kept as a description of the visible fraction.** "
+        "Only ~6 % of a decode step appears as individual kernel events here, because a step replays a "
+        "captured CUDA graph and the profiler records the launch rather than the kernels inside it. So "
+        "these shares are of the visible 6 %, not of the step, and the `linear ~44 %` reading must not be "
+        "quoted. What does survive with numbers: the top row is the **LM head**, unquantized BF16 "
+        "(`logits_processor._apply_head` -> `default_unquantized_gemm` -> `F.linear`), 324 kernels, median "
+        "0.284 ms, ~5.3 ms per step, **~2.2 % of the c6 step**. The correct instrument is "
+        "`capture_torch_profiler: true`, which profiles the graph at capture time. Round 30 profiled "
+        "under `--enforce-eager` (distorts the regime) and this one sees 6 % of it (hides the graph), so "
+        "no per-stage share of the step should be quoted from either. "
+        "Original note follows. **A correction to round 30, and it changes the next step.** Round 30 profiled under "
+        "`--enforce-eager` and concluded that 30 % of CUDA time was unfused pointwise work, which made "
+        "compilation look like the lever; five rounds were spent on it. On the normal graph-mode arm the "
+        "pointwise block is ~13 % (`reshape` + `copy_` + `mm` + `bmm`) and the profile is led by "
+        "**`linear` plus `blockscaled_serialized` at ~44 %** and the MoE at 30 %. Absolute totals are not "
+        "comparable between the two captures because stack recording inflates them, but the rank order "
+        "is. So compilation targets much less than round 30 claimed, and the linear layer family -- where "
+        "only `b12x` and `deep_gemm` have been tried, and `deep_gemm` was worse -- is the largest "
+        "untried surface. Our own overlay file is exonerated: its two hot sites are 0.96 ms and ~2 ms.",
+    },
+
+    {
+        "name": "the TP all-reduce priced by removal (decisive negative)",
+        "command": "add a `skip_allreduce` marker under `VLLM_SKIP_FLAG_DIR` to a bind-mounted "
+        "`vllm/distributed/communication_op.py`, serve `proto2` under `--enforce-eager` + "
+        "`VLLM_PROFILE_DECODE=1`, and compare the enclosing per-layer total with round 26's control",
+        "log": "outputs/driver/one-off/allreduce-skip-probe.log",
+        "table": "\n".join(
+            [
+                "| measurement | control | all-reduce skipped |",
+                "|---|---|---|",
+                "| `b12x layers: n=43 sum` | **148.0 ms** | **147.7 ms** |",
+                "| region `allreduce` gpu_sum | 5.7 ms | 0.1 ms |",
+                "| region `attn` gpu_sum | 80.3 ms | 80.2 ms |",
+                "| region `ffn` gpu_sum | 65.2 ms | 64.2 ms |",
+            ]
+        ),
+        "verdict": "**All 87 collectives per step become free and the layer total moves 0.3 ms.** The skip "
+        "is verified to have fired (`grep -c skip_allreduce` in the container returns 1, and the region "
+        "counter drops from `gpu_sum=5.7ms` to `0.1ms`), so this is not a patch that quietly did "
+        "nothing. The TP all-reduce is therefore **~0.2 % of layer time**, and every profiler reading "
+        "that implicated it was an artifact: the region marks measure queue-drain, round 30's 21.4 % was "
+        "a share of an eager capture, round 37's 54.9 ms was a share of the 6 % of a step visible outside "
+        "graph replay. This closes the hypothesis behind round 27 (b12x's PCIe transport, which cannot "
+        "cross hosts in any case). It also settles the method: the profiler has failed three ways here "
+        "while a single skip A/B was decisive immediately, and `attn` + `ffn` = 144.4 of 147.7 ms says "
+        "which two stages to price next.",
+    },
+
+    {
+        "name": "kernel density per layer, from the stack-recorded trace",
+        "command": "count `cat == \"kernel\"` events and graph-replay annotations in "
+        "spark1:~/.cache/vllm/prof2/dp0_pp0_tp0*.gz",
+        "log": "documented here; trace on spark1",
+        "table": "\n".join(
+            [
+                "| quantity | value |",
+                "|---|---|",
+                "| kernel events in the window | 139353 |",
+                "| kernel CUDA time | 5194.8 ms |",
+                "| graph replays (`execute_context_0(0)_generation_1(8)`) | 35 |",
+                "| kernels per step | ~3981 |",
+                "| **kernels per layer** | **~92.6** |",
+                "| implied launch cost at 25 us/launch | ~2.3 ms per layer, ~99 ms per step |",
+            ]
+        ),
+        "verdict": "**The batch-invariant residual is launch overhead, and now has a size.** Round 41 "
+        "measured the step as flat at 96-98 ms from 8 to 48 rows with the FFN removed, which cannot be "
+        "memory traffic; this counts ~92.6 kernel launches per layer, and at a conservative 25 us each "
+        "that is ~2.3 ms per layer -- the residual almost exactly. It also **corrects round 38**: that "
+        "round said only ~6 % of a step is visible because a graph replay hides the kernels, but the "
+        "kernels are all there (5194.8 ms); what covers 675.3 ms is attribution to a *Python frame*, "
+        "since most run inside Inductor's `execute_context_*` regions. The shares computed there are "
+        "still not shares of the step, but the recorded reason was wrong. This re-justifies the compile "
+        "port on a mechanism -- kernel count per layer -- rather than on the eager-mode percentage "
+        "round 38 rightly distrusted.",
+    },
+
+    {
+        "name": "kernels ranked by launches per layer, and the biggest one named",
+        "command": "aggregate `cat == \"kernel\"` events by name and by count/(steps*layers) from "
+        "spark1:~/.cache/vllm/prof2/dp0_pp0_tp0*.gz",
+        "log": "documented here; trace on spark1",
+        "table": "\n".join(
+            [
+                "| count | per layer | ms | kernel |",
+                "|---|---|---|---|",
+                "| 7560 | 5.02 | **1543.03** | `...gpu_kernel_impl_nocast<direct_copy_kernel_cuda...` |",
+                "| 4177 | 2.78 | 294.65 | `b12x_libdense_gemmDenseGemmKernel...` |",
+                "| 3891 | 2.59 | 203.03 | `cutlass_80_wmma...bf16_16x16_128x2` |",
+                "| 3636 | 2.42 | 204.06 | `ncclDevKernel_AllReduce_bf16_RING` |",
+                "| 3492 | 2.32 | 17.37 | `mhc_pre_big_fuse_with_norm_tilelang_kernel` |",
+                "| 3335 | 2.22 | 52.41 | `mhc_fused_tilelang_kernel` |",
+            ]
+        ),
+        "verdict": "**One kernel family is 30 % of all kernel time: a large direct copy, 5.02 launches per "
+        "layer, 44 ms per step.** Its largest instance is `grid [28496,1,1]` -- ~15M elements, ~29 MB in "
+        "bf16 -- and round 37's stack put the family under `execute_context_0 <- aten::reshape <- "
+        "aten::clone <- aten::copy_`, i.e. a clone inside a compiled region. It is **not** our all-reduce "
+        "workspace copies: round 39 made that whole function a no-op, removing four copies per layer, and "
+        "the layer total moved 0.3 ms. It is **not** the MoE either: round 41 removed the FFN and the step "
+        "fell only 9.1 ms, so a 44 ms cost there would have gone with it. That leaves the attention/mHC "
+        "half, and our own overlay files contain only small `.contiguous()` calls and KV page slices, "
+        "nothing ~29 MB. **Naming it needs shapes rather than counts** -- `torch_profiler_record_shapes: "
+        "true` under `--enforce-eager` -- and it is worth naming: 44 ms/step is 19 % of the c6 step and "
+        "33 % of the c1 step, larger than anything else still open.",
+    },
+
+    {
+        "name": "the indexer-gather win confirmed at the kernel level, and the new top item",
+        "command": "re-run the shapes + CUDA-time dump on the kept arm (`--enforce-eager`, "
+        "`record_shapes`, no stacks) and compare against round 45's dump",
+        "log": "spark1:~/.cache/vllm/prof5/profiler_out_0.txt (both runs)",
+        "table": "\n".join(
+            [
+                "| host op | old arm | kept arm | change |",
+                "|---|---|---|---|",
+                "| `aten::copy_` | **433.03 ms** | **22.33 ms** | **19x less** |",
+                "| `elementwise_kernel<...direct_copy...>` | 416.56 ms | not in the top list | gone |",
+                "| `b12x::tp_moe_dynamic_launch` | 362.49 ms | **304.39 ms (42.55 %, #1)** | |",
+                "| `vllm::all_reduce` | 265.62 ms | 74.22 ms | |",
+                "| `aten::mm` | 117.91 ms | 98.10 ms | |",
+                "| `b12x::blockscaled_serialized` | 103.02 ms | 84.95 ms | |",
+            ]
+        ),
+        "verdict": "**The switch does exactly what it was supposed to, and the MoE is what is left.** "
+        "`aten::copy_` falls 19x -- from the single largest item to 3 % -- and the `direct_copy` "
+        "elementwise kernel drops out of the top list entirely, which is the full-cache indexer gather the "
+        "switch removes. Windows differ between the captures (25 graph replays against 35, plus 5 prefill "
+        "captures), so the other columns are indicative rather than matched, but the copy's collapse is "
+        "unambiguous. **The new largest item is the MoE at 42.55 % of kernel time**, and it is the one "
+        "place every lever is already spent: our kernel measured 10-13x faster than FlashInfer's, the A16 "
+        "activation format is a wash, and the tile-shape override landed inside the run-to-run range.",
+    },
+
+    {
+        "name": "the plain BF16 GEMMs: launcher check (negative)",
+        "command": "attribute `aten::bmm` and `aten::mm` in the shapes trace by launcher name and recorded "
+        "Input Dims",
+        "log": "spark1:~/.cache/vllm/prof5/dp0_pp0_tp0*1789648766*.gz",
+        "table": "\n".join(
+            [
+                "| op | calls | recorded shapes | verdict |",
+                "|---|---|---|---|",
+                "| `aten::bmm` | 276 | `[4,8,4096] x [4,4096,1024]` x215, `[4,84,...]` x43 | the "
+                "documented grouped WO-A **b12x path**, not the `o_proj` else-branch |",
+                "| `aten::mm` | 828 | `[8,4096] x [4096,256|2048|64|512|1024]` + bias, BF16 | mHC "
+                "coefficient generators; per-step counts, no main-projection shape |",
+            ]
+        ),
+        "verdict": "**Suspicion raised, mechanism checked, no unquantised fallback.** 148 ms of plain "
+        "BF16 GEMMs in an FP8-quantised model looked like a fallback, but `try_b12x_wo_proj`'s docstring "
+        "says it replaces the einsum with \"bmm + cached WO-A\", and the shapes confirm it: `4` is "
+        "`o_groups` after the TP=2 split, `4096` the group width, `1024` the `o_lora_rank`. The `aten::mm` "
+        "family is small `F.linear(x, w, bias)` calls whose counts are per step rather than per layer, "
+        "matching the legitimately-unquantised mHC coefficient generators. Neither family carries a "
+        "launcher Python frame, because both run inside Inductor's `execute_context_*` regions. Two side "
+        "notes: `try_b12x_wo_proj` declines above 256 tokens, so **prefill uses a different WO path than "
+        "decode**; and its `DBG wo_proj` prints are still in the shipped file.",
+    },
+
+]
+
+
+def fmt_levels(arm: dict) -> str:
+    return " / ".join(f"{v['median']:.1f}" for _, v in sorted(arm["levels"].items()))
+
+
+def main() -> int:
+    arms = sorted((parse_median(p) for p in DRIVER.rglob("*.median.log")), key=lambda a: a["tag"])
+    if not arms:
+        print(f"no median logs under {DRIVER}", file=sys.stderr)
+        return 1
+
+    guarded = [a for a in arms if a["guarded"]]
+    legacy = [a for a in arms if not a["guarded"]]
+
+    out: list[str] = []
+    w = out.append
+    w("# Experiments")
+    w("")
+    w("The measured record of this work, generated from the artifacts by")
+    w("[`scripts/experiment-ledger.py`](../scripts/experiment-ledger.py). Do not hand-edit: change the")
+    w("script's annotations or the logs and regenerate, or the file and the evidence will drift apart.")
+    w("")
+    w("The protocol is fixed and is the only arbiter: chat mode, `thinking=false`, seed 1234, 512-token")
+    w("generations, levels 1 3 5 6, three passes, median reported per level. Both arms launch through")
+    w("`scripts/05-serve.sh` with the worker first and the head about 85 s later.")
+    w("")
+    w("## How to read a row")
+    w("")
+    w(f"- **guarded** means the arm's log records the container that answered. Every arm measured before")
+    w(f"  {GUARD_EPOCH} is listed under *superseded* instead, and is not evidence: a still-running")
+    w("  reference container once answered a whole series, which made five candidate arms look like the")
+    w("  reference.")
+    w("- **spread** is the pass-to-pass swing of the median. One 128-token pass can swing 18 % on this")
+    w("  rig, so a change is kept only if it beats the larger spread of the two arms being compared.")
+    w("- **sum** is the sum of the four level medians, which the completion criterion also uses.")
+    w("- the gates are `gate_france` (' Paris...') and `gate_9x8` ('72, 9x9'). Failing them means the")
+    w("  model's own output is wrong, which has happened twice and was the whole signal in both cases.")
+    w("")
+    def gates_verdict(arm: dict) -> str:
+        """Pass requires the France gate to answer ' Paris...' and the 9x8 gate to be arithmetic."""
+        if not arm["gates"]:
+            return "n/a"
+        france = arm["gates"].get("gate_france", set())
+        nine = arm["gates"].get("gate_9x8", set())
+        if not france or not nine:
+            return "partial"
+        ok = all(v.startswith(" Paris") for v in france) and all("72" in v for v in nine)
+        return "pass" if ok else "fail"
+
+    def arm_row(a: dict) -> str:
+        levels = a["levels"]
+        cells = [f"{levels[k]['median']:.1f}" if k in levels else "-" for k in (1, 3, 5, 6)]
+        total = f"{a['sum']:.1f}" if levels else "-"
+        spread = f"{a['worst_spread']:.1f} %" if levels else "-"
+        return f"| `{a['tag']}` | " + " | ".join(cells) + f" | {total} | {spread} | {gates_verdict(a)} |"
+
+    candidates = [a for a in guarded if KIND.get(a["tag"], "candidate") == "candidate"]
+    reference = [a for a in guarded if KIND.get(a["tag"]) == "reference"]
+    diagnostic = [a for a in guarded if KIND.get(a["tag"]) == "diagnostic"]
+    no_table = [a for a in guarded if not a["levels"]]
+
+    table_head = [
+        "| tag | c1 | c3 | c5 | c6 | sum | worst spread | gates |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+
+    if candidates or reference:
+        w("## Candidate arms, and the reference they are measured against")
+        w("")
+        w("\n".join(table_head))
+        for a in sorted(reference, key=lambda x: -x["sum"]):
+            out.append(arm_row(a))
+        for a in sorted(candidates, key=lambda x: -x["sum"]):
+            out.append(arm_row(a))
+        w("")
+        if no_table:
+            w(
+                "No median table, so no numbers: "
+                + ", ".join(f"`{a['tag']}`" for a in sorted(no_table, key=lambda x: x["tag"]))
+                + " (the run was stopped after the failure was visible)."
+            )
+            w("")
+        w("Per-level detail, best sum first.")
+        w("")
+    if diagnostic:
+        w("## Diagnostic arms (profiler-armed)")
+        w("")
+        w(
+            "These run the decode profiler, which distorts throughput, so they are not candidates and"
+            " their sums must not be compared with the table above. They are kept because they produced"
+            " the attribution."
+        )
+        w("")
+        w("\n".join(table_head))
+        for a in sorted(diagnostic, key=lambda x: -x["sum"]):
+            out.append(arm_row(a))
+        w("")
+    if guarded:
+        kind_order = {"reference": 0, "candidate": 1, "diagnostic": 2}
+        for a in sorted(
+            guarded, key=lambda x: (kind_order.get(KIND.get(x["tag"], "candidate"), 1), -x["sum"])
+        ):
+            change, verdict = NOTES.get(a["tag"], ("(unannotated)", "(unannotated)"))
+            w(f"### `{a['tag']}`")
+            w("")
+            w(f"**Changed.** {change}")
+            w("")
+            w(f"**Verdict.** {verdict}")
+            w("")
+            cont = a["guard"]["container"] or "?"
+            eng = a["guard"]["engine"] or "(not in the log)"
+            detail = a.get("detail", {}).get("levels", {})
+            rows = []
+            for level in sorted(a["levels"]):
+                v = a["levels"][level]
+                d = detail.get(level, {})
+                rows.append(
+                    f"| {level} | {' / '.join(f'{x:.1f}' for x in v['values'])} | {v['median']:.1f} | "
+                    f"{v['spread']:.1f} % | {d.get('tokens_per_step', '-')} | "
+                    f"{d.get('accept_rate', '-')} | {d.get('wall_s', '-')} |"
+                )
+            w(
+                f"Container `{cont}`, engine `{eng}`, "
+                f"{a.get('passes', '?')} passes at {a.get('max_tokens', '?')} tokens, "
+                f"started {a.get('start', '?')}."
+            )
+            w("")
+            w("| level | passes | median | spread | tokens/step | accept % | wall s |")
+            w("|---|---|---|---|---|---|---|")
+            out.extend(rows)
+            w("")
+    if FAILED_ARMS:
+        w("## Arms that produced no numbers")
+        w("")
+        for tag, change, why in FAILED_ARMS:
+            w(f"- **`{tag}`**: changed {change}. {why}")
+        w("")
+    w("## Superseded arms (pre-guard)")
+    w("")
+    w(f"Measured before {GUARD_EPOCH}, from an earlier generation of this work. Kept as history. Their")
+    w("numbers are **not evidence** and should not be compared against anything below or above.")
+    w("")
+    w("| tag | levels | sum |")
+    w("|---|---|---|")
+    for a in sorted(legacy, key=lambda x: x["tag"]):
+        w(f"| `{a['tag']}` | {fmt_levels(a) or '-'} | {a['sum']:.1f} |")
+    w("")
+    if PROBES:
+        w("## Kernel probes (offline, no serve)")
+        w("")
+        w("These do not run the serving protocol, so their numbers are not comparable with the arm")
+        w("tables above. Each answers one premise with a real GPU measurement; raw output is kept")
+        w("under `outputs/driver/one-off/`.")
+        w("")
+        for probe in PROBES:
+            w(f"### {probe['name']}")
+            w("")
+            w(f"**Command.** `{probe['command']}`")
+            w("")
+            w(f"**Log.** [`{probe['log']}`](../{probe['log']})")
+            w("")
+            w(probe["table"])
+            w("")
+            w(f"**Verdict.** {probe['verdict']}")
+            w("")
+    w("## Regenerating")
+    w("")
+    w("```sh")
+    w("python3 scripts/experiment-ledger.py")
+    w("```")
+    w("")
+    w(
+        "Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in "
+        "`superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered "
+        "`*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`."
+    )
+    w(f"As of the last run: {len(guarded)} guarded arms, {len(legacy)} superseded, {len(FAILED_ARMS)} failed.")
+    w("")
+
+    DOC.write_text("\n".join(out) + "\n")
+    JSON_OUT.write_text(
+        json.dumps(
+            {
+                "protocol": {
+                    "levels": [1, 3, 5, 6],
+                    "passes": 3,
+                    "max_tokens": 512,
+                    "guard_epoch": GUARD_EPOCH,
+                },
+                "arms": [
+                    {
+                        k: v
+                        for k, v in a.items()
+                        if k not in ("detail", "gates")
+                    }
+                    | {
+                        "change": NOTES.get(a["tag"], ("", ""))[0],
+                        "gates": {k: sorted(v) for k, v in a["gates"].items()},
+                    }
+                    for a in arms
+                ],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    print(f"wrote {DOC.relative_to(ROOT)} and {JSON_OUT.relative_to(ROOT)}")
+    print(f"{len(guarded)} guarded, {len(legacy)} superseded")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

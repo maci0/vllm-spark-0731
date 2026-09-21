@@ -1,0 +1,20 @@
+/* Version node for the LD_PRELOAD CUDA launch interposer.
+ *
+ * libtorch_cuda.so references the launches as cudaLaunchKernel@libcudart.so.13 and
+ * cudaLaunchKernelExC@libcudart.so.13, so the shim's definitions have to carry that same
+ * version node or the dynamic linker binds straight to libcudart and the shim is never
+ * entered. A bare .symver cannot supply the node (ld: "version node not found"), so the
+ * node is declared here and the link passes -Wl,--version-script=libcudart.vers.
+ *
+ * Build: gcc -shared -fPIC -O2 -o dcopy_trace.so dcopy_trace.c -ldl \
+ *            -Wl,--version-script=libcudart.vers
+ */
+libcudart.so.13 {
+  global:
+    cudaLaunchKernel;
+    cudaLaunchKernelExC;
+    cudaGraphLaunch;
+    cudaGraphInstantiateWithFlags;
+  local:
+    *;
+};

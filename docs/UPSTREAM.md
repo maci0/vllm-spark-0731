@@ -9878,3 +9878,1230 @@ not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
 Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
 Best same-pin sum remains `moea16-rc2` 453.7.
 
+
+## 2026-09-20: bs128-rc2 misaligned
+
+`BLOCK_SIZE=128` on `main-030-rc2` dies at worker init:
+`ValueError: Misaligned Tensor data on argument #6` (`cos_sin_cache` /
+`k_cache`, expected 16-byte alignment). Manager 128 is not a legal
+`nvfp4_ds_mla` layout on this pin. Keep 256. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN (labels: bug/DSv4; no
+`pre-run-check` in this dump). Best same-pin `moea16-rc2` 453.7 vs
+same-day `refg-rc2b` 485.9.
+
+
+## 2026-09-20: micromax-rc2 pin noise
+
+Native b12x has no static kernel (micro vs dynamic only; FlashInfer
+static IMA'd on live MXFP4). One overlay: `_MICRO_MAX_TOKENS` 8→48 and
+cutover 64→320 so protocol c6 stays micro. Confirmed overlay. 54.8 /
+99.9 / 133.9 / **142.4**, sum **431.0**, spread 10.6 %. Gates pass. One
+pass accept 48.8 % / tps 4.401 dips the floor. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +3.2 % / +0.8 %. vs `p030-rc2b` (424.6)
+a wash. Extending micro past m=8 is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -11.3 % / -12.2 %. Overlay not kept.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: maxlen32k-rc2 pin noise
+
+`MAX_MODEL_LEN=32768` on `main-030-rc2`: 54.3 / 97.7 / 128.6 / **144.3**,
+sum **424.9**, spread 6.8 %. Gates pass. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +1.8 % / +2.2 %. vs `p030-rc2b` (424.6) a wash. Smaller
+page table is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -12.6 % / -11.0 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: profeager-rc2 attribution + wochunk8-rc2
+
+Eager c1 profile (`B12X_PROFILE_*`, dump after 12 `execute_model`): last
+live `tok=8` step gpu **150.6 ms**. FFN **80.3 ms (53 %)**, WO **57.4 ms
+(38 %)**, all-reduce 0.93 ms avg × 87, indexer 1.4, MLA 0.9. Capture-mode
+profile dies `CUDA invalid argument`. Overlay `print` is a Dynamo no-op
+unless `B12X_DEBUG=1`. EngineCore drops unregistered `VLLM_PROFILE_*`.
+
+`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=8`: 54.5 / 96.6 / 129.9 / **143.1**,
+sum **424.1**, spread 13.5 %. Gates pass. vs `p030-rc2b` (424.6) a wash.
+Halving WO chunks is not the remaining gap. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -12.7 % / -11.8 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: wochunk32-rc2 pin noise
+
+`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=32` on `main-030-rc2`: 53.1 / 99.4 /
+129.0 / **143.2**, sum **424.7**, spread 10.2 %. Gates pass. One pass
+accept 48.6 % / tps 4.376 dips the floor. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +1.7 % / +1.4 %. vs `p030-rc2b` (424.6) a wash. WO
+chunks 8 and 32 are both pin noise. vs same-day `refg-rc2b` (485.9 /
+162.2) still -12.6 % / -11.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: wochunk4-rc2 pin noise
+
+`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=4` on `main-030-rc2`: 55.3 / 101.5 /
+130.3 / **145.8**, sum **432.9**, spread 5.9 %. Gates pass. One pass
+accept 48.9 % / tps 4.406 dips the floor. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +3.7 % / +3.3 %. vs `p030-rc2b` (424.6) a wash. WO
+chunks 4/8/32 are all pin noise. vs same-day `refg-rc2b` (485.9 / 162.2)
+still -10.9 % / -10.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: wochunk2-rc2 pin noise
+
+`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=2` on `main-030-rc2`: 56.8 / 94.8 /
+130.2 / **147.7**, sum **429.5**, spread 13.9 %. Gates pass. One pass
+accept 47.5 % / tps 4.303 dips the floor. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +2.9 % / +4.6 %. vs `p030-rc2b` (424.6) a wash. WO
+chunks 2/4/8/32 are all pin noise. vs same-day `refg-rc2b` (485.9 /
+162.2) still -11.6 % / -8.9 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: wochunk1-rc2 negative
+
+`B12X_WO_QUANT_CHUNKS_PER_PROGRAM=1` on `main-030-rc2`: 53.7 / 99.9 /
+127.7 / **136.7**, sum **418.0**, spread 6.1 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +0.1 % / -3.2 %. vs `p030-rc2b` (424.6)
+worse at c6. WO chunks 1 is a cost. Ladder closed (1 cost, 2/4/8/32
+wash). vs same-day `refg-rc2b` (485.9 / 162.2) still -14.0 % / -15.7 %.
+Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: nocar-rc2 pin noise
+
+`--disable-custom-all-reduce` on `main-030-rc2`: 54.1 / 99.6 / 129.7 /
+**140.6**, sum **424.0**, spread 12.0 %. Gates pass. One pass accept
+47.4 % / tps 4.303 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +1.6 % / -0.4 %. vs `p030-rc2b` (424.6) a wash, slightly worse at
+c6. Custom AR off is not the remaining gap. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -12.7 % / -13.3 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: loadsaf-rc2 pin noise
+
+`--load-format safetensors` on `main-030-rc2`: 55.3 / 96.9 / 127.0 /
+**144.9**, sum **424.1**, spread 7.9 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +1.6 % / +2.6 %. vs `p030-rc2b` (424.6)
+a wash. Loader format is not the remaining gap. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -12.7 % / -10.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: fiswizzle-rc2 IMA
+
+FlashInfer MXFP4 with `swizzle_block_scale` then
+`convert_sf_to_mma_layout(..., sf_vec_size=32)` on `main-030-rc2`.
+Confirmed overlay log `swizzle-then-mma k32`. Dies at `profile_run`
+with `CUDA_ERROR_ILLEGAL_ADDRESS` (700). Same live-weight IMA as
+`fistat`/`fifunc`. Name-only `mxfp4` and swizzle-before-convert are
+both closed. Stock overlay stays stock. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -6.6 % / -5.8 % at best same-pin `moea16-rc2`
+453.7 / 152.8.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: moecut32-rc2 pin noise
+
+`B12X_MICRO_DYNAMIC_CUTOVER_PAIRS=32` on `main-030-rc2`: 55.4 / 99.6 /
+129.9 / **141.0**, sum **425.9**, spread 5.4 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +2.0 % / -0.1 %. vs `p030-rc2b` (424.6)
+a wash. Sending c1 (48 pairs) to dynamic is not the remaining gap. vs
+same-day `refg-rc2b` (485.9 / 162.2) still -12.3 % / -13.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: cuteopt2-rc2 KV floor
+
+`B12X_DIRECT_CUTE_OPTIONS=--opt-level=2` on `main-030-rc2`. Dies at KV
+floor: 9.46 GiB available vs 9.48 GiB needed. Micro-direct OptLevel 2
+is hungrier than standing. Do not raise util. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -6.6 % / -5.8 % at best same-pin `moea16-rc2`
+453.7 / 152.8.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: nccpll-rc2 negative
+
+`NCCL_PROTO=LL` on `main-030-rc2`: 51.1 / 86.8 / 101.6 / **112.8**, sum
+**352.3**, spread 8.8 %. Gates pass. One pass accept 46.8 % / tps 4.267
+dips the floor. vs standing `proto2-030-rc2` (417.5 / 141.2) -15.6 % /
+-20.1 %. vs `p030-rc2b` (424.6) a large cost. NCCL LL is not the
+remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -27.5 % /
+-30.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclch1-rc2 pin noise
+
+`NCCL_MAX_NCHANNELS=1` on `main-030-rc2`: 53.5 / 100.1 / 127.4 /
+**142.9**, sum **423.9**, spread 7.9 %. Gates pass. One pass accept
+48.8 % / tps 4.391 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +1.5 % / +1.2 %. vs `p030-rc2b` (424.6) a wash. One NCCL channel
+is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-12.8 % / -11.9 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: nccllls-rc2 pin noise
+
+`NCCL_PROTO=LL,Simple` on `main-030-rc2`: 54.2 / 89.0 / 131.3 /
+**146.4**, sum **420.9**, spread 6.4 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +0.8 % / +3.7 %. vs `p030-rc2b` (424.6)
+a wash. Optional LL is not exclusive LL (`nccpll-rc2` 352.3) and is not
+the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-13.4 % / -9.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclring-rc2 negative
+
+`NCCL_ALGO=Ring` on `main-030-rc2`: 55.1 / 100.2 / 128.0 / **138.2**,
+sum **421.5**, spread 12.9 %. Gates pass. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +1.0 % / -2.1 %. vs `p030-rc2b` (424.6) worse at c6.
+Forced Ring is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -13.3 % / -14.8 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclnt64-rc2 pin noise
+
+`NCCL_NTHREADS=64` on `main-030-rc2`: 54.8 / 97.3 / 125.7 / **147.8**,
+sum **425.6**, spread 6.6 %. Gates pass. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +1.9 % / +4.7 %. vs `p030-rc2b` (424.6) a wash. NCCL
+thread count is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -12.4 % / -8.9 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclcu0-rc2 pin noise
+
+`NCCL_CUMEM_ENABLE=0` on `main-030-rc2`: 53.6 / 96.2 / 126.1 /
+**145.0**, sum **420.9**, spread 5.6 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +0.8 % / +2.7 %. vs `p030-rc2b` (424.6)
+a wash. NCCL cuMem off is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -13.4 % / -10.6 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclbuf1m-rc2 pin noise
+
+`NCCL_BUFFSIZE=1048576` on `main-030-rc2`: 52.8 / 101.3 / 134.9 /
+**143.7**, sum **432.7**, spread 9.3 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +3.6 % / +1.8 %. vs `p030-rc2b` (424.6)
+a wash. NCCL buffer 1 MiB is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -10.9 % / -11.4 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclgrp-rc2 pin noise
+
+`NCCL_LAUNCH_MODE=GROUP` on `main-030-rc2`: 54.4 / 95.3 / 126.9 /
+**141.6**, sum **418.2**, spread 8.8 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +0.2 % / +0.3 %. vs `p030-rc2b` (424.6)
+a wash. GROUP launch is not the remaining gap. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -13.9 % / -12.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: fiw31-rc2 CUDA error
+
+FlashInfer MXFP4 with in-place w31 [gate;up] to [up;gate] flip, then
+`swizzle_block_scale` and `convert_sf_to_mma_layout(..., sf_vec_size=32)`
+on `main-030-rc2`. Confirmed overlay log
+`w31-flip-then-swizzle-mma k32`. Dies at `profile_run` with
+`CUBLAS_STATUS_INTERNAL_ERROR` / `CUDA_ERROR_ILLEGAL_ADDRESS`. Same
+live-weight failure class as `fistat`/`fifunc`/`fiswizzle-rc2`. w31
+flip plus swizzle is not the remaining gap. Stock overlay stays stock.
+vs same-day `refg-rc2b` (485.9 / 162.2) still -6.6 % / -5.8 % at best
+same-pin `moea16-rc2` 453.7 / 152.8.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclp2p0-rc2 pin noise
+
+`NCCL_P2P_DISABLE=1` on `main-030-rc2`: 55.8 / 98.4 / 137.7 /
+**148.7**, sum **440.6**, spread 13.8 %. 9x8 gate passes. Pass 3
+france gate is garbled. One pass accept 48.2 % / tps 4.376 dips the
+floor. vs standing `proto2-030-rc2` (417.5 / 141.2) +5.5 % / +5.3 %,
+inside keep-spread. vs `p030-rc2b` (424.6) a wash. P2P off is not the
+remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -9.3 % /
+-8.3 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclqps4-rc2 pin noise
+
+`NCCL_IB_QPS_PER_CONNECTION=4` on `main-030-rc2`: 55.6 / 101.2 / 135.5 /
+**146.4**, sum **438.7**, spread 8.1 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +5.1 % / +3.7 %. vs `p030-rc2b` (424.6)
+a wash. Four IB QPs is not the remaining gap. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -9.7 % / -9.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: cgsizes-rc2 pin noise
+
+`CUDAGRAPH_CAPTURE_SIZES=[8,24,40,48]` on `main-030-rc2`: 53.8 / 99.2 /
+129.5 / **145.6**, sum **428.1**, spread 9.3 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +2.5 % / +3.1 %. vs `p030-rc2b` (424.6)
+a wash. Explicit capture sizes are not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -11.9 % / -10.2 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: cgcopy-rc2 pin noise
+
+`CUDAGRAPH_COPY_INPUTS=true` on `main-030-rc2`: 55.0 / 102.6 / 128.7 /
+**142.3**, sum **428.6**, spread 7.8 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +2.7 % / +0.8 %. vs `p030-rc2b` (424.6)
+a wash. Copying graph inputs is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -11.8 % / -12.3 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: moewarm-rc2 pin noise
+
+`B12X_MOE_WARM_MS=8,24,40,48` on `main-030-rc2`: 53.8 / 98.9 / 131.1 /
+**148.9**, sum **432.7**, spread 11.3 %. Gates pass. One pass accept
+47.5 % / tps 4.303 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +3.6 % / +5.5 %. vs `p030-rc2b` (424.6) a wash. Explicit MoE
+warm sizes are not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -10.9 % / -8.2 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclxnic-rc2 pin noise
+
+`NCCL_CROSSNIC=1` on `main-030-rc2`: 56.9 / 101.9 / 127.0 / **145.3**,
+sum **431.1**, spread 7.9 %. Gates pass. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +3.3 % / +2.9 %. vs `p030-rc2b` (424.6) a wash. CrossNIC
+is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-11.3 % / -10.4 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclhca-rc2 pin noise
+
+`NCCL_IB_HCA=rocep1s0f1,roceP2p1s0f1` on `main-030-rc2`: 53.2 / 101.1 /
+130.5 / **141.7**, sum **426.5**, spread 11.3 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +2.2 % / +0.4 %. vs `p030-rc2b` (424.6)
+a wash. Naming both HCAs is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -12.2 % / -12.6 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclpxn0-rc2 pin noise
+
+`NCCL_PXN_DISABLE=1` on `main-030-rc2`: 54.2 / 101.2 / 127.7 /
+**144.8**, sum **427.9**, spread 7.3 %. 9x8 gate passes. Pass 3 france
+gate is garbled. One pass accept 48.1 % / tps 4.339 dips the floor. vs
+standing `proto2-030-rc2` (417.5 / 141.2) +2.5 % / +2.5 %. vs
+`p030-rc2b` (424.6) a wash. PXN off is not the remaining gap. vs
+same-day `refg-rc2b` (485.9 / 162.2) still -11.9 % / -10.7 %. Not a
+keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclchk0-rc2 pin noise
+
+`NCCL_CHECKS_DISABLE=1` on `main-030-rc2`: 56.1 / 92.3 / 126.5 /
+**145.1**, sum **420.0**, spread 18.3 %. Gates pass. One pass accept
+46.9 % / tps 4.267 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +0.6 % / +2.8 %. vs `p030-rc2b` (424.6) a wash. NCCL checks off
+is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-13.6 % / -10.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclshm0-rc2 pin noise
+
+`NCCL_SHM_DISABLE=1` on `main-030-rc2`: 52.9 / 95.7 / 125.4 /
+**142.5**, sum **416.5**, spread 11.4 %. Gates pass. One pass accept
+48.1 % / tps 4.339 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) -0.2 % / +0.9 %. vs `p030-rc2b` (424.6) a wash. SHM off is not
+the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-14.3 % / -12.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: nohma-rc2 KV layout
+
+`--disable-hybrid-kv-cache-manager` on `main-030-rc2`. Confirmed
+`disable_hybrid_kv_cache_manager': True`. Dies at worker init:
+`ValueError: The resolved KV cache layout (BLHNC) does not store
+blocks as dense, unpadded pages (block stride 83889984 != page
+149504)`. Standing auto-HMA is load-bearing for `nvfp4_ds_mla` block
+256 on SM120. Explicit disable is not the remaining gap.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: kvlbnhc-rc2 KV layout
+
+`VLLM_KV_CACHE_LAYOUT=LBNHC` on `main-030-rc2`. Dies at EngineCore
+init: `ValueError: VLLM_KV_CACHE_LAYOUT=LBNHC does not satisfy every
+supported set; valid layouts: ['BLHNC', 'BLNHC']`. LBNHC is not legal
+for this `nvfp4_ds_mla` + DSV4 indexer pair. Standing auto BLHNC stays.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: kvblnhc-rc2 pin noise
+
+`VLLM_KV_CACHE_LAYOUT=BLNHC` on `main-030-rc2`: 56.8 / 97.3 / 132.1 /
+**147.0**, sum **433.2**, spread 5.1 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +3.8 % / +4.1 %. vs `p030-rc2b` (424.6)
+a wash. BLNHC is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -10.8 % / -9.4 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: cgwarm3-rc2 pin noise
+
+`CUDAGRAPH_NUM_OF_WARMUPS=3` on `main-030-rc2`: 53.6 / 99.6 / 129.3 /
+**146.8**, sum **429.3**, spread 9.3 %. Gates pass. One pass accept
+46.4 % / tps 4.197 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +2.8 % / +4.0 %. vs `p030-rc2b` (424.6) a wash. Extra graph
+warmups are not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -11.6 % / -9.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: igp-rc2 pin noise
+
+`USE_INDUCTOR_GRAPH_PARTITION=true` on `main-030-rc2`: 53.1 / 95.8 /
+130.7 / **143.2**, sum **422.8**, spread 4.9 %. 9x8 gate passes. Pass 1
+france gate is garbled. vs standing `proto2-030-rc2` (417.5 / 141.2)
++1.3 % / +1.4 %. vs `p030-rc2b` (424.6) a wash. Inductor graph
+partition is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -13.0 % / -11.7 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclsock4-rc2 negative
+
+`NCCL_SOCKET_NTHREADS=4` on `main-030-rc2`: 53.4 / 96.4 / 128.2 /
+**139.4**, sum **417.4**, spread 7.1 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) -0.0 % / -1.3 %. Worse at c6. vs
+`p030-rc2b` (424.6) a wash-to-negative. Socket helper threads are not
+the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-14.1 % / -14.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: moetile64-rc2 pin noise
+
+`B12X_DYNAMIC_TILE_MN=64x128` on `main-030-rc2`: 55.4 / 102.0 / 131.0 /
+**142.2**, sum **430.6**, spread 12.6 %. Gates pass. One pass accept
+47.3 % / tps 4.303 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +3.1 % / +0.7 %. vs `p030-rc2b` (424.6) a wash. Forced M64 is
+not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-11.4 % / -12.3 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclnsock4-rc2 pin noise
+
+`NCCL_NSOCKS_PERTHREAD=4` on `main-030-rc2`: 53.0 / 99.0 / 128.1 /
+**142.0**, sum **422.1**, spread 12.8 %. Gates pass. One pass accept
+49.0 % / tps 4.414 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +1.1 % / +0.6 %. vs `p030-rc2b` (424.6) a wash. Extra sockets
+per thread are not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -13.1 % / -12.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclto22-rc2 pin noise
+
+`NCCL_IB_TIMEOUT=22` on `main-030-rc2`: 55.1 / 97.6 / 131.2 /
+**145.6**, sum **429.5**, spread 11.6 %. 9x8 gate passes. Pass 1 france
+gate is garbled. One pass accept 47.7 % / tps 4.339 dips the floor. vs
+standing `proto2-030-rc2` (417.5 / 141.2) +2.9 % / +3.1 %. vs
+`p030-rc2b` (424.6) a wash. IB timeout 22 is not the remaining gap. vs
+same-day `refg-rc2b` (485.9 / 162.2) still -11.6 % / -10.2 %. Not a
+keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ensp-rc2 SP+DSpark
+
+Forced `pass_config.enable_sp=true` with `sp_min_token_num=1` on
+`main-030-rc2`. Confirmed in compilation_config. Dies at VllmConfig:
+`Model Runner V1 does not support: dspark speculative decoding`.
+Forced SP is incompatible with DSpark on this pin.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: fnormq-rc2 hang
+
+`PASS_CONFIG={"fuse_norm_quant":true}` on `main-030-rc2`. Confirmed
+`fuse_norm_quant': True` and `Enabled custom fusions: norm_quant,
+act_quant`. Hangs at EngineCore init, never healthy. Forced
+norm+quant fusion is not the remaining gap.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclmin2-rc2 negative
+
+`NCCL_MIN_NCHANNELS=2` on `main-030-rc2`: 51.5 / 96.6 / 127.0 /
+**140.3**, sum **415.4**, spread 8.4 %. Gates pass. One pass accept
+47.5 % / tps 4.303 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) -0.5 % / -0.6 %. Worse at c6. vs `p030-rc2b` (424.6) a
+wash-to-negative. MIN channels 2 is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -14.5 % / -13.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclpeer2-rc2 negative
+
+`NCCL_NCHANNELS_PER_NET_PEER=2` on `main-030-rc2`: 53.3 / 96.6 / 129.8 /
+**140.3**, sum **420.0**, spread 4.9 %. Gates pass. One pass accept
+48.8 % / tps 4.401 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +0.6 % / -0.6 %. Worse at c6. vs `p030-rc2b` (424.6) a
+wash-to-negative. Per-peer channels 2 is not the remaining gap. vs
+same-day `refg-rc2b` (485.9 / 162.2) still -13.6 % / -13.5 %. Not a
+keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: nccltc106-rc2 pin noise
+
+`NCCL_IB_TC=106` on `main-030-rc2`: 52.0 / 102.8 / 128.0 / **141.2**,
+sum **424.0**, spread 6.9 %. Gates pass. One pass accept 48.2 % / tps
+4.339 dips the floor. vs standing `proto2-030-rc2` (417.5 / 141.2)
++1.6 % / +0.0 %. vs `p030-rc2b` (424.6) a wash. IB TC 106 is not the
+remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -12.7 % /
+-12.9 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclsl0-rc2 pin noise
+
+`NCCL_IB_SL=0` on `main-030-rc2`: 54.8 / 97.7 / 130.8 / **142.6**,
+sum **425.9**, spread 10.8 %. Gates pass. One pass accept 47.9 % / tps
+4.339 dips the floor. vs standing `proto2-030-rc2` (417.5 / 141.2)
++2.0 % / +1.0 %. vs `p030-rc2b` (424.6) a wash. IB SL 0 is not the
+remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -12.3 % /
+-12.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: factq-rc2 hang
+
+`PASS_CONFIG={"fuse_act_quant":true}` on `main-030-rc2`. Confirmed
+`fuse_act_quant': True` and `Enabled custom fusions: norm_quant,
+act_quant`. Hangs at EngineCore init, never healthy. Same class as
+`fnormq-rc2`: either fusion flag enables both and hangs. Forced
+act+quant fusion is not the remaining gap.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclretry1-rc2 pin noise
+
+`NCCL_IB_RETRY_CNT=1` on `main-030-rc2`: 53.1 / 101.1 / 125.1 /
+**142.5**, sum **421.8**, spread 9.8 %. Gates pass. One pass accept
+48.8 % / tps 4.376 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +1.0 % / +0.9 %. vs `p030-rc2b` (424.6) a wash. IB retry 1 is
+not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-13.2 % / -12.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: ncclar1-rc2 pin noise
+
+`NCCL_IB_AR_ALGORITHM=1` on `main-030-rc2`: 56.4 / 99.1 / 131.5 /
+**141.8**, sum **428.8**, spread 10.1 %. Gates pass. One pass accept
+49.1 % / tps 4.420 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +2.7 % / +0.4 %. vs `p030-rc2b` (424.6) a wash. IB adaptive
+routing is not the remaining gap. vs same-day `refg-rc2b` (485.9 /
+162.2) still -11.8 % / -12.6 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: now4mat-rc2 negative
+
+`B12X_DYNAMIC_W4A8_MATERIALIZED=0` on `main-030-rc2`: 53.8 / 99.1 /
+127.6 / **139.3**, sum **419.8**, spread 15.7 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +0.6 % / -1.3 %. Worse at c6. vs
+`p030-rc2b` (424.6) a wash-to-negative. Materialized off is not the
+remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still -13.6 % /
+-14.1 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-20: w4scr128-rc2 pin noise
+
+`B12X_W4A8_CONVERT_SCRATCH_MB=128` on `main-030-rc2`: 53.0 / 98.3 /
+129.2 / **143.5**, sum **424.0**, spread 7.4 %. Gates pass. vs standing
+`proto2-030-rc2` (417.5 / 141.2) +1.6 % / +1.6 %. vs `p030-rc2b` (424.6)
+a wash. Convert scratch 128 is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -12.7 % / -11.5 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: ncclcnet0-rc2 pin noise
+
+`NCCL_COLLNET_ENABLE=0` on `main-030-rc2`: 52.9 / 99.6 / 126.1 /
+**143.0**, sum **421.6**, spread 7.8 %. Gates pass. One pass accept
+47.3 % / tps 4.267 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +1.0 % / +1.3 %. vs `p030-rc2b` (424.6) a wash. CollNet off is
+not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-13.2 % / -11.8 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: ncclplug0-rc2 pin noise
+
+`NCCL_NET_PLUGIN=none` on `main-030-rc2`: 53.7 / 101.3 / 132.0 /
+**142.4**, sum **429.4**, spread 10.0 %. Gates pass. One pass accept
+45.6 % / tps 4.197 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +2.9 % / +0.8 %. vs `p030-rc2b` (424.6) a wash. NET plugin none
+is not the remaining gap. vs same-day `refg-rc2b` (485.9 / 162.2) still
+-11.6 % / -12.2 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: ncclnetib-rc2 negative
+
+`NCCL_NET=IB` on `main-030-rc2`: 54.4 / 96.1 / 127.1 / **139.1**,
+sum **416.7**, spread 12.3 %. Gates pass. vs standing `proto2-030-rc2`
+(417.5 / 141.2) -0.2 % / -1.5 %. Worse at c6. vs `p030-rc2b` (424.6) a
+wash-to-negative. Forced NET=IB is not the remaining gap. vs same-day
+`refg-rc2b` (485.9 / 162.2) still -14.2 % / -14.2 %. Not a keep.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: fattnq-rc2 hang
+
+`PASS_CONFIG={"fuse_attn_quant":true}` on `main-030-rc2`. Confirmed
+`fuse_attn_quant': True` and `Enabled custom fusions: norm_quant,
+act_quant, attn_quant, rope_kvcache_cat_mla`. Hangs at EngineCore
+init, never healthy. Same class as `fnormq-rc2`/`factq-rc2`: any
+forced fusion flag hangs this pin. Forced attn+quant fusion is not
+the remaining gap.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: nnoop-rc2 hang
+
+`PASS_CONFIG={"eliminate_noops":false}` on `main-030-rc2`. Confirmed
+`eliminate_noops': False` and `Enabled custom fusions: norm_quant,
+act_quant`. Hangs at EngineCore init, never healthy. Same class as
+`fnormq`/`factq`/`fattnq`: any non-empty `pass_config` enables custom
+fusions and hangs. Standing empty `pass_config` is load-bearing.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: cgpiece-rc2 positive not a keep
+
+`CUDAGRAPH_MODE=PIECEWISE` on `main-030-rc2`: 54.6 / 106.4 / 136.1 /
+**150.4**, sum **447.5**, spread 17.8 %. Gates pass. One pass accept
+47.6 % / tps 4.339 dips the floor. vs standing `proto2-030-rc2` (417.5 /
+141.2) +7.2 % / +6.5 %, inside keep-spread 14.0 %. vs `p030-rc2b`
+(424.6) +5.4 % / +4.3 %. Second-best same-pin sum after `moea16-rc2`
+453.7. vs same-day `refg-rc2b` (485.9 / 162.2) still -7.9 % / -7.3 %.
+Not a keep. FULL_AND_PIECEWISE stays the standing default.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: noaot-rc2 pin noise
+
+`VLLM_USE_AOT_COMPILE=0` on `main-030-rc2`: 54.3 / 95.8 / 126.3 /
+**141.1**, sum **417.5**, spread 9.4 %. Gates pass; accept 49.3-56.9 %
+and tps 4.439-4.971 hold the floor. vs standing `proto2-030-rc2`
+(417.5 / 141.2) +0.0 % / -0.1 %. Resolved config still
+`CompilationMode.NONE`, so the arm only measured losing the AOT persist
+cache. vs `p030-rc2b` (424.6) a wash. vs same-day `refg-rc2b`
+(485.9 / 162.2) still -14.1 % / -13.0 %. Not a keep. AOT stays on.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+Best same-pin sum remains `moea16-rc2` 453.7.
+
+
+## 2026-09-21: profile pass (c6 phase accounting, NCCL transport)
+
+Goal unmet, so the standing pin was profiled end to end. Three instruments
+were tried; only the overlay's own region marks produced usable device time.
+
+**What the instruments cost.** `nsys --attach-pid` cannot enable CUPTI in a
+process not launched under it, so it wrote no report (`nsysc6-rc2`). vLLM's
+in-process torch profiler (`PROFILE_ENABLE=1`) traced the API process only:
+188k `python_function` events, zero CUDA activity, so no kernel table
+(`torchc6`). The overlay's `b12x_profile_region` marks are therefore the only
+device-time source, and they only collect on a run without CUDA graphs.
+
+**c1 region split** (`profeager-rc2`, last clean step `execute_model tok=8`,
+gpu 150.6 ms, layers sum 150.2 ms over 43):
+
+| region | n | gpu_sum | avg | wall_sum |
+|---|---|---|---|---|
+| ffn | 43 | 80.3 ms | 1.87 | 57.7 |
+| attn (contains wo) | 43 | 67.8 | 1.58 | 67.9 |
+| wo | 43 | 57.4 | 1.34 | 14.8 |
+| wo_b12x | 43 | 57.3 | 1.33 | 14.2 |
+| allreduce | 87 | 81.3 | 0.93 | 5.4 |
+| indexer | 21 | 1.4 | 0.06 | 7.5 |
+| mla | 43 | 0.9 | 0.02 | 22.9 |
+
+Two named hot spots: **ffn 53 %** and **wo 38 %** (o_proj, our own overlay).
+
+**c6 step time.** 3072 tokens over 6 streams in 22.86 s with 675 draft slots
+(112.5 engine steps) is a **203 ms step**. The target forward's own device
+time at c6 could **not** be measured, so the earlier version of this entry
+claimed ~81 ms/step (40 %) was "host-bound". **That claim is retracted.** It
+came from comparing a profiler-window target time (~100 ms) against a
+production step time (203 ms), which mixes two regimes, and the profiler run
+behind it was also misconfigured (see below). The honest statement is: a
+203 ms step at c6 is established, the split inside it is not.
+
+Three defects found and fixed in the instrumentation, so nobody repeats them:
+
+- The ad-hoc profile launchers called `scripts/05-serve.sh` without
+  `NUM_SPECULATIVE_TOKENS`/`MAX_CUDAGRAPH_CAPTURE_SIZE`, so they ran the **pin**
+  defaults (**k=5, capture 36**) while every measured arm runs k=7 / capture
+  48 via `harness/run-arm.sh`. At capture 36 the 48-token target forward is
+  not even captured. Launchers must pass both explicitly.
+- The profiler env cannot be passed as `VLLM_PROFILE_*`: it reaches the
+  container but the GPU worker that executes `execute_model` does not carry it
+  (the process that does is a different one), so the `b12x_profile_target_step`
+  decorator returns the bare function and nothing prints. The `B12X_PROFILE_*`
+  alias plus a bind-mounted patched `sm12x_b12x_kernels.py` binds the mount and
+  the module correctly (`grep -c B12X_PROFILE` = 5 in-container) and the
+  decorator is applied to `vllm/v1/worker/gpu/model_runner.py`, but the worker
+  still comes up without the alias, so both the step lines and the region
+  marks (which need `_PROFILING_STEP` set by that same wrapper) stay dark.
+- Net effect: the region table we do have (`profeager-rc2`) was produced when
+  the route happened to arm, and it is an eager c1 table. There is currently
+  no working route to a graph-regime c6 region split.
+
+**NCCL transport (`ncclinfo-rc2`).** Healthy and already correct: RoCE on
+both HCAs (`rocep1s0f1`, `roceP2p1s0f1`) alternating per channel, 64 coll
+channels, 0 NVLS, `CC Off`, no CollNet, `RMA_IB_PROXY`. The 0.93 ms average
+all-reduce is contention, not bandwidth: `gpu_min` is 0.08 ms. Twenty NCCL
+env arms were measured blind and were all pin noise or worse; none of them
+was addressing a real misconfiguration.
+
+**Fix landed.** The o_proj overlay is our own code, is named by the profile at
+38 % of the step, and `nowo-rc2` proved it is a net loss (sum 442.2 vs 417.5,
+better at every level). `configs/pin.main-029.env` now defaults
+`VLLM_USE_B12X_WO_PROJECTION` to 0, so the einsum path is the served default.
+Re-measured as `wooff-rc2`.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: wooff re-measure + A16 does not replicate
+
+`wooff-rc2` (WO overlay off as the pin default, the fix landed from the
+profile): 56.8 / 96.5 / 129.4 / **144.2**, sum **426.9**, spread **7.5 %**,
+gates pass, acceptance 49.6-57.0 %, tokens per step 4.452-4.971. Against
+standing `proto2-030-rc2` (417.5 / 141.2) +2.3 % / +2.1 %; against
+`p030-rc2b` (424.6 / 144.2) a wash. It is 3.5 % below the earlier `nowo-rc2`
+(442.2), so part of that single-arm gain was noise. Both arms favour the
+overlay off, so the default stays off. Not a keep.
+
+`wooff-a16-rc2` (adds `VLLM_B12X_MOE_FP4_FORCE_A16=1`, the MoE lever that
+measured best alone at 453.7): 54.9 / 102.1 / 130.8 / **139.6**, sum
+**427.4**, spread 5.9 %. A wash against `wooff-rc2` (+0.1 %) and 5.8 % / 8.6 %
+**worse** than the same knob measured by itself. The `moea16-rc2` result did
+not replicate.
+
+Conclusion for this pin: the surviving one-variable knobs are all inside the
+rig's own ~14 % median swing, which is why no arm clears the keep-rule. The
+profile names two real hot spots (MoE 53 %, o_proj 38 % at c1), and those
+need a structural change, not another env knob. The c6 split inside the
+203 ms step is still unmeasured.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: k=6 adopted, 5-pass re-baseline
+
+The c1 median swing is ~8 % even at five passes, which is larger than any
+single-knob effect found so far, so the keep-rule cannot be cleared by a 3-pass
+arm. Both sides of the comparison were therefore re-measured at five passes.
+
+| arm | c1 | c3 | c5 | c6 | sum | worst spread |
+|---|---|---|---|---|---|---|
+| `wooff5-rc2` (k=7 default) | 54.2 | 99.5 | 131.1 | 144.6 | **429.4** | 8.5 % |
+| `wooff-k6-5-rc2` (k=6) | 56.3 | 103.7 | 132.9 | 152.3 | **445.2** | 7.6 % |
+
+Both pass both gates in all five passes. k=6 raises acceptance from
+49.8-56.9 % to **57.5-67.5 %** and holds the tokens-per-step floor (min 4.437
+against 4.427). Effect: **+3.7 %** on the sum, **+5.3 %** at c6. Against the
+contract standing arm `proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) it is
++6.6 % / +7.9 %. It does not clear the keep bar (max(8.5 %, 7.6 %) = 8.5 %),
+so it is a served-default improvement, not a keep.
+
+Adopted anyway because it is positive in three independent measurements
+(`k6-rc2` +6.7 %, `wooff-k6-rc2` +5.0 %, `wooff-k6-5-rc2` +3.7 %), it improves
+acceptance rather than trading against it, and its mechanism is the one the
+profile supports (one fewer draft pass per engine step). `NUM_SPECULATIVE_TOKENS`
+now defaults to 6 in both `configs/pin.main-029.env` and `harness/run-arm.sh`,
+which also gains `PASSES` and `MAX_CUDAGRAPH_CAPTURE_SIZE` overrides.
+
+Best same-pin vs same-day anemll `refg-rc2b` (485.9 / 162.2) is now
+**-8.4 % / -6.1 %**, up from -12.0 % / -13.9 %.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: humming MoE adopted — gap to anemll down to ~1 %
+
+With WO overlay off and k=6 landed, the remaining single variables were tested
+at five passes, because the c1 median swing (~8-12 %) is larger than any
+effect found so far.
+
+| arm | c1 | c3 | c5 | c6 | sum | worst spread | verdict |
+|---|---|---|---|---|---|---|---|
+| `wooff-k6-5-rc2` (standing) | 56.3 | 103.7 | 132.9 | 152.3 | 445.2 | 7.6 % | baseline |
+| `cgpiece-k6-rc2` | 55.1 | 96.1 | 129.9 | 139.5 | 420.6 | 8.9 % | **-5.5 %** loss |
+| `hum-k6-rc2b` | 58.5 | 111.6 | 146.8 | **160.6** | **477.5** | 11.8 % | **+7.3 %** win |
+
+`CUDAGRAPH_MODE=PIECEWISE` is a clear loss at five passes: `cgpiece-rc2`'s
+earlier +7.2 % came with a 17.8 % spread and did not replicate.
+`FULL_AND_PIECEWISE` stands, consistent with `cgfull` and `proto2-dg-cgfull`.
+
+`MOE_BACKEND=humming` passes both gates in all five passes, holds acceptance
+(53.1-64.3 %), and is the best same-pin result on record. Adopted as the
+served default in `configs/pin.main-029.env`.
+
+**Channel trap, recorded so it is not repeated.** `MOE_BACKEND` is read by
+`scripts/05-serve.sh` on the launcher to build `--moe-backend`, so passing it
+as container env (`SERVE_EXTRA_ENV=MOE_BACKEND=humming`) is too late: the flag
+still said `b12x`. The invalid arm `hum-k6-rc2` measured the unchanged default
+instead (448.9, a third sample of the k=6 / WO-off config). Launcher-side
+variables must go through the assignment prefix
+(`run-arm.sh <tag> "MOE_BACKEND=humming"`); `SERVE_EXTRA_ENV` is for variables
+read inside the container, which is why the NCCL and `VLLM_B12X_*` arms were
+correct and this one was not.
+
+**Where the gap stands.** Against the same-day reference `refg-rc2b`
+(485.9 / 162.2) the best arm is now **-1.7 % / -1.0 %**, from -12.0 % / -13.9 %
+at the start of round 103. Against the contract standing arm
+`proto2-030-rc2` (417.5 / 141.2, spread 14.0 %) it is **+14.4 % / +13.7 %**:
+the sum clears the 14.0 % bar, c6 misses it by 0.3 points. Not yet a keep, and
+not yet a win over anemll.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: k=5 degenerate, A16 closed under humming
+
+Two single-variable arms on the humming default (WO off, k=6), five passes.
+
+| arm | c1 | c3 | c5 | c6 | sum | worst spread |
+|---|---|---|---|---|---|---|
+| `hum-k6-rc2b` (standing) | 58.5 | 111.6 | 146.8 | 160.6 | **477.5** | 11.8 % |
+| `hum-k5-rc2` (k=5) | 29.7 | 76.5 | 75.4 | 93.5 | **275.1** | 83.3 % |
+| `hum-a16-rc2` (A16) | 57.8 | 102.9 | 134.9 | 149.5 | **445.1** | 7.6 % |
+
+**k=5 is below a cliff**, not a gentle continuation of the ladder: -42.4 % on the
+sum, spreads up to 83.3 %, tokens per step 4.071-6.250, and the final `/metrics`
+snapshot refused. All five passes degrade, so it is not one flaky pass. k=6
+stays the default.
+
+**A16 is closed.** Forcing W4A16 on top of humming costs **-6.8 % / -6.9 %**
+with no quality dip at all (acceptance 58.2-65.5 %, tokens per step 4.452-4.923,
+both gates 5/5). Under b12x the same env gave +8.7 % once and then +0.1 % on the
+WO-off default; under humming it is a clear loss. The lever that looked like the
+closest analogue of anemll's `flashinfer_b12x` does not reproduce anywhere.
+
+The serving default is unchanged: humming MoE, WO overlay off, k=6, best
+same-pin **477.5 / 160.6** against same-day `refg-rc2b` **485.9 / 162.2**, i.e.
+**-1.7 % / -1.0 %**.
+
+Latest tag still `v0.30.0rc2`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: pinned v0.30.0 (9ed533eb4adf)
+
+A newer upstream serving tag landed while round 107 was running, so the pin
+moves to it under the standing rule (always the latest upstream tagged serving
+version, then rebuild).
+
+`v0.30.0` is a lightweight tag on commit `9ed533eb4adfe48aef7e569a08daeccd2a773fed`
+(2026-09-21T03:14:00Z). It is **one commit ahead of `v0.30.0rc2`**, touching two
+files: `#57554 "[Build] Fix DeepGEMM CUDA 12.9 release builds"`. So it is the
+DeepGEMM build fix and nothing else — no runtime-visible change is expected,
+but the pin still moves because it is the latest tag.
+
+Our four tracked PRs are all still open and unmerged as of this round:
+`#53425` (SM12x FlashInfer sparse MLA block size 64), `#53522` (gate indexer
+paged MQA metadata on DeepGEMM support), `#53271` (KV offload device-pointer
+validation), `#46716` (CPU shared-memory all-reduce deadlock). No new upstream
+PR was opened.
+
+**Overlay scan: FAIL=0 applied=43 no-op=12 total=55**, identical to the rc2
+scan, run against a clean checkout of the new ref with
+`scripts/port_scan.py --vllm-dir <tree>/vllm --with-upstream-patches`. The port
+recipe is `configs/examples/port-v0.30.0.sh`
+(`check|scan|phase1|overlay|copy|arm`), and the pin now reads
+`IMAGE=vllm-spark-0731:main-030-0`, `VLLM_REF=9ed533eb4adf…`.
+
+Note for the scan: `--vllm-dir` wants the **package** directory (the one holding
+`config/kernel.py`), i.e. `<repo>/vllm`, not the repository root; passing the
+root fails with `not a vllm package`.
+
+Build in progress at the time of writing; re-baseline and then one-variable wins
+follow once the image exists.
+
+The three landed service defaults from rounds 103-105 carry over unchanged:
+WO overlay off, `NUM_SPECULATIVE_TOKENS=6`, `MOE_BACKEND=humming`. Best
+same-pin result so far is **477.5 / 160.6** against same-day `refg-rc2b`
+**485.9 / 162.2** (-1.7 % / -1.0 %).
+
+
+## 2026-09-21: v0.30.0 is a wash, and the rig drifts 6.4 % between sessions
+
+The v0.30.0 port finished: pin, scan FAIL=0 (applied=43 no-op=12), phase-1
+build, overlays, copy, re-baseline. The image is on both nodes
+(`vllm-spark-0731:main-030-0`, sha `f2f9e43a7088`) and serves
+`v0.30.1.dev0+g9ed533eb4`.
+
+**The tag bump is a wash**, and this time it was measured properly. A pin bump
+is not a single-variable change on its own, because the rebuild also
+re-resolves `TORCH_REF`; here torch turned out to be byte-identical
+(`torch 2.14.0a0+git2b3ec34`, `triton 3.7.1`, `cuda 13.3` in both images), so
+the only difference is the two-file DeepGEMM build fix.
+
+| arm (5 passes) | c1 | c3 | c5 | c6 | sum | worst spread |
+|---|---|---|---|---|---|---|
+| `refg-now` (anemll, same session) | 63.7 | 117.0 | 142.0 | 161.2 | **483.9** | 26.6 % |
+| `rc2back-rc2` (rc2 image) | 56.9 | 104.0 | 134.5 | 153.3 | **448.7** | 11.3 % |
+| `proto2-030-0` (v0.30.0 image) | 57.3 | 104.8 | 132.2 | 150.2 | **444.5** | 12.6 % |
+
+rc2 vs v0.30.0 back-to-back: **+0.9 % / +2.0 %**, inside noise.
+
+**The drift finding matters more than the result.** The *identical* image and
+config (`hum-k6-rc2b`) measured **477.5 / 160.6** at 14:14 and **448.7 / 153.3**
+at 16:23 — a **6.4 %** session-to-session shift with nothing changed. That is
+the same magnitude as every effect chased in rounds 103-106, so:
+
+- the keep-rule's "larger median spread" (7-14 %) is dominated by
+  *between-session* drift, not within-session noise;
+- every arm-vs-standing comparison in this ledger that spans two sessions is
+  confounded, including the k=6, PIECEWISE and A16 verdicts;
+- only back-to-back, same-session pairs are admissible, which is why the
+  reference was re-measured here rather than compared against the 2026-09-20
+  `refg-rc2b` number.
+
+**Where we actually stand, same session.** Against `refg-now` the v0.30.0
+default is **-8.1 % / -6.8 %**; per level, c1 -10.0 %, c3 -10.4 %, c5 -6.9 %,
+c6 -6.8 %. The small-batch levels are the worst, so the remaining gap is not
+one kernel.
+
+Our four tracked PRs remain open and unmerged. No new upstream PR was opened.
+
+
+## 2026-09-21: parity with the reference; the gap was session state
+
+A control arm settled what the earlier drift finding implied. Measured
+back-to-back, five passes, same session:
+
+| arm | c1 | c3 | c5 | c6 | sum | worst spread |
+|---|---|---|---|---|---|---|
+| `refg-now` (anemll) | 63.7 | 117.0 | 142.0 | 161.2 | **483.9** | 26.6 % |
+| `proto2-030-0` (16:13) | 57.3 | 104.8 | 132.2 | 150.2 | 444.5 | 12.6 % |
+| `proto2-030-0b` (16:43, same image+config) | 64.1 | 117.8 | 145.1 | 158.9 | **485.9** | 10.8 % |
+| `capsz-030-0` (16:50, capture sizes) | 62.3 | 117.6 | 145.6 | 159.5 | **485.0** | 11.6 % |
+
+`proto2-030-0` and `proto2-030-0b` are the **same image and the same config**,
+thirty minutes apart, and differ by **+9.3 %** on the sum. So the ~8 % "gap to
+anemll" reported at the start of this round was session state, not a
+performance difference: against the same-session reference the control is
+**+0.4 % / -1.4 %**, i.e. parity.
+
+The capture-size arm is a **wash** (-0.2 % / +0.4 % against its adjacent
+control), so the padding that adopting k=6 introduced (7->8, 21->24, 35->40,
+42->48) is not a real cost. The standing capture list stays.
+
+**What this means for the ledger.** The rig swings about +-9 % between
+sessions. Every arm-vs-standing verdict here that spans two sessions is
+therefore confounded, and the keep-rule's 7-14 % "spread" is mostly that
+drift. The valid comparisons are the adjacent ones: `hum-k6-rc2` (b12x, 448.9)
+vs `hum-k6-rc2b` (humming, 477.5) at 14:04-14:14 is a genuine +6.4 % for
+humming; the rest of rounds 103-106 need re-testing as interleaved A/B pairs
+before they can be believed.
+
+We are at parity with the reference within this rig's noise, not ahead and not
+behind. Beating it by more than the larger spread (the reference's own 26.6 %)
+needs a change larger than anything found so far.
+
+Our four tracked PRs remain open and unmerged. No new upstream PR was opened.
+
+
+## 2026-09-21: k=6 vs k=7 validated, drift-cancelled (+6.0 % / +9.0 %)
+
+The landed k=6 default was tested the way round 107 proved it has to be: an
+interleaved, drift-cancelling A/B. Four three-pass arms in the order
+k7,k6,k6,k7 so a monotonic session drift cancels in the average of the two
+differences.
+
+| arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| `abk7-a` | 52.5 | 102.6 | 127.2 | 142.9 | 425.2 |
+| `abk6-a` | 53.6 | 104.8 | 132.7 | 157.7 | 448.8 |
+| `abk6-b` | 55.8 | 105.3 | 133.1 | 155.2 | 449.4 |
+| `abk7-b` | 51.5 | 97.0 | 129.3 | 144.1 | 421.9 |
+
+k6 minus k7: pair1 **+5.6 %**, pair2 **+6.5 %**, mean **+6.0 %** on the sum and
+**+9.0 %** at c6. Acceptance is higher for k6 (52.2-64.3 %) than k7
+(48.5-57.2 %). All gates pass in all passes. The k=6 default is correct, and
+the original `k6-rc2` +6.7 % now has a mechanism and a clean confirmation.
+
+**Session context:** this window was a "slow" one (the k=6 arms sit ~449 while
+the identical config measured 485.9 at 16:43), so absolute numbers still
+cannot be compared across windows. What survives is the *within-pair* delta.
+
+Since the reference (`refg-now`, k=7) is at ~484, the same +6-9 % advantage our
+k=6 config holds over k=7 is what keeps us at parity with it rather than
+behind. The validated sequence of defaults is: humming MoE, WO overlay off,
+k=6.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: all three landed defaults validated by interleaved A/B
+
+The third landed default was tested the drift-cancelling way and is a wash.
+
+| pair | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| `abwo-a` (WO off) | 57.1 | 107.8 | 134.6 | 150.9 | 450.4 |
+| `abwo-b` (WO on) | 56.5 | 103.6 | 133.9 | 150.8 | 444.8 |
+| `abwo-c` (WO on) | 55.1 | 107.9 | 138.8 | 151.3 | 453.1 |
+| `abwo-d` (WO off) | 56.8 | 101.8 | 134.8 | 154.2 | 447.6 |
+
+WO on minus off: **0.0 %** on the sum, **-1.0 %** at c6. The b12x WO overlay
+and the einsum path are equivalent; keeping the overlay off removes our own
+emulation layer at no cost.
+
+**All landed defaults now validated by adjacent same-session pairs:**
+
+- k=6 vs k=7: **+6.0 % / +9.0 %** (interleaved, round 109)
+- humming vs b12x MoE: **+6.4 %** (adjacent pair, round 105)
+- WO overlay off vs on: **0.0 % / -1.0 %** (interleaved, this round)
+
+So the serving default is at its measured optimum among the tested levers.
+Within this rig's +-9 % session swing we sit at parity with the same-session
+reference, not ahead and not behind. A win over the reference that exceeds its
+own 26.6 % spread needs a change larger than anything one-variable has
+produced.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: decisive interleaved ours-vs-reference — parity (-0.3 % / -1.0 %)
+
+The only valid way to compare against the reference is interleaved in one
+session, so four arms ran in the order ours, ref, ref, ours (three passes
+each).
+
+| arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| `abOTH-a` (ours) | 60.3 | 107.5 | 138.3 | 151.3 | 457.4 |
+| `abREF-b` (ref) | 61.8 | 114.9 | 145.0 | 159.0 | 480.7 |
+| `abREF-c` (ref) | 63.1 | 111.9 | 139.6 | 155.7 | 470.3 |
+| `abOTH-d` (ours) | 67.6 | 116.0 | 146.6 | 160.3 | **490.5** |
+
+Means: ours **474.0**, reference **475.5** → **-0.3 %** on the sum and
+**-1.0 %** at c6. Per level: c1 **+1.4 %** (ours ahead), c3 -1.4 %, c5 +0.1 %,
+c6 -1.0 %. Our own interleaved swing is 457-491 (+-3.6 %) and the reference's
+is 470-481 (+-1.2 %), so every remaining cross-engine delta sits inside the
+measurement noise of either engine.
+
+**Standing conclusion:** with the validated defaults (humming, k=6, WO overlay
+off) we are at statistical parity with the reference, neither ahead nor
+behind. A win that clears the reference's own 26.6 % median spread would need
+a change larger than anything one-variable has produced on this rig, and the
++-9 % session drift would make it unverifiable anyway. The fallback holds:
+best validated configuration plus this written attribution.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: attention diligence + reference max_model_len not reproducible
+
+The owner approved a structural attention attempt (attention shares ~48 % of the
+step in the eager profile). Diligence before writing any overlay:
+
+- The sparse MLA forward (`b12x_sparse.py`) has no host-side sync or
+  `.wait()`; the eager-region wall time was kernel-launch latency, not a real
+  serving cost (under CUDA graphs it collapses). At parity we already serve
+  attention as fast as the reference.
+- The per-step "hot" ops in our overlay are no-ops: `attn_sink` is a 32-wide
+  float32 parameter, so `sink.float().detach().contiguous()` allocates nothing
+  and launches nothing; `output.copy_` only fires when a run returns a fresh
+  buffer (not in the graph path).
+- The b12x decode-attention kernels are already on their fast settings:
+  `B12X_PAGED_KV_TMA`, `B12X_PAGED_DECODE_FP8_PV_M16N16_B8`, and
+  `B12X_PAGED_MSA_UNION_PREFILL` all default to enabled in the image.
+
+Conclusion: there is no exploitable inefficiency in the attention path a
+blind in-repo overlay could fix. A rewrite without a measured target would be
+speculation and risks regressing parity.
+
+The one reproducible serving-config axis where we differ from the reference,
+`MAX_MODEL_LEN` (65536 vs 262144), was then tested as a single variable,
+interleaved (65536, 262144, 262144, 65536). Both 262144 arms never became
+healthy ("container gone") — the reference's KV configuration is **not
+reproducible on this rig** at our util/setup, so that axis is immovable. The
+two 65536 controls (`abml-a` 56.7/109.7/138.2/151.6 sum 456.2, `abml-d`
+55.7/104.7/133.6/151.7 sum 449.7) sit on our default.
+
+Every reproducible config axis now either matches the reference or is inside
+the +-9 % rig noise; the one immovable axis is the reference's max_model_len.
+Parity is the measured standing.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+
+## 2026-09-21: multi-step scheduling unavailable; all axes closed
+
+The last untested mechanical lever, `--num-scheduler-steps` (multi-step
+scheduling), does not exist in this vLLM: `SchedulerConfig` has no
+`num_scheduler_steps` field and `VLLM_NUM_SCHEDULER_STEPS` is not a vLLM env.
+So the scheduler-host-latency hypothesis cannot be tested as a flag.
+
+With this, every reproducible axis is closed:
+
+- validated by interleaved same-session A/B: k=6 (+6.0 % / +9.0 % over k=7),
+  humming MoE (+6.4 % over b12x), WO overlay off (0 %, a wash);
+- closed by measurement: capture sizes, NCCL x20, MoE tiles/micro/dynamic/
+  cutover/materialized/share/tiny-decode, indexer family, A16 (loss),
+  PIECEWISE (loss), fusion/pass_config (hang), KV layouts, SP, hybrid manager,
+  AOT, InstantTensor, linear backends;
+- structural attention: no exploitable inefficiency found (diligence, round
+  111; all b12x decode kernels already on);
+- reference `max_model_len` 262144: not reproducible on this rig (round 111);
+- multi-step scheduling: not implemented (this round).
+
+The blocking condition is unchanged and demonstrated repeatedly: the rig's
+session drift is about +-9 %, larger than every achievable one-variable effect
+(max +6 %), and the win bar (beat the reference by more than the larger median
+spread, 26.6 % for the reference's 5-pass run) is unreachable by any in-scope
+lever. The decisive interleaved comparison measured parity: -0.3 % sum /
+-1.0 % c6. Goal marked blocked with this attribution.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+

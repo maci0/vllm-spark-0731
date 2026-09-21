@@ -215,6 +215,12 @@ if [[ "${ENFORCE_EAGER:-0}" != "1" ]]; then
   if [[ -n "${CUDAGRAPH_COPY_INPUTS:-}" ]]; then
     _cc_parts+=("\"cudagraph_copy_inputs\": ${CUDAGRAPH_COPY_INPUTS}")
   fi
+  if [[ -n "${CUDAGRAPH_NUM_OF_WARMUPS:-}" ]]; then
+    _cc_parts+=("\"cudagraph_num_of_warmups\": ${CUDAGRAPH_NUM_OF_WARMUPS}")
+  fi
+  if [[ -n "${USE_INDUCTOR_GRAPH_PARTITION:-}" ]]; then
+    _cc_parts+=("\"use_inductor_graph_partition\": ${USE_INDUCTOR_GRAPH_PARTITION}")
+  fi
   # Base mode for vLLM's registered CustomOp classes, e.g. CUSTOM_OPS='["all"]'.
   # Only defaulted when unset: `config/vllm.py:1631` appends "none" for
   # inductor+compiled and "all" otherwise, and `is_custom_op_enabled` reads this as
