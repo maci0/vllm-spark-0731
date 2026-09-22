@@ -11461,3 +11461,29 @@ q+r+baselines). Still below the larger median spread — no keep.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: control-vs-baseline cells close the coverage map (round 129)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Every keep-rule cell compared so far has been pair-sample vs pair-sample.
+The two ledger re-baselines each side (`ctl3-rc2` 491.0/164.3, `hum-k6-rc2b`
+477.5/160.6 vs `refg-now` 483.9/161.2, `refg-rc2b` 485.9/162.2) had never been
+crossed explicitly. Recomputed from the raw logs:
+
+| cell | sum | c6 | larger median spread |
+|---|---|---|---|
+| ctl3-rc2 vs refg-now | +1.47 % | +1.92 % | 26.6 % (ref c5) |
+| ctl3-rc2 vs refg-rc2b | +1.05 % | +1.29 % | 20.7 % (ref c5) |
+| hum-k6-rc2b vs refg-now | -1.32 % | -0.37 % | 26.6 % (ref c5) |
+| hum-k6-rc2b vs refg-rc2b | -1.73 % | -0.99 % | 20.7 % (ref c5) |
+
+The standing beats both ref baselines on both gates; the older validation
+control trails both (it predates the clean-rig provenance fixes, so its loss
+is the contaminated era, not the engine — recorded, not evidence). The bar
+column is the same everywhere: ref c5 at 20-27 %, again 10-20x the deltas.
+All 8 keep-rule cells now on record; every one is decided by reference-side
+c5 noise, never by ours trailing on merit.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
