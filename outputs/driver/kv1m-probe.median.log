@@ -1,0 +1,35 @@
+== kv1m-probe: 1 passes at max_tokens=512, levels 1 3 5 6, start 2026-09-22T17:44:06+08:00
+== port holder: LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*          
+== container: vllm-ds4-0731 Up 5 minutes
+== engine: v0.30.1.dev0+g9ed533eb4
+-- pass 1 at 2026-09-22T17:44:06+08:00
+== kv1m-probe-1 metered start 2026-09-22T17:44:06+08:00
+== health=200 after 1 polls at 2026-09-22T17:44:06+08:00
+== tag kv1m-probe-1
+== gate_france ' Paris. The capital of Spain'
+== gate_9x8 '72, 9x9'
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c1   per-stream=   8.3 tok/s  agg=    8.3  wall= 62.0s  toks=512
+-- level 1
+no steps counted
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c3   per-stream=   3.2 tok/s  agg=    9.5  wall=162.0s  toks=1536
+-- level 3
+no steps counted
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c5   per-stream=   1.9 tok/s  agg=    9.6  wall=266.6s  toks=2560
+-- level 5
+no steps counted
+mode=chat prompt='Write a Python binary search tree with insert, delete, and i' max_tokens=512 temp=0.7 seed=1234 thinking=False
+c6   per-stream=   1.6 tok/s  agg=    9.6  wall=320.6s  toks=3072
+-- level 6
+no steps counted
+== wrote /home/maci/vllm-spark-0731/outputs/driver/kv1m-probe-1.meter.txt
+== kv1m-probe-1 metered done 2026-09-22T17:59:11+08:00
+tag kv1m-probe, 1 passes
+ level   n  median agg tok/s    spread   values
+     1   1               8.3      0.0%   8.3
+     3   1               9.5      0.0%   9.5
+     5   1               9.6      0.0%   9.6
+     6   1               9.6      0.0%   9.6
+== kv1m-probe done 2026-09-22T17:59:11+08:00

@@ -13200,3 +13200,34 @@ round-116/121 clean interleaved pairs (+2.8/+2.5, +1.2/+1.3), the pooled
 the documented reason no keep was possible (keep-rule bar is always the
 reference's 17-25 % c5 spread, 4-30x any measured delta). All committed and
 pushed; the record is complete and self-consistent at HEAD.
+
+## 2026-09-22: 1M context serves — pool was never the problem, autotune was
+
+The 1M push is done and serving: `MAX_MODEL_LEN=1048576` at util 0.90,
+`kv1m-probe` metered 8.3 / 9.5 / 9.6 / **9.6** (single pass, gates pass,
+`vllm-ds4-0731`, engine `v0.30.1.dev0+g9ed533eb4`). The config is a stripped
+capacity probe (no speculative decode, no CUDA graphs, one sequence), so the
+~10 tok/s is a floor measurement, not a benchmark.
+
+What the two failed attempts proved, in order:
+
+1. **The 584 B envelope was never the fat.** Both engines bill 584 B/token
+   for `nvfp4_ds_mla` (verified read-only inside the anemll image). The old
+   "tokens/GiB" table compared pool-token counts against available GiB,
+   which mixes block granularity and multi-group pages — not width.
+2. **The pool fits with room.** Stripped 1M serve: 28.08 GiB available →
+   5,513,451-token pool, **5.22x concurrency**. Even the first (full-config)
+   attempt allocated 1,396,688 tokens before dying downstream.
+3. **The killer was FlashInfer JIT autotune at 1M sequence length.**
+   First attempt: pool alloc OK, then autotune + shm broadcast stall with
+   host RAM pinned until spark1 rebooted. Second attempt: same wedge, cache
+   frozen at 24 files, no log movement for 10+ minutes. Fix:
+   `ARM_EXTRA_ARGS="--no-enable-flashinfer-autotune"` (a real
+   `--help=KernelConfig` flag, heuristics instead of tuned tactics) —
+   serve reached health=200 and metered clean.
+
+Throughput at 1M in this stripped config is ~10 tok/s agg because there is
+no speculation and no graphs; restoring k=6 + graphs at a proven KV is
+separate work. Standing beat/keep logic is untouched.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.

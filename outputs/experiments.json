@@ -3237,6 +3237,63 @@
       }
     },
     {
+      "tag": "kv1m-probe",
+      "levels": {
+        "1": {
+          "n": 1,
+          "median": 8.3,
+          "spread": 0.0,
+          "values": [
+            8.3
+          ]
+        },
+        "3": {
+          "n": 1,
+          "median": 9.5,
+          "spread": 0.0,
+          "values": [
+            9.5
+          ]
+        },
+        "5": {
+          "n": 1,
+          "median": 9.6,
+          "spread": 0.0,
+          "values": [
+            9.6
+          ]
+        },
+        "6": {
+          "n": 1,
+          "median": 9.6,
+          "spread": 0.0,
+          "values": [
+            9.6
+          ]
+        }
+      },
+      "passes": 1,
+      "max_tokens": 512,
+      "start": "2026-09-22T17:44:06+08:00",
+      "guard": {
+        "port_holder": "LISTEN 0      2048         0.0.0.0:8000       0.0.0.0:*",
+        "container": "vllm-ds4-0731 Up 5 minutes",
+        "engine": "v0.30.1.dev0+g9ed533eb4"
+      },
+      "guarded": true,
+      "sum": 37.0,
+      "worst_spread": 0.0,
+      "change": "",
+      "gates": {
+        "gate_france": [
+          " Paris. The capital of Spain"
+        ],
+        "gate_9x8": [
+          "72, 9x9"
+        ]
+      }
+    },
+    {
       "tag": "kv229376",
       "levels": {
         "1": {
