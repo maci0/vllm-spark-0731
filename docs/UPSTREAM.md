@@ -12069,3 +12069,21 @@ this repo at the pushed HEAD.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-position stdevs — the lead is level at every depth (round 159)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: round 135 gave per-position means; this adds the stdevs
+(all 80 blocks per side). Ours: p0 89.8±2.05, p1 77.1±2.88, p2 64.2±2.91,
+p3 53.7±2.96, p4 44.4±3.02, p5 36.5±3.33. Reference: p0 88.2±1.63, p1
+75.0±2.56, p2 61.1±2.85, p3 49.8±2.64, p4 40.4±2.47, p5 31.5±2.96, p6
+21.7±2.78. Stdevs match within ~0.5 at every shared position — both draft
+trees decay with the same shape of noise — while the means differ by 1.6 to
+5.0 points. A noisier opponent would show fatter tails where it trails;
+instead the two distributions are parallel-shifted copies. The acceptance
+lead is therefore a location shift, not a variance artifact: ours accept
+more at every depth with the same pass-to-pass stability as the reference.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
