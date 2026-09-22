@@ -11546,3 +11546,29 @@ three of four ref arms, not ours to fix). Standing remains `ctl3-rc2`.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: pass-level wins — where the beat is unanimous vs marginal (round 133)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: in each pair cell, how many of ours' 5 passes beat the
+reference median, per level (recomputed from raw logs):
+
+| ours vs ref | c1 | c3 | c5 | c6 |
+|---|---|---|---|---|
+| qO-a vs qR-b | 3/5 | 4/5 | 5/5 | 4/5 |
+| qO-d vs qR-c | 4/5 | 2/5 | 5/5 | 4/5 |
+| rO-a vs rR-b | 2/5 | 1/5 | 5/5 | 4/5 |
+| rO-d vs rR-c | 4/5 | 0/5 | 3/5 | 1/5 |
+
+c5 is the beat's anchor: 18 of 20 ours passes beat the ref median. c6 is
+mostly ours (13/20). c3 is the weak level — rO-d loses all 5 passes to the
+rR-c median (109.5 vs 111.4), which is exactly the round-122 pooled c3
+deficit in its raw form. c1 is mixed but ours-leaning (13/20). This is the
+pass-level anatomy of the +2.0 % pooled beat: one unanimous level (c5), two
+leaning levels (c1, c6), one deficit level (c3). Nothing here moves the keep
+verdict; it locates precisely where a future lever would have to land: c3
+decode and c1 prefill, not the MoE-heavy levels already won.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
