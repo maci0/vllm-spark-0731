@@ -11774,3 +11774,24 @@ keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: full 16-cell matrix — ours win every cell incl. cross-session (round 144)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: all 16 ours-vs-ref sum cells from raw medians, same-session
+and cross-session (sessions ran 03:00-03:50 and 10:10-10:48, bracketing the
+morning). Session 1: +4.21 / +2.31 / +3.27 / +1.38 %. Session 2: +1.66 /
++1.26 / +1.05 / +0.65 %. Cross (s1-ours vs s2-ref): +2.69 / +2.28 / +1.77 /
++1.36 %. Cross (s2-ours vs s1-ref): +3.16 / +1.28 / +2.54 / +0.67 %.
+
+**All 16 cells positive, range +0.65 to +4.21 %.** The cross-session cells
+kill the last confound the interleave was designed against: even comparing
+across a 7-hour gap, in both directions, every ours arm beats every ref
+arm. The smallest margin (+0.65 %, rO-d vs rR-c) is the known latest-session
+pair; the largest (+4.21 %, qO-a vs qR-b) the earliest. No cell clears the
+keep spread — recorded, not claimed — but the sign is now 16/16 with zero
+dependence on session pairing.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
