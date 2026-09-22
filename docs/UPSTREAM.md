@@ -11505,3 +11505,20 @@ KV depth stays performance-neutral. Standing remains `ctl3-rc2`.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: the standing's own worst pass is 9.7 %, still 2x the best delta (round 131)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the keep-rule bar has always been the reference's spread,
+but the standing carries its own worst single-pass deviation — recomputed
+from `ctl3-rc2`'s raw 5-pass values: c1 9.7 % (69.0 vs median 62.9), c3
+5.1 %, c5 3.3 %, c6 3.2 %. So even if the reference's c5 noise vanished
+entirely, the standing's own c1 deviation (9.7 %) still admits no keep:
+the largest ours-vs-ref sum delta recorded (+4.21 %, qO-a vs qR-b) is less
+than half of it. The rule is unmeetable from *both* sides of the comparison,
+not just the reference side. No new information can change this without a
+larger effect size; standing remains `ctl3-rc2`.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
