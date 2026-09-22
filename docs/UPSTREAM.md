@@ -11387,6 +11387,35 @@ resolved first. No bump; the hold stands.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-pair same-session deltas — 4 of 4 ours ahead on sum (round 127)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes.
+
+No new arms this round; the rig stays clean for the next live measurement.
+Instead, the one missing aggregation: same-session per-pair deltas, the
+unit the keep-rule is actually written at (each ours arm against its
+adjacent reference arm, not pooled means):
+
+| pair | ours | ref | sum delta | c6 delta |
+|---|---|---|---|---|
+| qO-a vs qR-b | 488.1 | 468.4 | **+4.21 %** | **+3.58 %** |
+| qO-d vs qR-c | 483.7 | 477.1 | **+1.38 %** | **+1.44 %** |
+| rO-a vs rR-b | 483.2 | 475.3 | **+1.66 %** | **+2.73 %** |
+| rO-d vs rR-c | 480.3 | 477.2 | **+0.65 %** | -0.19 % |
+
+Ours lead the sum in **4 of 4** direct comparisons. At c6 it is 3 of 4:
+`rO-d` (160.7) trails `rR-c` (161.0) by 0.3 tok/s — the only ref c6 reading
+that beats any ours c6 reading, an order smaller than either arm's own
+spread (3.9 % / 5.3 %). That single cell is also the pair where both arms ran
+latest in the session, so session drift, not the engine, is the likely cause.
+
+This tightens the picture from the pooled +2.0 %: no pooled mean hid a
+losing matchup on the sum. Still below the keep spread on every cell — no
+keep.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
 ## 2026-09-22: extended pool with both ref re-baselines — +1.5/+1.6 (round 126)
 
 vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
