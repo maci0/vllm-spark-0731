@@ -11487,3 +11487,21 @@ c5 noise, never by ours trailing on merit.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: kv98304 is the ledger's best KV arm — audited, still no keep (round 130)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Recomputed the round-113 KV sweep from the raw medians (all 7 arms
+`vllm-ds4-0731`-served, gates pass): kv65536 454.4, kv98304 **463.3**, kv131072
+446.8, kv196608 446.5, kv229376 454.2, kv245760 449.3, kv262u086 443.7. The
+best sweep arm is `kv98304` (59.8 / 109.7 / 136.2 / 157.6). Against the
+standing `ctl3-rc2` (491.0 / 164.3) it is -5.7 % / -4.1 % — worse on every
+level, because the sweep predates the clean-rig provenance fixes (b12x worker
+mismatch era) and cannot be compared against the standing. Against its
+adjacent `kv65536` (454.4) it is +2.0 % / +2.7 %, inside the ±9 % drift band.
+So the best KV arm is a sweep artifact, not a challenger: no keep, and the
+KV depth stays performance-neutral. Standing remains `ctl3-rc2`.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
