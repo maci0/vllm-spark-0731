@@ -11696,3 +11696,20 @@ locates the bar's source precisely: one level, one side, one ratio.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: c6 quality is tight on both sides — the lead is throughput, not luck (round 140)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-134 quality pool mixed all four levels. Restricted
+to c6 (the contract's first gate), all 20 blocks per side: ours accept
+**60.7 ± 1.17**, tokens/step **4.629 ± 0.069**; reference accept **52.0 ±
+1.12**, tokens/step **4.623 ± 0.081**. Both engines are metronomes at c6 —
+stdevs ~1 point and ~0.07 steps — so the +8.7-point acceptance gap and the
++2.4 tok/s throughput gap are level, systematic differences, not samples
+that happened to land apart. Draft yield identical to two decimals; the
+entire c6 beat is acceptance quality. No quality regression; both floors
+hold with the gap now measured at its tightest.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
