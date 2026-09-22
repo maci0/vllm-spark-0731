@@ -11880,3 +11880,20 @@ is within striking distance rather than an order of magnitude away.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: pairwise matchups — three cells ours-dominated, one a coin flip (round 149)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: every ours pass vs every ref pass at c6 (25 matchups per
+pair cell, raw logs). qO-a vs qR-b: ours win **21/25**. qO-d vs qR-c:
+**17/25**. rO-a vs rR-b: **20/25**. rO-d vs rR-c: **10/25** — a coin flip,
+the same cell that loses the median (-0.19 %) and the t-test. Three cells
+show ours winning two-thirds to five-sixths of all head-to-head pass
+comparisons; the fourth is exactly even. No median, no spread, no model —
+just counting. The beat is robust to the choice of summary statistic in
+three cells and absent in one; the pooled result is carried by the three,
+not manufactured by aggregation.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
