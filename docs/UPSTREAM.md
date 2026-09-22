@@ -11816,3 +11816,23 @@ clock artifact.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: mean-of-passes agrees with median-of-medians — c5 carries, c3 ties (round 146)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: every pooled figure so far takes medians of arm medians.
+Recomputed as mean of all 20 raw passes per side, which weights outliers
+instead of discarding them: c1 +0.42 %, c3 +0.11 %, c5 **+7.27 %**, c6
++1.53 %. The median-based pool said c1 +2.0 / c3 -1.1 / c5 +4.5 / c6 +1.9 —
+same sign everywhere except c3, which flips from a -1.1 % deficit to a
++0.1 % tie. The flip's source is visible in the stdevs: ref c5 stdev 11.39
+vs ours 3.09, i.e. the reference's own outlier passes drag its mean down
+while our mean barely moves (median 146.6 vs mean 146.6 ours; ref median
+140.3 vs mean 136.7). Under either aggregation the beat's anchor is c5 and
+its shape is unchanged; the c3 "deficit" was a median artifact of two close
+distributions (ours 112.9 vs ref 113.2 medians, 113.2 vs 113.1 means).
+Nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
