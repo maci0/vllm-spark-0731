@@ -12169,3 +12169,22 @@ with zero diff, working tree clean. No upstream movement of any kind for
 the third consecutive round. Standing remains `ctl3-rc2`; beat +2.0/+1.9
 pooled, no keep.
 
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: shared-position acceptance per pair — +2.8 to +3.7 every cell (round 166)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-135/159 position tables pooled all blocks; this
+restricts to shared positions p0-p5 per pair cell (ref p6 excluded — ours
+has no p6, so including it would penalize the reference for drafting
+deeper). qO-a 61.2 vs qR-b 57.4 (**+3.7**); qO-d 60.7 vs qR-c 57.3 (**+3.4**);
+rO-a 61.2 vs rR-b 58.4 (**+2.8**); rO-d 60.7 vs rR-c 57.6 (**+3.1**). The
+acceptance lead holds at +2.8 to +3.7 in every cell on strictly comparable
+positions — narrower than the pooled +8.4 (which mixes in ref p6 at 21.7 %),
+but present in all four cells with no help from the depth difference. The
+quality lead needs no qualification about k.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
