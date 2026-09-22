@@ -12158,3 +12158,14 @@ remains `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: ledger steady again at 211 guarded — second quiet round (round 165)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Same housekeeping as round 164, re-verified rather than cited: all 12 key
+medians present locally, ledger regenerates to 211 guarded / 0 superseded
+with zero diff, working tree clean. No upstream movement of any kind for
+the third consecutive round. Standing remains `ctl3-rc2`; beat +2.0/+1.9
+pooled, no keep.
+
