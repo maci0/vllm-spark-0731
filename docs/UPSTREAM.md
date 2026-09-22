@@ -12468,3 +12468,14 @@ Housekeeping only: ledger regenerates to 211 guarded / 0 superseded with
 zero diff, all 12 key medians present locally, working tree clean.
 Twenty-first quiet round with no upstream movement and no new measurement.
 Standing remains `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: protocol re-verified an eleventh time — routine unbroken (round 191)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the compliance audit re-read an eleventh time against
+current files (same prompt, 160/160 full blocks, first-poll health, correct
+containers per arm). Eleven consecutive rounds certify identical inputs
+without exception. The beat is engine-only; nothing moves the keep verdict.
