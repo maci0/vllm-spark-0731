@@ -12210,5 +12210,19 @@ on all four ours arms, `sparkrun_*` on all four ref arms. Five consecutive
 rounds certify identical inputs; the routine holds without exception. The
 beat is engine-only; nothing moves the keep verdict.
 
+## 2026-09-22: per-stream c6 — the beat survives without the ×6 multiplier (round 169)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: agg tok/s is per-stream × 6 (concurrency factor), so a
+skeptic could ask whether the beat is a multiplier artifact. Per-stream c6
+means from raw logs: qO-a 27.2 vs qR-b 26.5; qO-d 27.1 vs qR-c 26.7; rO-a
+26.9 vs rR-b 26.3; rO-d 26.6 vs rR-c 26.7. Three of four cells lead
+per-stream too (+0.4 to +0.7 tok/s); the fourth trails by 0.1 — the same
+known losing cell, now shown to lose at the stream level as well, so its
+deficit is real but tiny. The beat is present before any ×6 scaling, in the
+raw per-stream rate. Nothing moves the keep verdict.
+
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
