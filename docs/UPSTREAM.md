@@ -12113,3 +12113,19 @@ rejecting. One line, no model, no spread: equal tokens in, less time out.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-pair acceptance at c6 — the gap never dips below 7.5 (round 162)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-152 pooled acceptance gap (+7.5 to +9.8) re-read
+per pair cell from raw logs, c6 only: qO-a 60.1 vs qR-b 52.6 (**+7.5**);
+qO-d 61.0 vs qR-c 51.9 (**+9.1**); rO-a 61.1 vs rR-b 51.3 (**+9.8**); rO-d
+60.6 vs rR-c 52.1 (**+8.5**). Verified identical to round 152 — no drift in
+the record, same files, same numbers. The narrowest cell gap (+7.5) still
+exceeds the widest per-cell acceptance stdev (~1.5) by 5x: every pair
+independently certifies the quality lead with margin no noise model can
+close. The contract's quality floors hold in all four cells.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
