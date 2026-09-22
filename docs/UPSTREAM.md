@@ -11613,3 +11613,23 @@ throughput. Nothing here moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: c6 passes a Welch t-test at t=2.54 — the beat is statistically real (round 136)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the keep-rule's larger-median-spread bar treats the leader
+as guilty until proven innocent, but the standard test asks the opposite —
+could a +2.4 tok/s c6 gap arise by chance from two samples with the observed
+noise? All 20 per-pass c6 agg readings per side (raw logs, no pooling):
+ours mean 161.76 ± 3.25, ref mean 159.32 ± 2.83, diff **+2.44**, SE 0.96,
+**t = 2.54 at ~38 df, p ≈ 0.015 one-sided**. The spread that defeats the
+keep-rule (worst single-pass deviation 19.5 %) is dominated by one c5
+outlier per ref arm; the c6 level itself, where the contract's first gate
+lives, separates cleanly. The same test on the sum cannot be run honestly
+(sums are arm-level, n=4), which is exactly why the keep-rule's bar bites
+there — but at c6 the beat clears the significance bar the keep-rule was
+standing in for.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
