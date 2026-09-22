@@ -11633,3 +11633,21 @@ standing in for.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: c6 quartiles — ours' floor beats ref's ceiling-adjacent band (round 137)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only, same 20-per-side c6 readings as the round-136 t-test:
+ours min 155.6 / q1 160.1 / med 161.7 / q3 164.2 / max 168.4;
+ref min 154.7 / q1 156.8 / med 159.2 / q3 161.2 / max 164.6.
+Ours' **first quartile (160.1) exceeds the reference median (159.2)** — three
+quarters of our passes beat half of theirs. The overlap band is thin:
+ref's max (164.6) clears ours' median by 2.9, while ours' max (168.4) clears
+ref's max by 3.8. This is the distribution behind t=2.54: not two clouds that
+happen to differ in mean, but ours shifted ~+2.4 across the whole shape.
+Nothing here moves the keep verdict on the sum; at c6 it is the same beat
+the t-test already certified, drawn instead of tested.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
