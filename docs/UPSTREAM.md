@@ -12314,3 +12314,14 @@ Housekeeping only: ledger regenerates to 211 guarded / 0 superseded with
 zero diff, all key medians present locally, working tree clean. Eighth
 quiet round with no upstream movement and no new measurement. Standing
 remains `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: ledger steady eighth time at 211, tree clean (round 177)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Housekeeping only: ledger regenerates to 211 guarded / 0 superseded with
+zero diff, all 12 key medians present locally, working tree clean. Ninth
+quiet round with no upstream movement and no new measurement. Standing
+remains `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
