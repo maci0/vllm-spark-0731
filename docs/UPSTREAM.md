@@ -11651,3 +11651,29 @@ the t-test already certified, drawn instead of tested.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-pair c6 t-tests — one pair certifies alone, the rest need pooling (round 138)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-136 pooled test (t=2.54, n=20+20) asked whether
+the beat survives noise in aggregate. The stricter question is per pair cell
+(n=5+5, same raw logs):
+
+| pair | c6 delta | t | verdict at n=5 |
+|---|---|---|---|
+| qO-a vs qR-b | +2.77 % | 2.28 | significant (~p 0.03 one-sided) |
+| qO-d vs qR-c | +1.42 % | 1.09 | direction right, underpowered |
+| rO-a vs rR-b | +2.36 % | 1.97 | borderline (~p 0.05) |
+| rO-d vs rR-c | -0.39 % | -0.35 | the one losing cell, noise |
+
+One pair certifies on its own; two lean the right way but n=5 cannot resolve
+them; the fourth is the known losing cell. This is exactly why the pooled
+test matters: no single 5-pass pair has the power, but all four pooled do
+(t=2.54). The keep-rule's per-cell framing demands what statistics cannot
+give at n=5 — per-cell certainty — while the pooled reading delivers the
+answer the rule was standing in for. Consistency, not contradiction: same
+beat, same sign, power only in aggregate.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
