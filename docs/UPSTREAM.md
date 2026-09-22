@@ -11982,3 +11982,23 @@ Nothing moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: tokens/step by level — the yield curve crosses at c5 (round 154)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the acceptance companion — tokens/step means ± stdev per
+level, all 20 blocks per side. Ours: c1 4.628±0.211, c3 4.683±0.179, c5
+4.637±0.083, c6 4.629±0.069. Reference: c1 4.697±0.201, c3 4.727±0.159, c5
+4.595±0.108, c6 4.623±0.081. The reference drafts *more* per step at c1/c3
+(+0.069 / +0.044) and *less* at c5/c6 (-0.042 / -0.006): the yield curves
+cross between c3 and c5. Combined with round 153 (acceptance lead flat at
+~+8 everywhere), the mechanism sharpens: the reference proposes deeper trees
+at low concurrency but converts worse at every position, so its extra
+proposals die as rejects while ours convert. At c5/c6 both yield curves
+tighten (stdevs ~0.07-0.11 both sides) — the high-concurrency regime is
+where drafting is deterministic and acceptance decides everything, which is
+exactly where ours lead most. No quality regression; both floors hold.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
