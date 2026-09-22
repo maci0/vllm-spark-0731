@@ -12278,3 +12278,17 @@ zero diff, all key medians present locally, working tree clean. Sixth quiet
 round with no upstream movement and no new measurement. Standing remains
 `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
 
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: protocol re-verified a seventh time — routine unbroken (round 174)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the compliance audit re-read a seventh time against current
+files. Same prompt both engines, all 160 blocks full 512 tokens (zero
+truncations), health 200 first poll on all 5 passes per arm, `vllm-ds4-0731`
+on all four ours arms, `sparkrun_*` on all four ref arms. Seven consecutive
+rounds certify identical inputs without exception. The beat is engine-only;
+nothing moves the keep verdict.
+
