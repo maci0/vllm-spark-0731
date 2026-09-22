@@ -11370,3 +11370,20 @@ note; this pool is a separate 8-arm reading and does not revise it.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: dep-tag check — tokenspeed-mla 0.2.10 exists, still blocked by the tvm-ffi hold (round 125)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. Dep sweep: everything already at the pin. The one exception:
+**tokenspeed-mla `0.2.10`** exists (pin: `0.2.8`; `0.2.11` is 404). Its
+`requires_dist` is unchanged from 0.2.9:
+`apache-tvm-ffi==0.1.13.post3`, plus `nvidia-cutlass-dsl`,
+`tokenspeed-triton>=3.8.10.post20260920`, `torch`. The `tvm-ffi==0.1.13.post3`
+pin is exactly the conflict recorded in the pin comment — tilelang 0.1.13/0.1.14
+declare `apache-tvm-ffi<0.1.13`, and 0.1.13.post3 breaks tilelang at import
+(`'tl.SwizzleMode' has no enum at string index 'NONE'`). Bumping tokenspeed
+alone would orphan tilelang, and per the contract a conflicting dep only moves
+as its own one-variable arm — which needs the tvm-ffi/tilelang conflict
+resolved first. No bump; the hold stands.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
