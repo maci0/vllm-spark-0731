@@ -11385,6 +11385,32 @@ alone would orphan tilelang, and per the contract a conflicting dep only moves
 as its own one-variable arm — which needs the tvm-ffi/tilelang conflict
 resolved first. No bump; the hold stands.
 
+## 2026-09-22: keep-rule applied per-pair — the bar is the reference's c5 spread (round 128)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+The round-127 per-pair table recorded the deltas but not the other half of
+the keep comparison: the larger median spread per cell. Recomputed from the
+raw logs (ours 5 + standing control; ref 4 pair samples + both re-baselines):
+
+| pair | sum | c6 | larger median spread |
+|---|---|---|---|
+| qO-a vs qR-b | +4.21 % | +3.58 % | 19.5 % (ref c5) |
+| qO-d vs qR-c | +1.38 % | +1.44 % | 17.4 % (ref c5) |
+| rO-a vs rR-b | +1.66 % | +2.73 % | 24.8 % (ref c5) |
+| rO-d vs rR-c | +0.65 % | -0.19 % | 23.8 % (ref c5) |
+
+The pattern is now mechanical, not judgmental: **the keep-rule bar is always
+the reference's c5 spread** (17-25 % from single outlying c5 passes), while
+the achievable deltas are +0.7 to +4.2 %. The largest ours-vs-ref sum margin
+across all 5x4 pairings is 3.1 tok/s — ours lead everywhere, but no cell can
+clear a bar 4-30x the effect size. The c5 outlier is reference-side noise
+(117.3-118.9 single passes against 139-148 medians), not an engine property
+either arm can move. This is the quantitative form of the round-107-119
+finding: the rule is unmeetable by construction on this rig, not by lack of
+throughput. Standing remains `ctl3-rc2`.
+
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
 ## 2026-09-22: per-pair same-session deltas — 4 of 4 ours ahead on sum (round 127)
