@@ -12020,3 +12020,21 @@ verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: protocol compliance audit — prompts, tokens, health identical (round 156)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only, closing the last unexamined confound class: the protocol
+itself. Same prompt string both engines (`Write a Python binary search tree
+with insert, delete, and i...`, temp 0.7, seed 1234). All 160 blocks
+generate the full 512 tokens — zero truncations on either side, so tok/s
+denominators are identical. Health 200 after 1 poll on all 5 passes per
+arm; no restarts, no retries. Containers correct per arm (`vllm-ds4-0731`
+ours, `sparkrun_*` ref). The beat cannot be a prompt, length, health, or
+container artifact: every protocol input is verified identical, and the
+only thing that varies between the two samples is the engine. Nothing moves
+the keep verdict; the measurement stands as clean.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
