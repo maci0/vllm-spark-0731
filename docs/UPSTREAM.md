@@ -11277,3 +11277,16 @@ ambiguous; recorded under both readings. Standing remains `ctl3-rc2`
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: dep-tag check — flashinfer v0.7.0rc4 exists, not a bump candidate (round 119)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. Dep tags: InstantTensor v0.2.0, fastsafetensors 0.4.0, LMCache v0.5.5,
+quack v0.6.5, tilelang v0.1.14, DeepEP v1.2.1 — all already at the pin.
+**FlashInfer has a new tag, `v0.7.0rc4`** (pin: `v0.7.0rc3`). Its rc3→rc4 diff
+is 14 files, all outside our serving path (`cub_topk`, `mnnvl`,
+trtllm-MoE alltoall, topk tests, docs/cli) — no MoE decode or serving change.
+A serving-metric bump for doc/topk-only changes is unwarranted, so the pin
+holds at `v0.7.0rc3`.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
