@@ -11713,3 +11713,23 @@ hold with the gap now measured at its tightest.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: full gate census — 79/80 france clean, 40/40 9x9, one truncated JSON (round 141)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: every gate string in all 8 pair arms (40 france + 40 9x9
+lines), because the contract's "both gates" clause deserves a census, not a
+spot check. 9x9: 40/40 exact `'72, 9x9'`. France: 39/40 clean
+(Spain ×29 ours-side + 20 ref-side... precisely: ours 13 Spain / 6 Italy /
+1 truncated; ref 20 Spain / 0 Italy / 0 truncated). The single anomaly is
+one rO-a pass returning `' Paris.",\n    "label":'` — a truncated JSON
+fragment where the city answer should be, i.e. a generation cut, not a wrong
+city. No arm shows a wrong-capital or wrong-product answer in any pass;
+generations are never short of 512 tokens. The Italy/Spain split is
+temperature sampling over the same prompt, present on ours (6/20 passes)
+and absent on the reference (0/20) — a decoding-distribution difference
+worth noting alongside the acceptance lead, not a gate failure.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
