@@ -11522,3 +11522,27 @@ larger effect size; standing remains `ctl3-rc2`.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: delta-to-bar ratios — closest cell reaches 22 % of the bar (round 132)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only, closing the last uncomputed form of the keep-rule table:
+delta divided by the bar, per pair cell (recomputed from raw logs):
+
+| pair | sum delta | bar | fraction of bar |
+|---|---|---|---|
+| qO-a vs qR-b | +4.21 % | 19.5 % | **0.22** |
+| qO-d vs qR-c | +1.38 % | 17.4 % | 0.08 |
+| rO-a vs rR-b | +1.66 % | 24.8 % | 0.07 |
+| rO-d vs rR-c | +0.65 % | 23.8 % | 0.03 |
+
+The closest any measured cell has ever come to the keep-rule is **22 % of
+the bar**. The remaining gap is not a measurement-power problem: reaching
+1.0 would need either a ~5x larger throughput delta (no lever on record
+exceeds +6.4 %, and none of those replicated) or the reference's c5 single-
+pass outliers to disappear (they are reference-side measurement noise, in
+three of four ref arms, not ours to fix). Standing remains `ctl3-rc2`.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
