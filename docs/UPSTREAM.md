@@ -12099,5 +12099,17 @@ per arm, `vllm-ds4-0731` on all four ours arms, `sparkrun_*` on all four ref
 arms. Three consecutive rounds now certify identical protocol inputs by
 fresh read. The beat is engine-only; nothing moves the keep verdict.
 
+## 2026-09-22: work totals — equal tokens, less wall, the beat in one line (round 161)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the whole comparison reduced to two totals. Both sides
+generated exactly **153,600 tokens** (80 blocks × 1,920 tokens: identical
+denominators, no truncation anywhere). Ours took **1,164 s** of wall;
+the reference took **1,199 s**. Same work, 35 fewer seconds: the +2 %
+beat is 35 seconds of accepted draft tokens the reference spent
+rejecting. One line, no model, no spread: equal tokens in, less time out.
+
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
