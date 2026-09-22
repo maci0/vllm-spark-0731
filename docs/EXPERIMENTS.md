@@ -37,10 +37,14 @@ generations, levels 1 3 5 6, three passes, median reported per level. Both arms 
 | `pO-a` | 63.7 | 112.6 | 145.9 | 161.5 | 483.7 | 11.8 % | pass |
 | `qO-d` | 62.2 | 111.5 | 148.3 | 161.7 | 483.7 | 11.7 % | pass |
 | `refg030` | 64.0 | 114.2 | 143.4 | 162.1 | 483.7 | 18.5 % | pass |
+| `rO-a` | 62.8 | 112.5 | 146.2 | 161.7 | 483.2 | 9.9 % | pass |
 | `abREF-b` | 61.8 | 114.9 | 145.0 | 159.0 | 480.7 | 26.2 % | pass |
+| `rO-d` | 63.7 | 109.5 | 146.4 | 160.7 | 480.3 | 8.0 % | pass |
 | `pR-b` | 62.9 | 112.0 | 139.1 | 163.7 | 477.7 | 17.6 % | pass |
 | `hum-k6-rc2b` | 58.5 | 111.6 | 146.8 | 160.6 | 477.5 | 11.8 % | pass |
+| `rR-c` | 62.2 | 111.4 | 142.6 | 161.0 | 477.2 | 23.8 % | pass |
 | `qR-c` | 61.2 | 114.3 | 142.2 | 159.4 | 477.1 | 17.4 % | pass |
+| `rR-b` | 63.1 | 115.2 | 139.6 | 157.4 | 475.3 | 24.8 % | pass |
 | `pR-c` | 59.8 | 107.8 | 147.8 | 155.7 | 471.1 | 25.0 % | pass |
 | `abREF-c` | 63.1 | 111.9 | 139.6 | 155.7 | 470.3 | 24.4 % | pass |
 | `qR-b` | 60.9 | 111.7 | 136.6 | 159.2 | 468.4 | 19.5 % | pass |
@@ -438,6 +442,21 @@ Container `sparkrun_bccefe990c7aefab_718a38c1841d_node_0 Up 6 minutes`, engine `
 | 5 | 121.9 / 148.4 / 143.4 | 143.4 | 18.5 % | - | - | - |
 | 6 | 153.4 / 162.1 / 162.3 | 162.1 | 5.5 % | - | - | - |
 
+### `rO-a`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 3 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 5 passes at 512 tokens, started 2026-09-22T10:10:48+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 63.9 / 58.2 / 64.4 / 62.4 / 62.8 | 62.8 | 9.9 % | - | - | - |
+| 3 | 112.9 / 120.8 / 112.5 / 111.5 / 110.4 | 112.5 | 9.2 % | - | - | - |
+| 5 | 146.5 / 146.2 / 146.0 / 150.9 / 144.5 | 146.2 | 4.4 % | - | - | - |
+| 6 | 163.5 / 161.7 / 156.4 / 165.7 / 160.2 | 161.7 | 5.8 % | - | - | - |
+
 ### `abREF-b`
 
 **Changed.** (unannotated)
@@ -452,6 +471,21 @@ Container `sparkrun_bccefe990c7aefab_7eedc6a565a2_node_0 Up 6 minutes`, engine `
 | 3 | 117.1 / 114.9 / 113.0 | 114.9 | 3.6 % | - | - | - |
 | 5 | 112.5 / 145.0 / 150.5 | 145.0 | 26.2 % | - | - | - |
 | 6 | 158.3 / 159.0 / 170.3 | 159.0 | 7.5 % | - | - | - |
+
+### `rO-d`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `vllm-ds4-0731 Up 2 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 5 passes at 512 tokens, started 2026-09-22T10:43:33+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 64.9 / 63.7 / 63.0 / 65.9 / 60.8 | 63.7 | 8.0 % | - | - | - |
+| 3 | 109.5 / 105.1 / 110.4 / 110.9 / 109.5 | 109.5 | 5.3 % | - | - | - |
+| 5 | 147.6 / 146.6 / 142.5 / 146.4 / 142.4 | 146.4 | 3.6 % | - | - | - |
+| 6 | 161.9 / 161.0 / 160.1 / 160.7 / 155.6 | 160.7 | 3.9 % | - | - | - |
 
 ### `pR-b`
 
@@ -483,6 +517,21 @@ Container `vllm-ds4-0731 Up 2 minutes`, engine `(not in the log)`, 5 passes at 5
 | 5 | 148.1 / 140.1 / 139.9 / 146.8 / 147.7 | 146.8 | 5.6 % | - | - | - |
 | 6 | 158.2 / 165.0 / 164.8 / 160.6 / 153.1 | 160.6 | 7.4 % | - | - | - |
 
+### `rR-c`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `sparkrun_bccefe990c7aefab_ad9bc134f4b6_node_0 Up 6 minutes`, engine `(not in the log)`, 5 passes at 512 tokens, started 2026-09-22T10:34:14+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 62.2 / 62.3 / 63.5 / 62.2 / 61.1 | 62.2 | 3.9 % | - | - | - |
+| 3 | 108.9 / 117.9 / 114.2 / 111.4 / 109.7 | 111.4 | 8.1 % | - | - | - |
+| 5 | 111.5 / 144.8 / 139.5 / 145.5 / 142.6 | 142.6 | 23.8 % | - | - | - |
+| 6 | 159.2 / 156.1 / 161.5 / 161.0 / 164.6 | 161.0 | 5.3 % | - | - | - |
+
 ### `qR-c`
 
 **Changed.** (unannotated)
@@ -497,6 +546,21 @@ Container `sparkrun_bccefe990c7aefab_a68824c38ed1_node_0 Up 6 minutes`, engine `
 | 3 | 103.1 / 114.3 / 115.0 / 111.0 / 116.2 | 114.3 | 11.5 % | - | - | - |
 | 5 | 118.9 / 142.2 / 143.7 / 140.3 / 143.5 | 142.2 | 17.4 % | - | - | - |
 | 6 | 159.4 / 162.9 / 157.0 / 162.6 / 159.0 | 159.4 | 3.7 % | - | - | - |
+
+### `rR-b`
+
+**Changed.** (unannotated)
+
+**Verdict.** (unannotated)
+
+Container `sparkrun_bccefe990c7aefab_8e72df49c06c_node_0 Up 6 minutes`, engine `(not in the log)`, 5 passes at 512 tokens, started 2026-09-22T10:22:26+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 71.4 / 63.4 / 62.7 / 63.0 / 63.1 | 63.1 | 13.8 % | - | - | - |
+| 3 | 118.2 / 110.3 / 115.1 / 115.2 / 118.5 | 115.2 | 7.1 % | - | - | - |
+| 5 | 113.6 / 143.0 / 148.2 / 139.6 / 139.4 | 139.6 | 24.8 % | - | - | - |
+| 6 | 157.4 / 160.8 / 159.3 / 154.7 / 156.7 | 157.4 | 3.9 % | - | - | - |
 
 ### `pR-c`
 
@@ -4233,5 +4297,5 @@ python3 scripts/experiment-ledger.py
 ```
 
 Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in `superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered `*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`.
-As of the last run: 207 guarded arms, 0 superseded, 70 failed.
+As of the last run: 211 guarded arms, 0 superseded, 70 failed.
 
