@@ -11592,3 +11592,24 @@ with margin on our side.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-position acceptance — the ref drafts 7 deep, dies at p6 (round 135)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: mean acceptance by draft position over all 80 blocks per
+side. Ours (k=6): p0 89.8, p1 77.1, p2 64.2, p3 53.7, p4 44.4, p5 36.5.
+Reference (k=7): p0 88.2, p1 75.0, p2 61.1, p3 49.8, p4 40.4, p5 31.5,
+p6 **21.7**.
+
+Two facts. First, the reference runs k=7 and its 7th position accepts at
+21.7 % — below every ours position and the entire reason its tokens/step
+(4.660) barely edges ours (4.644) despite losing acceptance at every shared
+position by 3-5 points. Second, ours lead acceptance at **all six shared
+positions**, and the lead widens with depth (+1.6 at p0 growing to +5.0 at
+p5). The beat is draft-quality throughout the tree, not a p0 artifact; if
+anything the reference's extra depth flatters its yield while costing it
+throughput. Nothing here moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
