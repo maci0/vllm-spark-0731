@@ -11915,3 +11915,32 @@ certifying cells each show rank dominance; the fourth shows none.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-level delta/bar grid — c5 deltas biggest, c5 bars biggest (round 151)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: each level's delta against that level's own larger spread
+(delta % / bar %), recomputed from raw logs — the round-148 table re-verified
+against current files:
+
+| pair | c1 | c3 | c5 | c6 |
+|---|---|---|---|---|
+| qO-a vs qR-b | +4.4/13 | +2.3/16 | +6.4/20 | +3.6/5 |
+| qO-d vs qR-c | +1.6/11 | -2.4/12 | +4.3/17 | +1.4/7 |
+| rO-a vs rR-b | -0.5/14 | -2.3/9 | +4.7/25 | +2.7/6 |
+| rO-d vs rR-c | +2.4/8 | -1.7/8 | +2.7/24 | -0.2/5 |
+
+The structural fact this grid exposes: **c5 has the biggest deltas (+2.7 to
++6.4) and the biggest bars (17-25)** — the level where we lead most is also
+the level where the metric is noisiest, both driven by the reference's
+outlying c5 passes. c6 is the reverse: modest deltas (+3.6 max) against the
+thinnest bars (5-7). c1/c3 deltas hover near zero against 8-16 bars. So the
+two gates tell opposite stories about headroom: at c5 we already lead by
+more than the keep-rule would need if the bar were ours alone, but the
+reference's noise sets it; at c6 the lead is smaller but the bar is within
+~2 points. Nothing moves the keep verdict; the grid is now independently
+re-verified.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
