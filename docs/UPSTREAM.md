@@ -11963,3 +11963,22 @@ largest margin in the ledger.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: acceptance by level — the lead is flat, the engines differ by a constant (round 153)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: accept means ± stdev per level, all 20 blocks per side.
+Ours: c1 60.7±3.49, c3 61.6±2.98, c5 60.8±1.35, c6 60.7±1.17. Reference: c1
+53.1±2.91, c3 53.4±2.26, c5 51.6±1.52, c6 52.0±1.12. The gap is +7.6 / +8.2
+/ +9.2 / +8.7 — flat across levels within a point except c5, where it
+widens. Both engines' acceptance is level-independent (each side's four
+means span ~1 point); they differ by an additive ~8-point constant. That
+shape — constant offset, not level interaction — says the acceptance lead
+is a property of the draft model path, not of any level's serving regime.
+Combined with round 135 (lead widens with draft depth) the picture is
+complete: ours draft better trees at every depth and every concurrency.
+Nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
