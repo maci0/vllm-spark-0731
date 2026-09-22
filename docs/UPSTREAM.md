@@ -11944,3 +11944,22 @@ re-verified.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-pair c6 acceptance gaps — +7.5 to +9.8 points, every cell (round 152)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-140 pooled quality (+8.7 pts) never showed
+whether the acceptance lead holds inside every pair cell or rides on one.
+Per-pair c6 accept means ± stdev, raw logs: qO-a 60.1±0.88 vs qR-b 52.6±0.67
+(**+7.5**); qO-d 61.0±1.28 vs qR-c 51.9±0.80 (**+9.1**); rO-a 61.1±1.45 vs
+rR-b 51.3±1.27 (**+9.8**); rO-d 60.6±1.08 vs rR-c 52.1±1.48 (**+8.5**). The
+gap is +7.5 to +9.8 in all four cells with per-cell stdevs ~1 point — every
+pair independently certifies the acceptance lead, *including* the losing
+throughput cell (rO-d vs rR-c): it accepts +8.5 points better while trailing
+0.3 tok/s. That cell is therefore a pure throughput wobble, not a quality
+wobble, and the contract's quality floors hold in all four cells with the
+largest margin in the ledger.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
