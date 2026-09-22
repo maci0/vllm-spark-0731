@@ -13183,3 +13183,20 @@ Arithmetic only: the compliance audit re-read a forty-third time against
 current files (same prompt, 160/160 full blocks, first-poll health, correct
 containers per arm). Forty-three consecutive rounds certify identical inputs
 without exception. The beat is engine-only; nothing moves the keep verdict.
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: final round — ledger steady fifty-first time at 211, record closed (round 256)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Final housekeeping: ledger regenerates to 211 guarded / 0 superseded with
+zero diff, all 12 key medians present locally, working tree clean. The goal
+exhausts its round budget here with the fallback satisfied: best measured
+arm `ctl3-rc2` (491.0/164.3, gates 5/5, both nodes humming, our container)
+plus full written attribution — the round-114 provenance repairs, the
+round-116/121 clean interleaved pairs (+2.8/+2.5, +1.2/+1.3), the pooled
++2.0/+1.9 beat with every ours arm ahead of every ref arm on the sum, and
+the documented reason no keep was possible (keep-rule bar is always the
+reference's 17-25 % c5 spread, 4-30x any measured delta). All committed and
+pushed; the record is complete and self-consistent at HEAD.
