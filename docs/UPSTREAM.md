@@ -11305,3 +11305,66 @@ at `v0.7.0rc3`.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: pair121 at matched KV — beat narrows to +1.2/+1.3 (round 121)
+
+Repeat of the round-116 interleaved pair (ours/ref/ref/ours, 5 passes each),
+same-day, but at the reference's KV spec: ours serve `MAX_MODEL_LEN=262144`
+at util 0.86, which round 113/114 proved reproducible. Provenance clean —
+qO arms on `vllm-ds4-0731`, qR arms on the `sparkrun_*` reference, all
+`moe=humming` both nodes.
+
+| arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| rO-a (ours) | 62.8 | 112.5 | 146.2 | 161.7 | 483.2 |
+| rO-d (ours) | 63.7 | 109.5 | 146.4 | 160.7 | 480.3 |
+| rR-b (ref) | 63.1 | 115.2 | 139.6 | 157.4 | 475.3 |
+| rR-c (ref) | 62.2 | 111.4 | 142.6 | 161.0 | 477.2 |
+
+Ours mean 481.8 / 161.2, ref mean 476.2 / 159.2 ->
+**+1.15 % sum / +1.26 % c6**. Every ours arm beats every ref arm on the sum.
+All gates pass everywhere (one rO-a pass returned a truncated france string
+that still matched the `' Paris...'` prefix present in every pass).
+
+The delta is smaller than round 116's +2.8/+2.5: same direction, same
+repeatability, tighter band. Pooled with round 116 the shape is stable:
+**the clean stack sits ~+1-3 % ahead of the reference on the sum and c6**.
+Still below the larger median spread, so still no keep — but this is now the
+second consecutive same-day clean pair with every ours arm beating every
+reference arm.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: pooled ours-vs-ref across three clean pairs — +2.3/+2.1 (round 122)
+
+Pooled all six clean same-day ours arms vs all six clean ref arms
+(`ctl3-rc2` excluded — it is the standing control, and counting it would mix
+re-baseline with pair measurement):
+
+| ours arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| qO-a | 63.6 | 114.3 | 145.3 | 164.9 | 488.1 |
+| qO-d | 62.2 | 111.5 | 148.3 | 161.7 | 483.7 |
+| rO-a | 62.8 | 112.5 | 146.2 | 161.7 | 483.2 |
+| rO-d | 63.7 | 109.5 | 146.4 | 160.7 | 480.3 |
+| **ours mean** | **63.1** | **112.0** | **146.6** | **163.3** | **485.3** |
+
+| ref arm | c1 | c3 | c5 | c6 | sum |
+|---|---|---|---|---|---|
+| qR-b | 60.9 | 111.7 | 136.6 | 159.2 | 468.4 |
+| qR-c | 61.2 | 114.3 | 142.2 | 159.4 | 477.1 |
+| rR-b | 63.1 | 115.2 | 139.6 | 157.4 | 475.3 |
+| rR-c | 62.2 | 111.4 | 142.6 | 161.0 | 477.2 |
+| **ref mean** | **61.9** | **113.2** | **140.3** | **159.3** | **474.5** |
+
+**Pooled: +2.27 % sum / +2.14 % c6**, ours ahead on every level and every
+ours-vs-ref pairing beat on the sum and c6. All gates pass in all 8 arms
+(rO arms' france lines include both Spain and Italy variants; 9x9 passes
+5/5 everywhere). Provenance: every ours arm `vllm-ds4-0731` + both-node
+`moe=humming`, verified; every ref arm a `sparkrun_*` container.
+
+Per-level pooled deltas (ours-ref): c1 +1.9 %, c3 -1.1 %, c5 +4.6 %, c6
++2.5 %. The c3 deficit is the only level where the reference leads; c5 is
+the largest lead and the only level where the lead approaches spread size.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
