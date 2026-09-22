@@ -11755,3 +11755,22 @@ session.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-arm c6 ranges overlap — the beat is mean-shift, not separation (round 143)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only, honest footnote to the round-136/137 distribution story:
+per-arm c6 pass means and ranges. Ours: qO-a 163.2 (158.7-165.4), qO-d 162.5
+(157.6-168.4), rO-a 161.5 (156.4-165.7), rO-d 159.9 (155.6-161.9). Reference:
+qR-b 158.8 (155.2-162.8), qR-c 160.2 (157.0-162.9), rR-b 157.8 (154.7-160.8),
+rR-c 160.5 (156.1-164.6). Every arm's range overlaps every other arm's —
+no single 5-pass arm separates from any other, which is exactly what the
+round-138 per-pair t-tests said (only qO-a vs qR-b certifies alone). The
+beat exists only as a mean shift across the pooled 20+20 (+2.44, t=2.54),
+not as arm-level separation. This bounds the claim precisely: real and
+significant in aggregate, invisible in any single pair. Nothing moves the
+keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
