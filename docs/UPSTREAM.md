@@ -12266,3 +12266,15 @@ its job at every depth. Means differ by +2.8 to +3.7 with matched decay:
 ours accept more at fixed depth, same falloff. Nothing moves the keep
 verdict.
 
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: ledger steady fifth time at 211, tree clean (round 173)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Housekeeping only: ledger regenerates to 211 guarded / 0 superseded with
+zero diff, all key medians present locally, working tree clean. Sixth quiet
+round with no upstream movement and no new measurement. Standing remains
+`ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
+
