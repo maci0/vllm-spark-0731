@@ -11290,3 +11290,18 @@ holds at `v0.7.0rc3`.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: flashinfer v0.7.0 final exists, still not a bump candidate (round 120)
+
+vLLM still `v0.30.0`, all deps except FlashInfer still at the pin, our four
+PRs still OPEN MERGEABLE BLOCKED with no rebase or merge. **FlashInfer now has
+a final tag, `v0.7.0`** (pin: `v0.7.0rc3`). The rc4→final diff is one file,
+`version.txt` only. The rc3→final diff is 14 files: `version.txt`,
+`kda_decode_wy_output_only.py`, and the same doc/topk/`cub_topk`/`mnnvl`/
+trtllm-alltoall content already ruled out for rc4. The only runtime-adjacent
+addition is `flashinfer/kda_kernels/kda_decode_wy_output_only.py` — a KDA
+attention path the serving code never imports (no `flashinfer.kda` use in
+overlays, probes, or `patches/assert_image.py`'s dispatch checks). Pin holds
+at `v0.7.0rc3`.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
