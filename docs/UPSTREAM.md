@@ -12038,3 +12038,17 @@ the keep verdict; the measurement stands as clean.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: protocol compliance re-verified on current files (round 157)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-156 audit re-run against current files (nothing
+has changed on disk since, but the claim deserves a fresh read, not a
+citation). Same prompt both engines, all 160 blocks full 512 tokens, health
+200 first poll on all 5 passes per arm, `vllm-ds4-0731` on all four ours
+arms and `sparkrun_*` on all four ref arms. Unchanged: the beat is
+engine-only. Nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
