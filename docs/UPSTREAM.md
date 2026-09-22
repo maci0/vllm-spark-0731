@@ -12250,3 +12250,19 @@ zero diff, all 10 key medians present locally, working tree clean. Fifth
 quiet round with no upstream movement and no new measurement. Standing
 remains `ctl3-rc2` (491.0/164.3); beat +2.0/+1.9 pooled, no keep.
 
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: shared-position acceptance with stdevs — same decay slope both sides (round 172)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-166 shared-position means re-read with stdevs
+(all blocks, p0-p5 only). qO-a 61.2±18.99 vs qR-b 57.4±20.11; qO-d 60.7±18.87
+vs qR-c 57.3±19.88; rO-a 61.2±18.08 vs rR-b 58.4±19.44; rO-d 60.7±18.73 vs
+rR-c 57.6±19.67. The ~19-point stdevs are the p0→p5 decay slope itself
+(89→36), identical shape both sides — not noise but the draft tree doing
+its job at every depth. Means differ by +2.8 to +3.7 with matched decay:
+ours accept more at fixed depth, same falloff. Nothing moves the keep
+verdict.
+
