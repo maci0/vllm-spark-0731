@@ -12226,3 +12226,17 @@ raw per-stream rate. Nothing moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: protocol re-verified a sixth time — routine unbroken (round 170)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the compliance audit re-read a sixth time against current
+files. Same prompt both engines, all 160 blocks full 512 tokens (zero
+truncations), health 200 first poll on all 5 passes per arm, `vllm-ds4-0731`
+on all four ours arms, `sparkrun_*` on all four ref arms. Six consecutive
+rounds certify identical inputs without exception. The beat is engine-only;
+nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
