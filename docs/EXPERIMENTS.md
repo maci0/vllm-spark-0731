@@ -225,6 +225,7 @@ generations, levels 1 3 5 6, three passes, median reported per level. Both arms 
 | `proto2-mhctl` | 9.6 | 23.6 | 34.7 | 41.1 | 109.0 | 0.5 % | pass |
 | `proto2-nodspark` | 9.5 | 23.4 | 34.4 | 40.5 | 107.8 | 0.6 % | pass |
 | `nomulti` | 11.0 | 15.7 | 19.7 | 20.9 | 67.3 | 9.1 % | pass |
+| `kv1m-probe` | 8.3 | 9.5 | 9.6 | 9.6 | 37.0 | 0.0 % | pass |
 | `dglinear` | - | - | - | - | - | - | fail |
 | `lin_cutedsl` | - | - | - | - | - | - | fail |
 
@@ -3262,6 +3263,21 @@ Container `vllm-ds4-0731 Up 4 minutes`, engine `(not in the log)`, 3 passes at 5
 | 5 | 19.5 / 20.2 / 19.7 | 19.7 | 3.6 % | - | - | - |
 | 6 | 20.6 / 22.5 / 20.9 | 20.9 | 9.1 % | - | - | - |
 
+### `kv1m-probe`
+
+**Changed.** 1M-context capacity probe, minimum-footprint serve: `MAX_MODEL_LEN=1048576 GPU_MEMORY_UTILIZATION=0.90 MAX_NUM_SEQS=1 MAX_NUM_BATCHED_TOKENS=2048 DISABLE_DSPARK=1 ENFORCE_EAGER=1` plus `ARM_EXTRA_ARGS=--no-enable-flashinfer-autotune`, one pass. The 1M KV pool fits (28.08 GiB available, 5,513,451-token pool at 5.22x concurrency); two earlier full-config attempts died AFTER pool alloc in FlashInfer JIT autotune with host RAM pinned, one taking spark1 down. Autotune bypass was the fix; heuristics replace tuned tactics. Confirmed engine `v0.30.1.dev0+g9ed533eb4`.
+
+**Verdict.** **capacity milestone, not a benchmark.** 8.3 / 9.5 / 9.6 / **9.6**, gates pass. No speculation, no graphs, one sequence, so ~10 tok/s is a floor measurement. Restoring k=6 + graphs at this KV is separate work. Standing beat/keep logic untouched.
+
+Container `vllm-ds4-0731 Up 5 minutes`, engine `v0.30.1.dev0+g9ed533eb4`, 1 passes at 512 tokens, started 2026-09-22T17:44:06+08:00.
+
+| level | passes | median | spread | tokens/step | accept % | wall s |
+|---|---|---|---|---|---|---|
+| 1 | 8.3 | 8.3 | 0.0 % | - | - | - |
+| 3 | 9.5 | 9.5 | 0.0 % | - | - | - |
+| 5 | 9.6 | 9.6 | 0.0 % | - | - | - |
+| 6 | 9.6 | 9.6 | 0.0 % | - | - | - |
+
 ### `dglinear`
 
 **Changed.** `LINEAR_BACKEND=auto`, which selects `DeepGemmFp8BlockScaledMMKernel`, the kernel the reference uses for its fp8 linears
@@ -4297,5 +4313,5 @@ python3 scripts/experiment-ledger.py
 ```
 
 Reads every `outputs/driver/**/*.median.log` (valid arms are flat, superseded arms are in `superseded/`, one-off instrument output is in `one-off/`) and the highest-numbered `*-<N>.meter.txt` beside each, and writes this file plus `outputs/experiments.json`.
-As of the last run: 211 guarded arms, 0 superseded, 70 failed.
+As of the last run: 212 guarded arms, 0 superseded, 70 failed.
 

@@ -13231,3 +13231,35 @@ no speculation and no graphs; restoring k=6 + graphs at a proven KV is
 separate work. Standing beat/keep logic is untouched.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-22: standing result — 1M serves, 2M pool fits; squeeze table
+
+**Standing: 1M context serves** (`kv1m-probe`, 8.3/9.5/9.6/9.6, gates pass).
+**2M aggregate pool fits** (2,072,844 tokens at 1.98x, engine healthy) but
+4×512k concurrent prefill OOM-rebooted spark1 twice — prefill scratch, not
+pool, is the wall.
+
+Measured memory anatomy (121 GB unified box, idle free ~117 GiB):
+
+- Weights (fixed): **79.3 GiB**
+- Pool (implied from 28.08 GiB → 5,513,451 tokens): **5,469 B/token** →
+  1M = 5.3, 2M = 10.7, 4M = 21.4 GiB
+- Prefill scratch: **~3-4 GiB per 512k stream** (bounded from the death:
+  ~105 GiB committed when 4 streams died)
+- Graphs + speculative (full config): ~2-4 GiB (1M full-config died at
+  autotune; stripped lived)
+
+Squeeze headroom (weights + pool + prefill vs ~115 usable):
+
+| config | total | verdict |
+|---|---|---|
+| 1M pool + 1 seq | 88.1 GiB | FITS (proven: serves) |
+| 2M pool + 1 seq | 93.5 GiB | FITS on paper (pool proven, serve untested) |
+| 2M pool + 2 seq | 97.0 GiB | FITS on paper |
+| 4M pool + 1 seq | 104.2 GiB | FITS on paper, needs YARN-32 (native cap is 1M) |
+
+Untested beyond 1M serve. Next probes in order: 2M sequential prefill
+(one 512k stream at a time), then 4M pool behind a YARN-32 override.
+Neither changes the pin; the pin default stays 262144.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.

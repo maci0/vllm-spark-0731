@@ -639,6 +639,21 @@ NOTES: dict[str, tuple[str, str]] = {
         "(485.9 / 162.2) still -11.6 % / -9.5 %. Standing arm remains "
         "`proto2-030-rc2`.",
     ),
+    "kv1m-probe": (
+        "1M-context capacity probe, minimum-footprint serve: "
+        "`MAX_MODEL_LEN=1048576 GPU_MEMORY_UTILIZATION=0.90 MAX_NUM_SEQS=1 "
+        "MAX_NUM_BATCHED_TOKENS=2048 DISABLE_DSPARK=1 ENFORCE_EAGER=1` plus "
+        "`ARM_EXTRA_ARGS=--no-enable-flashinfer-autotune`, one pass. The 1M "
+        "KV pool fits (28.08 GiB available, 5,513,451-token pool at 5.22x "
+        "concurrency); two earlier full-config attempts died AFTER pool "
+        "alloc in FlashInfer JIT autotune with host RAM pinned, one taking "
+        "spark1 down. Autotune bypass was the fix; heuristics replace tuned "
+        "tactics. Confirmed engine `v0.30.1.dev0+g9ed533eb4`.",
+        "**capacity milestone, not a benchmark.** 8.3 / 9.5 / 9.6 / **9.6**, "
+        "gates pass. No speculation, no graphs, one sequence, so ~10 tok/s "
+        "is a floor measurement. Restoring k=6 + graphs at this KV is "
+        "separate work. Standing beat/keep logic untouched.",
+    ),
     "kvblnhc-rc2": (
         "`proto2-030-rc2` plus `SERVE_EXTRA_ENV=VLLM_KV_CACHE_LAYOUT=BLNHC`. "
         "One variable: the other legal layout vs standing auto BLHNC. "
