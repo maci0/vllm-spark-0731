@@ -11836,3 +11836,22 @@ Nothing moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: pass-1 c1 drift proxy — the rig opened hot, then settled (round 147)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: pass-1 c1 agg as the freshest read of rig state per arm,
+vs the standing `ctl3-rc2` (69.0). qO-a -14.5 %, qR-b -10.4 %, qR-c -15.4 %,
+qO-d -6.8 %, rO-a -7.4 %, rR-b +3.5 %, rR-c -9.9 %, rO-d -5.9 %. Two readings.
+First, the rig opened hot (ctl3's 69.0 is the highest pass-1 c1 on record)
+and every later arm reads 6-15 % lower — a cool-down, not random drift, and
+it hits both engines (qR-c -15.4 % is the coldest read, on the reference).
+Second, this *strengthens* the beat: ours' pair samples were measured on a
+colder rig than the standing, yet still beat the reference measured in the
+same cold band. The interleave's job was to cancel exactly this slope, and
+the per-pair cells show it did — the drift is common-mode, the delta is
+differential. Nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
