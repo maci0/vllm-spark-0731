@@ -11387,3 +11387,22 @@ resolved first. No bump; the hold stands.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: extended pool with both ref re-baselines — +1.5/+1.6 (round 126)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; round-125 tokenspeed hold stands.
+
+New measurement this round is arithmetic, not a new arm: the round-122 pool
+covered only the four pair-sampled reference arms. The ledger also holds two
+clean same-window reference re-baselines (`refg-now` 483.9/161.2, 09-21;
+`refg-rc2b` 485.9/162.2). Adding both to the ref side (5 ours incl. `ctl3-rc2`
+vs 6 ref) gives: c1 +1.1 %, c3 -1.0 %, c5 +3.7 %, c6 **+1.6 %**, sum
+**+1.5 %**. Every ours arm still beats every pair-sampled ref arm on the sum;
+the two ref re-baselines (483.9, 485.9) sit above our weakest pair sample
+(480.3) but below our mean and standing. Direction unchanged across all 11
+arms: ours lead the sum in 4 of 4 direct same-session comparisons, and the
+pooled sign is positive under every inclusion choice tried (q-only, q+r,
+q+r+baselines). Still below the larger median spread — no keep.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
