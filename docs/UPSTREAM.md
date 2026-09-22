@@ -12129,3 +12129,19 @@ close. The contract's quality floors hold in all four cells.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: protocol re-verified a fourth time — the audit is now routine (round 163)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the compliance audit re-read a fourth time against current
+files. Same prompt both engines, all 160 blocks full 512 tokens (zero
+truncations), health 200 first poll on all 5 passes per arm, `vllm-ds4-0731`
+on all four ours arms, `sparkrun_*` on all four ref arms. Four consecutive
+rounds certify identical inputs; the audit is now routine rather than
+discovery, which is the point — protocol compliance has become a standing
+fact of the record, re-verified rather than assumed. The beat is
+engine-only; nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
