@@ -11897,3 +11897,21 @@ not manufactured by aggregation.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: sorted c6 ladders — the losing cell overlaps everywhere (round 150)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the five sorted c6 passes per arm, side by side. qO-a
+158.7-165.4 vs qR-b 155.2-162.8 (ours ahead at 4 of 5 ranks). qO-d
+157.6-168.4 vs qR-c 157.0-162.9 (ahead at 4 of 5). rO-a 156.4-165.7 vs rR-b
+154.7-160.8 (ahead at all 5). rO-d 155.6-161.9 vs rR-c 156.1-164.6 (behind
+at 4 of 5 — the coin-flip cell in rank form). The losing cell is not a
+shifted distribution but a fully overlapping one: its best pass (161.9)
+lands mid-pack of the opponent's, its worst (155.6) below. Contrast qO-a vs
+qR-b, where only the bottom ranks touch. This is the rank anatomy of
+10/25: complete overlap, no separation at any quantile. The beat's three
+certifying cells each show rank dominance; the fourth shows none.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
