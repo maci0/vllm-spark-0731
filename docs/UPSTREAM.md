@@ -11733,3 +11733,25 @@ worth noting alongside the acceptance lead, not a gate failure.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: run-order trajectory — no monotonic drift inside either session (round 142)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: medians in first-pass start order (recomputed from raw
+logs), to test whether the beat is a drift artifact — a rising rig would
+hand later arms free tok/s.
+
+Session 1 (03:00-03:45): ctl3 164.3 → qO-a 164.9 → qR-b 159.2 → qR-c 159.4
+→ qO-d 161.7 at c6. Session 2 (10:10-10:44): rO-a 161.7 → rR-b 157.4 →
+rR-c 161.0 → rO-d 160.7. Ours arms bookend each session (first and last),
+so any monotonic drift would inflate one ours arm and deflate the other —
+instead both ours readings sit above both ref readings in session 1, and in
+session 2 the ref's middle readings straddle ours without trend. The only
+monotonic-looking run is ref c5 (136.6 → 142.2 → 139.6 → 142.6), which is
+the known outlier level recovering, not a rig trend (c1/c3/c6 show no
+slope). The interleave did its job: drift cannot explain the beat in either
+session.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
