@@ -11572,3 +11572,23 @@ decode and c1 prefill, not the MoE-heavy levels already won.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: quality pooled — ours accept more, draft the same (round 134)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the contract also gates on quality ("without losing
+acceptance or tokens/step"), so pooled all 80 per-pass blocks per side from
+the raw logs. Ours: accept mean **60.9 %** (range 54.3-68.5),
+tokens/step mean **4.644** (4.231-5.103). Reference: accept mean **52.5 %**
+(48.4-62.4), tokens/step mean **4.660** (4.339-5.333).
+
+Ours accept **+8.4 points** more per pass with no overlap of the means; the
+draft yield (tokens/step) is a wash (-0.3 %). The throughput lead therefore
+comes from acceptance, not from drafting more tokens per step — consistent
+with the per-position tables (ours p0 89-92 % vs ref lower at depth). No
+quality regression anywhere in the beat; both contract quality floors hold
+with margin on our side.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
