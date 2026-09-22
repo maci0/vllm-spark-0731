@@ -11677,3 +11677,22 @@ beat, same sign, power only in aggregate.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: wall-time CV — the noise lives in tok/s, not in time (round 139)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: wall-time coefficient of variation per level, all 20 blocks
+per side. Ours: c1 4.3 %, c3 4.6 %, c5 2.1 %, c6 2.0 %. Reference: c1 4.1 %,
+c3 3.7 %, c5 9.4 %, c6 1.8 %. Two readings. First, the keep-rule's
+17-25 % bars come entirely from the reference's c5 wall swing (±1.77 s on a
+18.86 s mean — the known outlying passes), while every other level on both
+sides runs at 2-5 % CV. Second, the tok/s spreads that set the bar
+(10-20 %) are 2-4x the wall CVs: the extra variance is generated when fixed
+tokens are divided by slightly varying walls — a ratio artifact, not engine
+jitter. The engines themselves tick at a few percent; the metric amplifies
+it. This does not move the keep verdict under the written rule, but it
+locates the bar's source precisely: one level, one side, one ratio.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
