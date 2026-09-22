@@ -12052,3 +12052,20 @@ engine-only. Nothing moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: ledger regeneration is a no-op — record stable at 211 guarded (round 158)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Housekeeping only, and worth recording precisely because nothing changed:
+all 12 key medians present locally (`ctl3-rc2`, `hum-k6-rc2b`, all 8 pair
+arms, both ref baselines), ledger regenerates to 211 guarded / 0 superseded
+with zero diff, working tree clean apart from this note. The measurement
+record has now been stable and complete for 16 rounds with no new arms, no
+new tags, and no PR movement — the entire round-123-158 span is
+re-analysis of a fixed, committed dataset, which is itself the provenance
+claim: every number cited in rounds 122-157 resolves to a file present in
+this repo at the pushed HEAD.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
