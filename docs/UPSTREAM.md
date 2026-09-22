@@ -12002,3 +12002,21 @@ exactly where ours lead most. No quality regression; both floors hold.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: wall time by level — the beat is tok/s, not less time (round 155)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: wall means ± stdev per level, all 20 blocks per side.
+Ours: c1 8.17±0.35, c3 13.59±0.63, c5 17.47±0.36, c6 19.00±0.39. Reference:
+c1 8.21±0.33, c3 13.60±0.51, c5 18.86±1.77, c6 19.30±0.34. Both engines take
+essentially the same wall at c1/c3/c6 (within 0.3 s); the only wall gap is
+c5, where the reference runs +1.39 s — and that gap is its own outlier
+passes (stdev 1.77 vs 0.36), the same passes behind its 17-25 % spread bar.
+So the +2 % tok/s beat is pure rate, not shorter runs: equal time, more
+accepted tokens per second, at every level. The c5 wall gap is not an
+efficiency of ours but an instability of theirs. Nothing moves the keep
+verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
