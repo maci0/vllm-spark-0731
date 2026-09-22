@@ -11855,3 +11855,28 @@ differential. Nothing moves the keep verdict.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: per-level deltas with per-level bars — c6 closest, c5 noisiest (round 148)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the keep-rule table so far used one bar per cell (the max
+spread anywhere in the two arms). Recomputed per level — each level's delta
+against that level's own larger spread:
+
+| pair | c1 | c3 | c5 | c6 |
+|---|---|---|---|---|
+| qO-a vs qR-b | +4.4/13 | +2.3/16 | +6.4/20 | +3.6/5 |
+| qO-d vs qR-c | +1.6/11 | -2.4/12 | +4.3/17 | +1.4/7 |
+| rO-a vs rR-b | -0.5/14 | -2.3/9 | +4.7/25 | +2.7/6 |
+| rO-d vs rR-c | +2.4/8 | -1.7/8 | +2.7/24 | -0.2/5 |
+
+(delta % / bar %). No level in any cell clears its own bar — closest is c6
+in qO-a vs qR-b (+3.6 vs 5), then c6 in rO-a vs rR-b (+2.7 vs 6). The c6
+column is uniformly the nearest: bars 5-7 % against deltas up to +3.6 %,
+while c1/c3/c5 bars run 8-25 %. If any future lever moves one level by
+~2 points, c6 is where the bar is thinnest — the only gate where the rule
+is within striking distance rather than an order of magnitude away.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
