@@ -12087,3 +12087,17 @@ more at every depth with the same pass-to-pass stability as the reference.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: protocol re-verified a third time — still identical inputs (round 160)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: the round-156/157 compliance audit re-read a third time
+against current files. Same prompt string both engines, all 160 blocks at
+full 512 tokens (zero truncations), health 200 first poll on all 5 passes
+per arm, `vllm-ds4-0731` on all four ours arms, `sparkrun_*` on all four ref
+arms. Three consecutive rounds now certify identical protocol inputs by
+fresh read. The beat is engine-only; nothing moves the keep verdict.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
