@@ -11795,3 +11795,24 @@ dependence on session pairing.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
 
+## 2026-09-22: median trajectory in run order — the beat is not a clock (round 145)
+
+vLLM still `v0.30.0`. Our four PRs still OPEN MERGEABLE BLOCKED, no rebase or
+merge. No dep changes; no new arms.
+
+Arithmetic only: per-level medians in first-pass start order (raw logs;
+ctl3 03:00, q-pair 03:11-03:50, r-pair 10:10-10:48). c6: 164.3 / 164.9 /
+159.2 / 159.4 / 161.7 / 161.7 / 157.4 / 161.0 / 160.7. Ours readings (O)
+never dip into the ref band in session 1 and straddle it without trend in
+session 2; ref readings never climb into ours' band in session 1. At c5 the
+ref trajectory (136.6 / 142.2 / 139.6 / 142.6) visibly recovers from its own
+outlier while ours holds flat (145.3-148.3) — the beat's anchor level is the
+stable one, the ref's gain is outlier recovery, not a trend ours must chase.
+c1 shows no slope on either side (60.9-63.7 band throughout); c3 interleaves
+without trend. If session drift drove the result, the 03:xx→10:xx gap would
+show as a level shift between the pairs; instead the pairs agree (+2.8 %
+then +1.2 %), bracketing the morning with the same sign. The beat is not a
+clock artifact.
+
+Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
