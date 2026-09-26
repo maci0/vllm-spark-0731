@@ -13263,3 +13263,55 @@ Untested beyond 1M serve. Next probes in order: 2M sequential prefill
 Neither changes the pin; the pin default stays 262144.
 
 Latest tag still `v0.30.0`. Ours still OPEN behind `pre-run-check`.
+
+## 2026-09-26: PR sweep — #53425 was conflicting, rebased and pushed
+
+Four-PR sweep against `vllm-project/vllm`. Three were clean; one was not.
+
+**#53425** (`[Bugfix][DSv4] SM12x FlashInfer sparse MLA kernel block size 64`)
+had gone `CONFLICTING / DIRTY` with the `needs-rebase` label, and its head had
+moved (2026-09-24) to add a second commit, *Break import cycle in indexer
+kernel block size lookup* (review from kitch2400). Rebased onto upstream main
+`a4eb3f25d6` (the branch had been cut from `52dd0d7562`).
+
+Two content conflicts, both resolved in the PR's favour:
+
+| file | upstream main | resolution |
+|---|---|---|
+| `models/deepseek_v4/nvidia/flashinfer_sparse.py` | re-added `get_supported_kernel_block_sizes() -> [256]` to the FlashInfer backend | deleted again — that re-add is exactly the bug the PR fixes (advertising 256 skips the SM120 kernel) |
+| `models/deepseek_v4/sparse_mla.py` | `get_supported_kernel_block_sizes(kv_cache_spec=None) -> [256]` | kept upstream's new `kv_cache_spec=None` parameter, kept the PR's `dsv4_supported_kernel_block_sizes()` body |
+
+The signature merge matters: main now calls this with a `kv_cache_spec`
+argument in `attention.py` and `composite.py` and without one in
+`platforms/interface.py`, `backend.py`, `worker/utils.py`, so the `=None`
+default is load-bearing. All four indexer subclasses in the rebased file keep
+it, and the lazy-import fix landed on `DeepseekV4IndexerBackend` unchanged.
+
+Verification performed: merge-base is exactly `origin/main`; no conflict
+markers anywhere; `ast.parse` on all four changed files; `ruff check` and
+`ruff format --check` both clean; both `Signed-off-by` trailers intact;
+`current_platform.is_device_capability_family` in the new base is
+`(capability, device_id=0)`, compatible with the helper's single-argument
+call. Pushed with `--force-with-lease`. PR is now `MERGEABLE` / `BLOCKED`
+(head `32042c72e912`).
+
+**Honest limit.** The PR's own test was *not* executed against the rebased
+head. It needs the new base's source tree, and the only image here is the
+pin (engine `v0.30.1.dev0+g9ed533eb4`); bind-mounting the three changed files
+over that older tree fails on an unrelated symbol
+(`rope_quant_attn_out` missing from `nvidia/ops/o_proj.py`), so the attempt
+was discarded rather than reported as a pass. Runtime proof needs a rebuild
+at the new base, which is the port pipeline's job, not a rebase's.
+
+**The other three need nothing:** #53522, #53271, #46716 are all
+`MERGEABLE` / `BLOCKED` with no `needs-rebase`, no failing own-CI, and no
+review comments. (#46716 had been reporting `UNKNOWN` mergeability; GitHub
+recomputed it to `MERGEABLE` during this sweep.) All four fail the same
+`pre-run-check` job, which per the standing rule is never requested.
+
+One thing could not be actioned: the stale `needs-rebase` label on #53425 is
+still set. `gh pr edit --remove-label` is refused (`maci0 does not have the
+correct permissions to execute RemoveLabelsFromLabelable`), so a maintainer or
+the label bot has to clear it.
+
+vLLM still `v0.30.0`. Rig idle, no containers. Pin unchanged.
