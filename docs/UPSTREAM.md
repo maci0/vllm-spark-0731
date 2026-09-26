@@ -13315,3 +13315,66 @@ correct permissions to execute RemoveLabelsFromLabelable`), so a maintainer or
 the label bot has to clear it.
 
 vLLM still `v0.30.0`. Rig idle, no containers. Pin unchanged.
+
+## 2026-09-26 (later): PR sweep — the actionable item was an unanswered review note
+
+Re-ran the sweep. Two mechanical moves since the rebase above: the stale
+`needs-rebase` label on #53425 cleared itself once the rebased head landed
+(a bot or maintainer removed it; my own `gh pr edit --remove-label` was
+refused, `maci0 does not have the correct permissions to execute
+RemoveLabelsFromLabelable`), and #46716 stopped reporting `UNKNOWN` and
+settled back to `MERGEABLE`. Nothing else had moved.
+
+Because GitHub's `MERGEABLE` only means "textually clean", each of the three
+stale PRs was re-checked against current `origin/main` (`7d8c5fe9a9`) to see
+whether the bug it fixes still exists or has been fixed upstream instead:
+
+| PR | upstream state on this main | still needed? |
+|---|---|---|
+| #53522 | `is_deep_gemm_supported` exists in `vllm/utils/deep_gemm.py`; the call site is still unguarded (`indexer.py:1594` is `if current_platform.is_cuda() and has_deep_gemm():`); `_should_build_paged_mqa_logits_metadata` absent | yes |
+| #53271 | `compute_sub_block_ptrs` intact with both anchors (`blocks_per_chunk == 1` fast path, `flat = all_ptrs.ravel()`); no bounds check upstream | yes |
+| #46716 | `_CPUSHMDistributed.make_group_name` still builds `f"{instance_identifier}-{unique_name}"` with no host identity; no `gethostname` anywhere in the file | yes |
+
+Cross-PR check, since #53425 and #53522 both edit
+`vllm/v1/attention/backends/mla/indexer.py`: merged the two branches together
+on a scratch branch. **Clean, no conflicts**, both changes present
+(`_should_build_paged_mqa_logits_metadata` and the lazy
+`dsv4_supported_kernel_block_sizes` import), `ruff check` and
+`ruff format --check` clean on the merged file. Scratch branch deleted.
+
+**What actually needed actioning** was not mechanical. ivanusto's comments on
+#53522 run through 2026-08-31, 09-06 and 09-07, and the last one carries a
+review note we never answered: with the gate added, `build()` returns
+`self.scheduler_metadata_buffer` unfilled on the skip path, and that buffer is
+allocated with `torch.empty`, so the newly-reachable CUDA branch returns
+uninitialised memory. The reviewer called it pre-existing, said a `zero_()`
+would be "cheap insurance", and explicitly did not hold the PR for it.
+
+Fixed in `6624a12` (`maci0/vllm`, `sm12x-indexer-paged-mqa-gate`), pushed;
+PR head is now `6624a12af2`, still `MERGEABLE`. Done at allocation
+(`torch.empty` → `torch.zeros`) rather than per decode step, because the
+gate's inputs are the frozen spec's `num_states` plus process-constant
+platform state, so the decision cannot flip between steps — the buffer is
+either always written or always left at its initial zeros. That avoids adding
+a CUDA op to the decode loop. Replied on the PR with that reasoning and an
+offer to move the zero to the skip branch if the reviewer prefers, plus the
+verification limit below.
+
+**Verification limit, stated rather than papered over.** Neither PR's own test
+could be executed here. Mounting this branch's `indexer.py` over our serving
+image (`v0.30.1.dev0+g9ed533eb4`, older than the branch base) dies at import:
+`cannot import name 'async_copy_to_gpu' from 'vllm.v1.worker.gpu.buffer_utils'`
+— the same class of failure that blocked #53425's test
+(`rope_quant_attn_out` missing). Running the test against the image's *own*
+`indexer.py` is not a valid substitute either: that tree carries our overlay
+superset, so it already has the capability-aware `[64]` from #53425
+(`assert [64] == [256]` fails) and the page64 block-table buffers
+(`AttributeError: 'DeepseekV32IndexerMetadataBuilder' object has no attribute
+'page64_block_table_buffer'`); all five cases fail for reasons unrelated to
+the gate. The commit is verified by inspection, `ast.parse`, `ruff check` and
+`ruff format --check` only. End-to-end evidence for the gate remains
+ivanusto's run on 2x GB10, which is cited in the PR thread.
+
+Standing state: all four PRs `MERGEABLE` / `BLOCKED` / `REVIEW_REQUIRED`,
+failing only `pre-run-check` (never requested). No code action left on
+#53425, #53271 or #46716. vLLM still `v0.30.0`. Pin unchanged, rig idle.
