@@ -13378,3 +13378,33 @@ ivanusto's run on 2x GB10, which is cited in the PR thread.
 Standing state: all four PRs `MERGEABLE` / `BLOCKED` / `REVIEW_REQUIRED`,
 failing only `pre-run-check` (never requested). No code action left on
 #53425, #53271 or #46716. vLLM still `v0.30.0`. Pin unchanged, rig idle.
+
+## 2026-09-26 (third sweep): nothing left to action, and here is the whole surface
+
+Re-ran the sweep. All four `MERGEABLE` / `BLOCKED` / `REVIEW_REQUIRED`. A
+momentary all-four `UNKNOWN` was GitHub's mergeability computation being
+unavailable, not a state change — it settled back to `MERGEABLE` on re-poll.
+
+Two completeness checks, because three sweeps in a row deserve an enumeration
+rather than a spot check:
+
+- `gh pr list --author maci0 --state open` on `vllm-project/vllm` returns
+  **exactly four**: #53425, #53522, #53271, #46716. There is no fifth PR
+  hiding outside the ones being tracked.
+- `maci0/vllm` has **no open PRs**. ivanusto's fold-PR (`maci0/vllm#1`, the
+  indexer gate test) is closed and its file is in #53522, as intended.
+
+Findings this pass: no conflicts, no `needs-rebase` label on any of them, no
+reviewer comment newer than the reply posted last round (my comment of
+2026-09-26T16:20 is the newest on #53522), and **zero failing checks other
+than `pre-run-check`** on all four. Mergify's three "please rebase, @maci0"
+notices on #53425 (09-01, 09-11, 09-24) are satisfied by the 09-26 rebase,
+which is why the label cleared.
+
+Deliberately not done: rebasing #53522, #53271 or #46716. All three are
+`MERGEABLE` with no conflict and no label asking for it, so force-pushing
+would invalidate review context and CI state for no benefit.
+
+So the only thing between these four and merge is maintainer review plus the
+`ready`/`pre-run-check` trigger, which the standing rule forbids requesting.
+No code action remains. vLLM still `v0.30.0`. Pin unchanged, rig idle.
