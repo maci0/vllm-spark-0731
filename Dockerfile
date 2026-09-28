@@ -15,7 +15,7 @@ FROM vllm/vllm-openai:${BASE_RELEASE}
 ARG BASE_RELEASE=v0.27.1
 ARG VLLM_RELEASE=v0.28.0rc2
 ARG B12X_VERSION=1.2.6
-ARG RECIPE_VERSION=0.2.0
+ARG RECIPE_VERSION=0.3.0
 
 LABEL org.opencontainers.image.title="vllm-spark-0731" \
       org.opencontainers.image.description="vLLM ${VLLM_RELEASE} + b12x for DeepSeek-V4-Flash-0731 on GB10" \
