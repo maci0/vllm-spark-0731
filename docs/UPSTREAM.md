@@ -13408,3 +13408,56 @@ would invalidate review context and CI state for no benefit.
 So the only thing between these four and merge is maintainer review plus the
 `ready`/`pre-run-check` trigger, which the standing rule forbids requesting.
 No code action remains. vLLM still `v0.30.0`. Pin unchanged, rig idle.
+
+## 2026-09-27: reviewer verified the zero fix independently — the argument and the memory
+
+ivanusto answered the #53522 reply on 2026-09-27 and did the thing we could
+not: ran the branch on a base that matches it. `vllm/vllm-openai:v0.30.0-aarch64`
+(135 commits ahead of the branch base `52dd0d75`, 0 behind), the PR's
+`indexer.py` hunks patched into site-packages (clean, offsets 25-31 lines),
+single GB10, sm_121, weight-free.
+
+| image | `indexer.py` sha256 | PR tests |
+|---|---|---|
+| stock v0.30.0 | `2acbc1c4fa57` | 4 failed, 3 passed |
+| v0.30.0 + `6624a12` | `be566c45a897` | **7 passed** |
+
+The stock failures are the two compress-128 call-site cases (end-to-end raises
+`attention.hpp:409: block_kv == 32 or block_kv == 64`; the line moved from 262
+in the newer DeepGEMM pin) plus the two `_should_build_paged_mqa_logits_metadata`
+cases, which fail only because the symbol is absent there.
+
+They also checked the zeroing claim directly rather than taking the invariant
+argument, and the method matters: a fresh CUDA process tends to hand back
+already-zero memory, so a plain run cannot tell `torch.empty` from
+`torch.zeros`. The probe first fills and frees 16 MiB of small-pool blocks with
+sentinel `12345` so later small allocations land on dirty memory, and the
+control is the same image with only `torch.zeros` reverted.
+
+| image | page | buffer non-zero at init | after build 1 / build 2 |
+|---|---|---|---|
+| `6624a12` | 64 states | 0 | filled by DeepGEMM (same storage) |
+| `6624a12` | 2 states | 0 | all zero / all zero |
+| gate + `torch.empty` | 64 states | 98 of 98 | filled, sentinel overwritten |
+| gate + `torch.empty` | 2 states | 98 of 98 | **98 of 98 are `12345`** / same |
+
+So the skip path really did hand stale memory downstream before this commit,
+and returns zeros after it. On the 64-state page the whole `(num_sms + 1, 2)`
+slice is overwritten, so the initial contents never matter there. They
+confirmed the three legs of the invariant independently:
+`is_deep_gemm_supported()` is `functools.cache`d, `is_cuda()` is
+process-constant, `num_states` comes from the builder's own spec, and the only
+write to the buffer is inside the gated branch — so zeroing once at `__init__`
+gives the per-step guarantee without the per-step op. **No change requested;
+zeroing stays at allocation.**
+
+**Actioned:** agreed to their offer to fold a "skip path returns zeros" check
+into `test_indexer_paged_mqa_gate.py` via a PR against
+`sm12x-indexer-paged-mqa-gate` (same mechanism as the earlier `maci0/vllm#1`
+fold). Without it `6624a12` has no test of its own. Reply posted
+(#issuecomment-5869498109); asked whether they want the probe attributed in the
+commit trailer or just the test docstring. Waiting on the fold-PR.
+
+This also closes the verification gap recorded in the previous two sections:
+the in-image limits we hit were ours, not the branch's, and the branch is
+confirmed good on a matching base.
