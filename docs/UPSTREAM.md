@@ -13461,3 +13461,57 @@ commit trailer or just the test docstring. Waiting on the fold-PR.
 This also closes the verification gap recorded in the previous two sections:
 the in-image limits we hit were ours, not the branch's, and the branch is
 confirmed good on a matching base.
+
+## 2026-09-29 to 2026-10-02: a maintainer asked for the #53271 config, and wanted the core fix
+
+First outside comment on #53271 in five weeks. Etelis, 2026-09-29:
+
+> I cannot reproduce the problem you're facing on the latest release of vLLM. Do
+> you mind sharing the config where you see that issue? About the PR itself, I'd
+> rather fix the issue from it's core rather then adding a validation. This issue
+> shouldn't occur in the first place. Was trying with DSV4 flash -- All seems to work.
+
+Both halves are answerable, and the first one turned out to be a real gap in the
+PR description: it gave the *symptom* config but not the condition that makes the
+bug reachable.
+
+**Reachability, pinned.** The sub-block arithmetic only runs when
+`blocks_per_chunk > 1`. That value is set at `gpu_worker.py:360` from the
+relationship its own comment states, `cpu_page_size = gpu_page_size *
+blocks_per_chunk`, so it exceeds 1 only when the GPU *kernel* page is smaller
+than the manager block. With the kernel page equal to the manager block,
+`blocks_per_chunk == 1` takes the fast path at line 112
+(`base_ptr + block_ids * row_stride`) and the offset math never executes — which
+is the most likely reason a DSV4-Flash run looks fine. When it does execute, the
+sub-block stride is `tensor.shape[1] // blocks_per_chunk` (line 119), which
+assumes a row splits evenly into equal unpadded kernel pages; a padded MLA page
+puts sub-block `j` at `j * page_size_bytes` instead, so the offsets walk past the
+row.
+
+Verified against current `origin/main` `f7999d2e44`: the function is unchanged,
+still `shape[1] // blocks_per_chunk`, no alignment or `page_size_bytes` use, no
+bounds check. The premise holds.
+
+**Replied** (#issuecomment-5945553433) with the flag names as main spells them now
+(`--kv-cache-dtype fp8_ds_mla`, `--block-size 256`, `--kv-offloading-size`,
+`--kv-offloading-backend native`; the v0.27.1 repro used `OffloadingConnector`
+with an `fs_python` tier), the reachability condition above, a request for the
+block and kernel sizes their run used, and agreement that the core fix is the
+right end state — deriving sub-block offsets from `MLAAttentionSpec.page_size_bytes`
+/ `alignment` rather than dividing `shape[1]`. Offered to do it as a follow-up or
+fold it in, their choice, with the honest caveat that padded-page offload cannot
+be exercised on this rig so that pointer math would ship without a run behind it.
+
+Deliberately not started yet: the core fix itself. Writing untestable pointer
+arithmetic before the maintainer answers which PR they want it in would be
+guessing at scope; the guard's own justification (the swap kernel masks against
+the declared size, not the allocation, so the mismatch can also corrupt KV
+silently rather than crash) is in the reply.
+
+**#53522:** ivanusto has not sent the skip-path test yet (`maci0/vllm` has no open
+PRs; only the earlier fold-PR, merged). A second copy of the 2026-09-26 reply
+appears at 2026-09-28T12:06:47Z — duplicate posting, harmless, left alone rather
+than deleting context from the thread.
+
+All four PRs report `UNKNOWN` mergeability again at sweep time; that has been
+transient every time it appeared and settled back to `MERGEABLE`.
