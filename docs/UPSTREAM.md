@@ -13515,3 +13515,22 @@ than deleting context from the thread.
 
 All four PRs report `UNKNOWN` mergeability again at sweep time; that has been
 transient every time it appeared and settled back to `MERGEABLE`.
+
+## 2026-10-05: sweep clean, all three stale fixes still needed on a newer main
+
+No new reviewer activity on any of the four (my 2026-10-02 reply is still the
+newest comment on #53271; ivanusto has not sent the #53522 skip-path test and
+`maci0/vllm` still has no open PRs). All four `MERGEABLE` / `BLOCKED` after the
+usual transient `UNKNOWN`.
+
+Main advanced to `0e468adb43d6`. Re-checked each stale PR's premise against it:
+
+| PR | probe on `0e468adb43d6` | verdict |
+|---|---|---|
+| #53522 | `_should_build_paged_mqa_logits_metadata` count 0; call site still `if current_platform.is_cuda() and has_deep_gemm():`, now at `indexer.py:1653` (was 1594 at `7d8c5fe9a9`, 1461 at the branch base) | still needed |
+| #53271 | `_assert_ptrs_within_tensor` count 0 | still needed |
+| #46716 | `gethostname` count 0 in `cpu_communicator.py` | still needed |
+
+Nothing to action. The line drift on #53522 is worth remembering when that one
+is finally reviewed: the anchor has moved ~200 lines since the branch was cut,
+even though GitHub reports it mergeable.
