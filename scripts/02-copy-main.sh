@@ -9,5 +9,5 @@ TAG="${1:-${IMAGE}}"
 docker image inspect "${TAG}" >/dev/null
 echo "copy ${TAG} -> spark2"
 docker save "${TAG}" | ssh spark2 docker load
-ssh spark2 docker image inspect "${TAG}" --format '{{.Id}} {{.RepoTags}} {{.Architecture}} {{.Size}}'
+ssh spark2 "docker image inspect '${TAG}' --format '{{.Id}} {{.RepoTags}} {{.Architecture}} {{.Size}}'"
 echo "copied ${TAG}"
