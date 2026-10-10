@@ -148,6 +148,7 @@ def patch_layer_profiler(vllm: Path) -> None:
         "        post_mix: torch.Tensor | None = None,\n"
         "        res_mix: torch.Tensor | None = None,\n"
         "        residual: torch.Tensor | None = None,\n"
+        "        mega_gate_metadata: MegaGateRoutingMetadata | None = None,\n"
         "    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:\n",
         "    @b12x_profile_layer\n"
         "    def forward(\n"
@@ -158,6 +159,7 @@ def patch_layer_profiler(vllm: Path) -> None:
         "        post_mix: torch.Tensor | None = None,\n"
         "        res_mix: torch.Tensor | None = None,\n"
         "        residual: torch.Tensor | None = None,\n"
+        "        mega_gate_metadata: MegaGateRoutingMetadata | None = None,\n"
         "    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:\n",
         "layer profiler decorator",
     )
@@ -447,9 +449,9 @@ def patch_region_profiler(vllm: Path) -> None:
         )
         replace_once(
             model,
-            "        x = self.ffn(x, input_ids)\n",
+            "        x = self.ffn(x, input_ids, mega_gate_metadata)\n",
             "        with b12x_profile_region(\"ffn\", x):\n"
-            "            x = self.ffn(x, input_ids)\n",
+            "            x = self.ffn(x, input_ids, mega_gate_metadata)\n",
             "region profiler ffn",
         )
 
@@ -523,26 +525,13 @@ def patch_region_profiler(vllm: Path) -> None:
     if "b12x_profile_region" not in o_proj.read_text():
         replace_once(
             o_proj,
-            "from vllm.utils.deep_gemm import fp8_einsum\n",
-            "from vllm.utils.deep_gemm import fp8_einsum\n"
+            "from vllm.utils.deep_gemm import fp8_einsum, get_tma_aligned_size\n",
+            "from vllm.utils.deep_gemm import fp8_einsum, get_tma_aligned_size\n"
             "from vllm.utils.sm12x_b12x_kernels import b12x_profile_region\n",
             "region profiler import (o_proj)",
         )
         replace_once(
             o_proj,
-            "    b12x_out = try_b12x_wo_proj(\n"
-            "        o,\n"
-            "        positions,\n"
-            "        cos_sin_cache,\n"
-            "        wo_a,\n"
-            "        wo_b,\n"
-            "        n_groups=n_groups,\n"
-            "        heads_per_group=heads_per_group,\n"
-            "        nope_dim=nope_dim,\n"
-            "        rope_dim=rope_dim,\n"
-            "        o_lora_rank=o_lora_rank,\n"
-            "    )\n",
-            "    with b12x_profile_region(\"wo_b12x\", o):\n"
             "        b12x_out = try_b12x_wo_proj(\n"
             "            o,\n"
             "            positions,\n"
@@ -555,6 +544,19 @@ def patch_region_profiler(vllm: Path) -> None:
             "            rope_dim=rope_dim,\n"
             "            o_lora_rank=o_lora_rank,\n"
             "        )\n",
+            "        with b12x_profile_region(\"wo_b12x\", o):\n"
+            "            b12x_out = try_b12x_wo_proj(\n"
+            "                o,\n"
+            "                positions,\n"
+            "                cos_sin_cache,\n"
+            "                wo_a,\n"
+            "                wo_b,\n"
+            "                n_groups=n_groups,\n"
+            "                heads_per_group=heads_per_group,\n"
+            "                nope_dim=nope_dim,\n"
+            "                rope_dim=rope_dim,\n"
+            "                o_lora_rank=o_lora_rank,\n"
+            "            )\n",
             "region profiler wo b12x call",
         )
 
@@ -1213,6 +1215,7 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         "        return MLAAttentionSpec(\n"
         "            block_size=vllm_config.cache_config.block_size,\n"
         "            num_kv_heads=1,\n"
+        "            max_tp_shards=1,\n"
         "            head_size=self.head_dim,\n"
         "            dtype=torch.uint8 if packed else self.kv_cache_torch_dtype,\n"
     )
@@ -1255,6 +1258,7 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
                 "        return MLAAttentionSpec(\n"
                 "            block_size=vllm_config.cache_config.block_size,\n"
                 "            num_kv_heads=1,\n"
+                "            max_tp_shards=1,\n"
                 "            head_size=self.head_dim,\n"
                 "            dtype=torch.uint8 if uses_fp8_ds_mla_layout else self.kv_cache_torch_dtype,\n"
                 "            tokens_per_state=self.compress_ratio,\n"
@@ -1277,10 +1281,15 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
     swa = vllm / "v1/attention/backends/mla/sparse_swa.py"
     replace_once(
         swa,
-        "        uses_fp8_ds_mla_layout = self.cache_config.cache_dtype == \"fp8_ds_mla\"\n"
+        "        uses_fp8_ds_mla_layout = self.cache_config.cache_dtype in (\n"
+        "            \"fp8_ds_mla\",\n"
+        "            \"nvfp4_ds_mla\",\n"
+        "        )\n"
         "        return SlidingWindowMLASpec(\n"
+        "            bounded_replay=self.bounded_replay,\n"
         "            block_size=self.block_size,\n"
         "            num_kv_heads=1,\n"
+        "            max_tp_shards=1,\n"
         "            head_size=self.head_dim,\n"
         "            dtype=self.dtype,\n"
         "            sliding_window=self.window_size,\n"
@@ -1293,13 +1302,15 @@ def patch_nvfp4_ds_mla(vllm: Path) -> None:
         "        packed = self.cache_config.cache_dtype in (\"fp8_ds_mla\", \"nvfp4_ds_mla\")\n"
         "        from vllm.models.deepseek_v4.attention import _dsv4_page_alignment\n"
         "        # nvfp4_ds_mla's 584B page doubles as its alignment; fp8_ds_mla keeps\n"
-        "        # upstream's packing stride.\n"
+        "        # upstream's 576B packing stride.\n"
         "        alignment = self.packed_page_alignment if packed else 512\n"
         "        if self.cache_config.cache_dtype == \"nvfp4_ds_mla\":\n"
         "            alignment = _dsv4_page_alignment(self.cache_config.cache_dtype)\n"
         "        return SlidingWindowMLASpec(\n"
+        "            bounded_replay=self.bounded_replay,\n"
         "            block_size=self.block_size,\n"
         "            num_kv_heads=1,\n"
+        "            max_tp_shards=1,\n"
         "            head_size=self.head_dim,\n"
         "            dtype=self.dtype,\n"
         "            sliding_window=self.window_size,\n"
@@ -4141,32 +4152,27 @@ def patch_o_proj_b12x(vllm: Path) -> None:
     path = vllm / "models/deepseek_v4/nvidia/ops/o_proj.py"
     replace_once(
         path,
-        "    Shared by the FlashMLA and FlashInfer CUDA backends. The attention\n"
-        "    layer selects the recipe at initialization.\n"
-        "    \"\"\"\n"
         "    use_fp8 = wo_a.weight.dtype == torch.float8_e4m3fn\n"
-        "    o_proj_input, o_scale = fused_inv_rope_fp8_quant(\n",
-        "    Shared by the FlashMLA and FlashInfer CUDA backends. The attention\n"
-        "    layer selects the recipe at initialization.\n"
-        "    \"\"\"\n"
-        "    from vllm.utils.sm12x_b12x_kernels import try_b12x_wo_proj\n"
+        "    if isinstance(o, QuantizedActivation):\n",
+        "    if not isinstance(o, QuantizedActivation):\n"
+        "        from vllm.utils.sm12x_b12x_kernels import try_b12x_wo_proj\n"
         "\n"
-        "    b12x_out = try_b12x_wo_proj(\n"
-        "        o,\n"
-        "        positions,\n"
-        "        cos_sin_cache,\n"
-        "        wo_a,\n"
-        "        wo_b,\n"
-        "        n_groups=n_groups,\n"
-        "        heads_per_group=heads_per_group,\n"
-        "        nope_dim=nope_dim,\n"
-        "        rope_dim=rope_dim,\n"
-        "        o_lora_rank=o_lora_rank,\n"
-        "    )\n"
-        "    if b12x_out is not None:\n"
-        "        return b12x_out\n"
+        "        b12x_out = try_b12x_wo_proj(\n"
+        "            o,\n"
+        "            positions,\n"
+        "            cos_sin_cache,\n"
+        "            wo_a,\n"
+        "            wo_b,\n"
+        "            n_groups=n_groups,\n"
+        "            heads_per_group=heads_per_group,\n"
+        "            nope_dim=nope_dim,\n"
+        "            rope_dim=rope_dim,\n"
+        "            o_lora_rank=o_lora_rank,\n"
+        "        )\n"
+        "        if b12x_out is not None:\n"
+        "            return b12x_out\n"
         "    use_fp8 = wo_a.weight.dtype == torch.float8_e4m3fn\n"
-        "    o_proj_input, o_scale = fused_inv_rope_fp8_quant(\n",
+        "    if isinstance(o, QuantizedActivation):\n",
         "deep_gemm_fp8_o_proj b12x WO projection",
     )
 
