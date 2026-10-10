@@ -13534,3 +13534,53 @@ Main advanced to `0e468adb43d6`. Re-checked each stale PR's premise against it:
 Nothing to action. The line drift on #53522 is worth remembering when that one
 is finally reviewed: the anchor has moved ~200 lines since the branch was cut,
 even though GitHub reports it mergeable.
+
+## 2026-10-11: port to vLLM v0.31.0 built and self-verified; serving blocked on a busy rig
+
+`v0.31.0` = `db9527a46873`. Overlay scan on a clean tree is **FAIL=0,
+applied=43, no-op=12, total=55**, the same shape as v0.30.0, and the image is
+built: `vllm-spark-0731:main-031-0` = `sha256:f0fbbc4bc931`, 29.4 GB, copied
+to spark2 with a matching id.
+
+Five things had moved and were fixed. The first four are overlay needles, the
+last two are not visible to `port_scan` at all:
+
+| what | fix |
+|---|---|
+| DSV4 MLA specs gained `max_tp_shards` in v0.31.0 | added to both needles and the shared replacement (`patches/apply_overlays.py`) |
+| SWA now accepts `nvfp4_ds_mla` upstream | needle updated; we only override `alignment` to 584 for nvfp4 now, since the dtype acceptance is upstreamed |
+| decoder layer `forward` grew `mega_gate_metadata` | added to the layer-profiler needle |
+| `o_proj` gained a `QuantizedActivation` branch, and `deep_gemm` import grew `get_tma_aligned_size` | needles updated; the b12x WO fast path is now gated on a plain-tensor input |
+| `use_existing_torch.py` moved out of the repo root (`#58572`) | `docker/Dockerfile.main` calls `tools/use_existing_torch.py`; the script is byte-identical and globs relative to cwd `/opt/vllm`, so only the path changed |
+| `pr-53425.diff` was cut against an older base | regenerated against v0.31.0 (see below) |
+
+The `pr-53425.diff` failure is worth recording because it was silent in a
+specific way. On v0.31.0 upstream had already added the `kv_cache_spec`
+parameter and moved the import block, so `patch --forward -N` applied the
+import hunk (dropping `MultipleOf`) and failed the method hunk. Partial
+application left `flashinfer_sparse.py` annotating a method with a name that
+was no longer imported, and the overlay build died at `assert_image` time with
+`NameError: name 'MultipleOf' is not defined`, not at patch time. Regenerated
+from the two PR commits cherry-picked onto v0.31.0; it now applies with rc=0
+and leaves the file self-consistent (the FlashInfer override is gone, the
+backend inherits `dsv4_supported_kernel_block_sizes`).
+
+`pr-53055.diff` also returns rc=1 on v0.31.0, but that one is benign and
+pre-existing: its `mhc/tilelang.py` hunk is already upstream (v0.31.0 hoists
+`is_deep_gemm_supported` at lines 123 and 338), and its `cutlass.py` hunk
+still applies. Rejects are left in `/opt/vllm` as `.rej`/`.orig` files, which
+is untidy but has no runtime effect.
+
+**Blocker, not ours to clear.** The rig is running two other jobs, started
+22:53:30 the same day: `screen -dmS train4096` on spark1 (`scratch_dgx.py`,
+`LEN=16384`) and `screen -dmS train2048` on spark2, holding ~61 GiB and
+~38 GiB of unified memory. The serve needs about 102 GiB free per node at
+`GPU_MEMORY_UTILIZATION=0.8389` and refuses:
+
+`ValueError: Free memory on device cuda:0 (52.7/121.69 GiB) on startup is less than desired GPU memory`
+
+Nothing about that is a porting defect. No reboot and no kill was attempted.
+So the image is built and in-image self-verified (the build's chained
+`apply_overlays && assert_image` RUN imports the DSV4 model tree and passed),
+but the France/Paris gate and the re-baseline cannot run until those jobs
+finish or are stopped.
