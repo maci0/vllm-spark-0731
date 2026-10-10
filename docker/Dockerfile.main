@@ -217,7 +217,7 @@ RUN --mount=type=cache,id=ccache,target=/root/.ccache \
     cd /opt/vllm; \
     python3 /opt/spark-0731/pin_cutlass_dsl.py "${CUTLASS_DSL_VERSION}" \
       --expected-count 1 requirements/cuda.txt; \
-    python3 use_existing_torch.py; \
+    python3 tools/use_existing_torch.py; \
     sed -i '/flashinfer/d' requirements/cuda.txt; \
     PINNED_TORCH="$(python3 -c 'import torch; print(torch.__version__)')"; \
     printf '%s\n' \
