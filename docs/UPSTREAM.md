@@ -13584,3 +13584,75 @@ So the image is built and in-image self-verified (the build's chained
 `apply_overlays && assert_image` RUN imports the DSV4 model tree and passed),
 but the France/Paris gate and the re-baseline cannot run until those jobs
 finish or are stopped.
+
+## 2026-10-11: port to vLLM v0.31.1rc0, and #53522 review actioned
+
+`v0.31.1rc0` = `e37e51dd246c`, 466 commits ahead of the v0.31.0 final, which is
+a much bigger delta than the last port and moved only one overlay needle
+family.
+
+**The needle.** In the indexer metadata builder's `__init__`, v0.31.1rc0 moved
+the `# KV compression` comment and the `compress_ratio` assignment earlier and
+put a DCP interleave check directly after `scheduler_metadata_buffer`. Both
+page64 needles are anchored on that trailing comment, so they lost their
+context, and the replacement could not re-emit it. Added `RC_OLD`, `RC_NEW` and
+`RC_SKIP` variants beside the v0.31.0 ones, sharing an
+`_INDEXER_PAGE64_BUFFER_RC_TAIL` constant, rather than rewriting the existing
+pair: a `replace_one_of` list tries each in turn, so both bases keep working.
+
+Scan on a clean v0.31.1rc0 tree: **FAIL=0, applied=43, no-op=12, total=55**,
+the same shape as v0.30.0 and v0.31.0. All 27 patched files compile.
+`pr-47988`, `pr-53425` and `pr-53522` apply clean; `pr-53055` again rejects only
+its mhc hunk, which is already upstream. `setup.py` and
+`tools/use_existing_torch.py` are both still where `docker/Dockerfile.main`
+expects, so the Dockerfile needed no change this time. Pin moved to
+`VLLM_REF=e37e51dd246c`, `IMAGE=vllm-spark-0731:main-031-1rc0`
+(`configs/examples/port-v0.31.1rc0.sh`); phase 1 is building.
+
+One RC commit is worth watching at serve time: `3403e0f176` "Persist FlashInfer
+autotune cache per rank to fix the rank-0-only cache-hit deadlock (#57635)".
+That is the area that wedged the 1M-context attempts, so the behaviour there
+may have changed.
+
+**#53522 review.** michael-gpu posted two findings from an independent survey of
+the `has_deep_gemm()` sites. Both hold, and the first is now fixed.
+
+1. A decode-path twin of the gated site was added by #57443 after this PR's
+   base, with the same unguarded predicate and the same `num_states` argument.
+   Resolved by rebasing the branch onto current main `c85616efc6f0` (no
+   conflicts) and pointing the decode site at
+   `_should_build_paged_mqa_logits_metadata` too. Verified the other three
+   `has_deep_gemm()` uses in that file are capability predicates, not metadata
+   builds. Pushed as `fc493b1f90`; PR head is now `fc493b1f90`, still
+   MERGEABLE.
+2. The consumer is not gated. Traced and confirmed: `has_deep_gemm()` is
+   `vllm/utils/import_utils.py:512`, package availability only; `_lazy_init()`
+   early-returns on it alone and never consults arch; `VLLM_USE_DEEP_GEMM` is
+   declared in `envs.py` but never read in `vllm/utils/deep_gemm.py`; the
+   `fp8_fp4_paged_mqa_logits` wrapper only checks that its impl is bound. So on
+   an unsupported arch with the package installed, or with the kill switch off,
+   the forward call still runs and a producer-only gate moves the failure
+   instead of removing it. Replied with that evidence, noted the citations have
+   moved (`vllm/model_executor/layers/sparse_attn_indexer.py:729`, plus a second
+   caller at `vllm/models/glm5next/nvidia/sparse_indexer.py:582`), and said
+   plainly that whether the kernel tolerates a zeroed schedule metadata for a
+   2-state page needs a run, not a reading. Offered to build the companion
+   guard as its own PR rather than widening this one, since changing the
+   wrapper's arch and env behaviour affects every caller including GLM5.
+
+Not done: no test for the decode site. Extending the existing gate test to
+`update_draft_decode_metadata` needs the draft metadata path stood up and a
+CUDA runner, and stating that is better than shipping a test that has never
+executed.
+
+**Overlay deletion candidates, not acted on.** The 12 no-ops include seven that
+say "already upstream" (`patch_envs`, `patch_moe_backend`, `patch_utils_b12x`,
+`patch_mxfp4_oracle`, `patch_mxfp4_process_weights`, `patch_mhc`,
+`patch_triton_e8m0_sm12x`), so those overlays are redundant on this base. Three
+others (`patch_dsv4_sm12x_block_size`, `patch_indexer_deepgemm_guard`,
+`patch_mqa_paged_cudagraph_safe`) are no-ops only because the matching
+`pr-*.diff` or an earlier overlay already applied. The two flashinfer ones skip
+because `flashinfer/` is not in the scanned tree, not because they are
+obsolete. Deleting the redundant seven is provenance hygiene worth doing, but
+it changes the build and can only be shown safe by a rebuild plus the gate, so
+it does not belong inside this port. Raised, not done.
