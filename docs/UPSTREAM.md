@@ -13743,3 +13743,47 @@ including GLM5.
 
 Rig still occupied by the two training jobs, so the RC image's France gate and
 re-baseline remain the only outstanding items of that port.
+
+## 2026-10-12: the consumer question reaches our own kernel, and our check is shape-only
+
+Following michael-gpu's finding into our own path, because our overlay replaces
+that same wrapper (`patch_mqa_paged_kernel`) and our b12x entry point takes the
+schedule:
+
+```python
+# patches/files/sm12x_b12x_kernels.py, try_paged_mqa_logits
+paged = try_paged_mqa_logits(..., schedule_metadata=schedule_metadata)
+```
+
+and inside it, when `uses_paged_schedule(...)` is true and our guard passes, the
+passed tensor becomes `sched` and is handed to b12x's
+`prepare_paged_metadata(schedule_metadata=sched, build_schedule=False)`.
+
+**Our guard does not check contents.** `_usable_b12x_schedule` tests only that
+it is int32, 2-D, last dim 2, same device, and `shape[0] >= 2`. A zeroed
+`(num_sms + 1, 2)` buffer passes all of that. So on our side the `torch.zeros`
+fix from `6624a12` makes the buffer *defined* but a zeroed schedule would still
+be accepted as valid, which is the same class of gap the reviewer found
+upstream, one layer further down.
+
+**It does not trigger in the production pin, and that is checkable.** On SM12x:
+`support_deep_gemm()` is `is_device_capability(90) or family(100) or family(120)`
+(`vllm/platforms/cuda.py:689`), so family 120 is true; `VLLM_USE_DEEP_GEMM`
+defaults to 1; the package is present; and the indexer group's `num_states` is
+64 (compress_ratio 4 over a 256 manager block), which is in (32, 64). The gate
+therefore passes and a real schedule is built. The exposure needs a declined
+gate *with* the consumer still running: the env-switch case, or a 2-state page
+reaching this call, and whether the latter happens on our stack is what source
+reading could not settle before and the occupied rig cannot measure now.
+
+**Proposed hardening, not applied.** Give `_usable_b12x_schedule` a content
+check so an all-zero schedule is rejected, which drops us into the existing
+`elif need_sched:` branch that trims the page table and skips the schedule. It
+is our file and a small diff, but it sits on the decode hot path and can only be
+landed after a throughput check, and the rig is busy with someone else's jobs. A
+zeroed schedule is also not unambiguously invalid in general, so the check is a
+heuristic and would need that run behind it. Flagged rather than guessed.
+
+This is the same failure shape the reviewer identified upstream: a producer that
+declines while the consumer proceeds. Their case needs the shared predicate;
+ours needs its consumer-side check to look at contents, not just shape.
