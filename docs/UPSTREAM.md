@@ -13694,3 +13694,52 @@ All four of our PRs remain unmerged and unimplemented upstream in this RC:
 `dsv4_supported_kernel_block_sizes`, `_should_build_paged_mqa_logits_metadata`,
 `_assert_ptrs_within_tensor` and a host-aware SHM group name are all still
 absent from `v0.31.1rc0`.
+
+## 2026-10-12: #53522 consumer question settled by the reviewer, with a scope correction
+
+michael-gpu ran the experiment and read the forward kernel's host assert
+(`csrc/apis/attention.hpp:201`):
+
+```
+(arch_major == 10 and (block_kv == 32 or block_kv == 64 or block_kv == 128))
+or (arch_major == 9 and block_kv == 64)
+```
+
+Their result, on SM80 with DeepGEMM HEAD `057ca59`:
+
+- Pre-Hopper with the package installed: the forward call raises a clean host
+  assert for any `block_kv`, zeroed skip-path buffer included. No IMA, no
+  garbage logits. The failure moves from the metadata build to a clean assert.
+- `block_kv == 2` matches no branch on any arch, so a declined compress-128
+  config also asserts cleanly at forward on SM90/100/120 before it reads the
+  metadata. That half needs no run from us.
+- The one path that does reach the kernel with declined metadata is the
+  divergent-predicate one: kernel-valid geometry while the gate declined, which
+  in practice is `VLLM_USE_DEEP_GEMM=0`. There the assert passes and the kernel
+  schedules from an unfilled buffer.
+
+Verified the mechanism here: `is_deep_gemm_supported()` is
+`current_platform.support_deep_gemm() and envs.VLLM_USE_DEEP_GEMM and
+has_deep_gemm()` (`vllm/utils/deep_gemm.py:110`) and our gate calls it, so the
+producer is env-aware while the consumer wrapper checks only that its impl is
+bound. The two disagree on exactly the env switch. Their scope reduction is
+correct and I accepted it.
+
+**Corrected our own claim.** The disjunction has no `arch_major == 12` branch,
+and our rig is SM12x, so the DeepEPP consumer path the assert governs is not
+what runs here: our overlay set patches the same wrapper to try the b12x
+page-64 paged kernel first (`patch_mqa_paged_kernel`), and that is what our
+stack reaches. The GB10 compress-128 run I offered would exercise that kernel,
+not the consumer in question, so it is withdrawn as evidence for this question
+rather than reported as a run that does not cover it. It remains a valid gate
+run for our own build.
+
+**Agreed next steps.** They will write the `update_draft_decode_metadata` gate
+test against our branch and send it as a PR, which I will fold in and run what I
+can. I will draft the companion guard as its own PR, scoped to the
+divergent-predicate path, preferring one shared predicate over two that must
+agree, and asked which shape they would accept since it touches every caller
+including GLM5.
+
+Rig still occupied by the two training jobs, so the RC image's France gate and
+re-baseline remain the only outstanding items of that port.
