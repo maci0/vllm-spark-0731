@@ -5,18 +5,21 @@ Authoritative provenance for the current serving pin. The pin file
 is the pinned tag; this document is a single-summary copy of exactly what the
 `vllm-spark-0731:main-031-1rc0` image contains and what the protocol serves.
 
-Status of this pin: the overlay scan on a clean tree is FAIL=0 and phase 1 is
-building. The image sha, the in-image version and the deps table below are
-**not yet measured for this pin**; the runtime table is still the `v0.30.0`
-image's contents, and every serving number belongs to that pin until a
-re-baseline is recorded. The France/Paris gate has not run.
+Status of this pin: the overlay scan on a clean tree is FAIL=0, and the image
+is **built and self-verified in-build** (the overlay stage runs
+`apply_overlays` then `assert_image`, which imports the DSV4 model tree; both
+passed). The in-image `vllm.__version__` and the deps table below are **not yet
+measured for this pin**; the runtime table is still the `v0.30.0` image's
+contents, and every serving number belongs to that pin until a re-baseline is
+recorded. The France/Paris gate has not run, because the rig is occupied by
+other jobs.
 
 ## Pinned commit / image
 
 | | |
 |---|---|
 | vLLM tag | `v0.31.1rc0` (`e37e51dd246cf421c554e7d6f53e178e3fd29085`), 466 commits ahead of the `v0.31.0` final |
-| image | `vllm-spark-0731:main-031-1rc0` (sha pending; overlay on `main-031-1rc0-phase1`) |
+| image | `vllm-spark-0731:main-031-1rc0` sha `f0d20a27dfc5`, 28.8 GB (overlay on `main-031-1rc0-phase1` sha `764865bd8423`) |
 | previous pin | `v0.31.0` = `db9527a46873`, image `vllm-spark-0731:main-031-0` sha `f0fbbc4bc931`, 29.4 GB |
 | in-image `vllm.__version__` | not read (no serve run on this pin yet) |
 
