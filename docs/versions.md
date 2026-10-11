@@ -21,9 +21,34 @@ other jobs.
 | vLLM tag | `v0.31.1rc0` (`e37e51dd246cf421c554e7d6f53e178e3fd29085`), 466 commits ahead of the `v0.31.0` final |
 | image | `vllm-spark-0731:main-031-1rc0` sha `f0d20a27dfc5`, 28.8 GB (overlay on `main-031-1rc0-phase1` sha `764865bd8423`) |
 | previous pin | `v0.31.0` = `db9527a46873`, image `vllm-spark-0731:main-031-0` sha `f0fbbc4bc931`, 29.4 GB |
-| in-image `vllm.__version__` | not read (no serve run on this pin yet) |
+| in-image `vllm.__version__` | `0.31.1rc1.dev0+ge37e51dd2.d20261011` (upstream stamps rc1.dev0 ahead of the `v0.31.1rc0` tag; ref is `e37e51dd2`) |
 
 ## Runtime versions inside the image
+
+Read from `vllm-spark-0731:main-031-1rc0` with `importlib.metadata`.
+
+| | |
+|---|---|
+| torch | `2.14.1a0+git5c48869` |
+| triton | `3.7.1` |
+| CUDA toolkit | `13.3` (`V13.3.73`); base `nvidia/cuda:13.3.1-cudnn-devel-ubuntu24.04` |
+| flashinfer | `0.7.0rc3` |
+| b12x | `1.2.6` from source `B12X_REF=3a437ab516…` (code identical to the 1.3.0 wheel; see pin comment) |
+| cutlass-dsl | `4.7.0` (pinned override; do not move to 4.6.2/4.7.1) |
+| quack-kernels | `0.6.5` |
+| humming-kernels | `0.1.15` |
+| tilelang | `0.1.14` |
+| tokenspeed-mla | `0.2.8` |
+| fastsafetensors / InstantTensor / LMCache | `0.4.0`, `0.2.0`, `0.5.5` |
+| DeepEP | **not installed.** `DEEPEP_REPO`/`DEEPEP_REF` are declared in the pin but never passed as a build arg and never referenced by `docker/Dockerfile.main`, so no image here has it. Verified absent by import in `main-031-1rc0`, `main-031-0` and `main-030-0`. An earlier row on this page listed it as `v1.2.1`, which described a pin variable rather than the image. |
+
+Two provenance notes. Torch is built from `TORCH_REF=release/2.14`, a **moving
+branch**, and `TORCHVISION_REF=release/0.29` likewise, so the torch in this
+image is not reproducible from the pin: it moved from `2.14.0a0+git2b3ec34` on
+the `v0.30.0` image to `2.14.1a0+git5c48869` here with no pin change. Pinning
+those two to commits would close that gap and needs its own rebuild to verify.
+
+## Overlay set
 
 | | |
 |---|---|
