@@ -1,23 +1,23 @@
 # Versions
 
 Authoritative provenance for the current serving pin. The pin file
-(`configs/pin.main-029.env`) is the version source of truth while `v0.31.0`
+(`configs/pin.main-029.env`) is the version source of truth while `v0.31.1rc0`
 is the pinned tag; this document is a single-summary copy of exactly what the
-`vllm-spark-0731:main-031-0` image contains and what the protocol serves.
+`vllm-spark-0731:main-031-1rc0` image contains and what the protocol serves.
 
-Status of this pin: the image is **built and self-verified in-build** (the
-overlay stage runs `apply_overlays` then `assert_image`, which imports the
-DSV4 model tree). The France/Paris gate and the protocol re-baseline have
-**not** run against it, because the rig was occupied by other jobs at build
-time. Treat every serving number in this document as belonging to the
-previous `v0.30.0` pin until a re-baseline is recorded.
+Status of this pin: the overlay scan on a clean tree is FAIL=0 and phase 1 is
+building. The image sha, the in-image version and the deps table below are
+**not yet measured for this pin**; the runtime table is still the `v0.30.0`
+image's contents, and every serving number belongs to that pin until a
+re-baseline is recorded. The France/Paris gate has not run.
 
 ## Pinned commit / image
 
 | | |
 |---|---|
-| vLLM tag | `v0.31.0` (`db9527a46873454610df6dbedf79a36d6bf1a7f6`) |
-| image | `vllm-spark-0731:main-031-0` sha `f0fbbc4bc931`, 29.4 GB (overlay on `main-031-0-phase1` sha `cad0c9f17698`) |
+| vLLM tag | `v0.31.1rc0` (`e37e51dd246cf421c554e7d6f53e178e3fd29085`), 466 commits ahead of the `v0.31.0` final |
+| image | `vllm-spark-0731:main-031-1rc0` (sha pending; overlay on `main-031-1rc0-phase1`) |
+| previous pin | `v0.31.0` = `db9527a46873`, image `vllm-spark-0731:main-031-0` sha `f0fbbc4bc931`, 29.4 GB |
 | in-image `vllm.__version__` | not read (no serve run on this pin yet) |
 
 ## Runtime versions inside the image
@@ -38,17 +38,25 @@ previous `v0.30.0` pin until a re-baseline is recorded.
 
 ## Overlay set
 
-- `scripts/port_scan.py --with-upstream-patches` on a clean `v0.31.0` tree:
-  **FAIL=0, applied=43, no-op=12, total=55** (same shape as the `v0.30.0` scan).
+- `scripts/port_scan.py --with-upstream-patches` on a clean `v0.31.1rc0` tree:
+  **FAIL=0, applied=43, no-op=12, total=55**, the same shape as the `v0.31.0`
+  and `v0.30.0` scans.
+- One needle family moved with this tag: in the indexer metadata builder's
+  `__init__`, upstream (#59211) moved the `# KV compression` comment and the
+  `compress_ratio` assignment earlier and put a DCP interleave check after
+  `scheduler_metadata_buffer`. The page64 needles are anchored on that comment,
+  so `RC_OLD`/`RC_NEW`/`RC_SKIP` variants were added beside the `v0.31.0` ones.
 - Upstream patch files applied by the overlay Dockerfile (`pr-*.diff`):
   `pr-47988.diff`, `pr-53425.diff`, `pr-53522.diff`. `pr-53055.diff` returns
-  rc=1 on v0.31.0 because its `mhc/tilelang.py` hunk is already upstream;
+  rc=1 on both new tags because its `mhc/tilelang.py` hunk is already upstream;
   its `cutlass.py` hunk still applies.
 - `pr-53425.diff` was regenerated against `v0.31.0`. The previous copy applied
   only its import hunk there, which dropped `MultipleOf` while leaving the
   method that annotates with it, so the overlay build failed with `NameError`.
+  It still applies cleanly to `v0.31.1rc0`.
 - Our tracked upstream PRs: `#53425`, `#53522`, `#53271`, `#46716` — all open,
-  mergeable-blocked behind `pre-run-check`, none merged into `v0.31.0`.
+  mergeable-blocked behind `pre-run-check`, and all four still unimplemented
+  upstream in `v0.31.1rc0`; none merged.
 
 ## Serving protocol (what `drive-median.sh <tag> 3 512 1 3 5 6` measures)
 
@@ -78,6 +86,7 @@ spread) is not reachable. See `docs/GOAL-BEAT-ANEMLL.md` and `docs/UPSTREAM.md`.
 
 ## Port recipe
 
-`configs/examples/port-v0.31.0.sh` carries the steps that produced this pin:
+`configs/examples/port-v0.31.1rc0.sh` carries the steps that produced this pin:
 `check`, `scan`, `phase1`, `overlay`, `copy`, `arm`. The `arm` step is the one
-not yet run.
+not yet run. `configs/examples/port-v0.31.0.sh` is the previous pin's recipe and
+still works against the `v0.31.0` tag.
