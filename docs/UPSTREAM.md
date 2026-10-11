@@ -13656,3 +13656,41 @@ because `flashinfer/` is not in the scanned tree, not because they are
 obsolete. Deleting the redundant seven is provenance hygiene worth doing, but
 it changes the build and can only be shown safe by a rebuild plus the gate, so
 it does not belong inside this port. Raised, not done.
+
+## 2026-10-11 (later): the upstream PRs that actually bear on this port
+
+"Relevant upstream PRs" needs a definition, so here is the mechanical one:
+commits in `v0.31.0..v0.31.1rc0` that touch a file our overlay set patches.
+That is 24 of the 466 commits, and it is the set that can change our
+behaviour. The overlay target list comes from the patched RC tree (27 files).
+
+First, the two that explain this port's own changes:
+
+- **#57443** (`8bdd8d847d`, GLM 5.3 fused multi-step decode) introduced the
+  decode paged-MQA metadata site that michael-gpu flagged on #53522. That is
+  why the gate had a twin to cover.
+- **#59211** (`30d4032363`, GLM-5.3 kpool sparse indexer DCP) is what moved the
+  DCP interleave check into the indexer builder's `__init__` and displaced the
+  `# KV compression` comment, which is the needle breakage fixed above. Knowing
+  the provenance matters: the new code is not incidental, it is indexer
+  structure, so the page64 needle should keep expecting it.
+
+Then the ones with interaction risk, in order of how much they worry me:
+
+| PR | why it matters here |
+|---|---|
+| #57635 (`3403e0f176`) persisting the FlashInfer autotune cache per rank | same mechanism that wedged the 1M-context attempts (`--no-enable-flashinfer-autotune` was our workaround). The deadlock it fixes is a rank-0-only cache hit, so the behaviour on our two-node TP=2 boot may differ. Read the autotune section of any new engine log before assuming the old workaround is still needed. |
+| #55222 (`c37f86e572`) right-sizing the indexer prefill workspace | our `page64_block_table_buffer` is sized from `scheduler_config.max_num_batched_tokens` and `block_table_width`. If upstream changed the workspace sizing assumption, our buffer can be under-sized at runtime without failing the scan. Worth a shapes check at the gate. |
+| #58463 (`fcf53d240c`) removing the eager metadata rebuild in MTP fused multi-step decode | same metadata path our gate guards, so the two change the same flow. |
+| #59532 (`eb2901b735`) DSv4.1 decoder replay layers in CUDA graphs, PIECEWISE trim | the pin runs `FULL_AND_PIECEWISE` with capture size 48, and our overlays capture the DSpark backbone separately. |
+| #59927 (`4a30c4cad0`) MegaMoE shared-expert finalize independent of linear post-load order | the `mega_gate_metadata` parameter this port had to add to the layer-profiler needle comes from this area. |
+| #57652 (`5463fe4962`) KV-offloading replicated_layout detection for multi-group MLA | same module as PR #53271. Row 1 of that PR's own concern, worth re-reading for whether the bounds case still exists as described. |
+
+None of these breaks the scan: FAIL=0 already accounts for them textually. The
+risk is semantic, and the only honest place to settle it is the France gate plus
+a re-baseline on the built image, which is still blocked on the occupied rig.
+
+All four of our PRs remain unmerged and unimplemented upstream in this RC:
+`dsv4_supported_kernel_block_sizes`, `_should_build_paged_mqa_logits_metadata`,
+`_assert_ptrs_within_tensor` and a host-aware SHM group name are all still
+absent from `v0.31.1rc0`.
