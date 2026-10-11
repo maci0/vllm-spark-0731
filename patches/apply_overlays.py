@@ -3912,6 +3912,49 @@ _INDEXER_PAGE64_BUFFER_SKIP = (
     "        # KV compression. Default to 1 for no compression.\n"
 )
 
+# v0.31.1rc0 moved the "# KV compression" comment and the compress_ratio
+# assignment earlier in __init__ and put the DCP interleave check directly
+# after the metadata buffer, so the two needles above no longer match and the
+# replacement tail has to name the DCP comment instead.
+_INDEXER_PAGE64_BUFFER_RC_TAIL = (
+    "\n"
+    "        # Each compressed state must live on a single rank, so the DCP\n"
+    "        # interleave has to cover whole states.\n"
+)
+
+_INDEXER_PAGE64_BUFFER_RC_OLD = (
+    "        self.scheduler_metadata_buffer = torch.empty(\n"
+    "            (self.num_sms + 1, 2), dtype=torch.int32, device=self.device\n"
+    "        )\n" + _INDEXER_PAGE64_BUFFER_RC_TAIL
+)
+
+_INDEXER_PAGE64_BUFFER_RC_NEW = (
+    "        self.scheduler_metadata_buffer = torch.empty(\n"
+    "            (self.num_sms + 1, 2), dtype=torch.int32, device=self.device\n"
+    "        )\n"
+    "        self.page64_sub = torch.arange(4, dtype=torch.int32, device=self.device)\n"
+    "        self.page64_block_table_buffer = torch.empty(\n"
+    "            (scheduler_config.max_num_batched_tokens, block_table_width * 4),\n"
+    "            dtype=torch.int32,\n"
+    "            device=self.device,\n"
+    "        )\n" + _INDEXER_PAGE64_BUFFER_RC_TAIL
+)
+
+_INDEXER_PAGE64_BUFFER_RC_SKIP = (
+    "        self.scheduler_metadata_buffer = torch.empty(\n"
+    "            (self.num_sms + 1, 2), dtype=torch.int32, device=self.device\n"
+    "        )\n"
+    "        self.page64_sub = torch.arange(4, dtype=torch.int32, device=self.device)\n"
+    "        if int(block_table_width) * 64 < int(\n"
+    "            self.vllm_config.model_config.max_model_len\n"
+    "        ):\n"
+    "            self.page64_block_table_buffer = torch.empty(\n"
+    "                (scheduler_config.max_num_batched_tokens, block_table_width * 4),\n"
+    "                dtype=torch.int32,\n"
+    "                device=self.device,\n"
+    "            )\n" + _INDEXER_PAGE64_BUFFER_RC_TAIL
+)
+
 _INDEXER_PAGE64_EXPAND_OLD = (
     "                    schedule_metadata = self.scheduler_metadata_buffer[:0]\n"
     "\n"
@@ -3986,6 +4029,16 @@ def patch_indexer_b12x_schedule(vllm: Path) -> None:
                 _INDEXER_PAGE64_BUFFER_NEW,
                 _INDEXER_PAGE64_BUFFER_SKIP,
                 "indexer page64 skip already-64 workspace",
+            ),
+            (
+                _INDEXER_PAGE64_BUFFER_RC_OLD,
+                _INDEXER_PAGE64_BUFFER_RC_SKIP,
+                "indexer page64 block table buffer (v0.31.1rc0)",
+            ),
+            (
+                _INDEXER_PAGE64_BUFFER_RC_NEW,
+                _INDEXER_PAGE64_BUFFER_RC_SKIP,
+                "indexer page64 skip already-64 workspace (v0.31.1rc0)",
             ),
         ],
     )
