@@ -1,5 +1,7 @@
 # Handoff: 2-Node vLLM for DeepSeek-V4-Flash-0731 on DGX Spark (GB10)
 
+> **Superseded as the entry point, 2026-10-12:** [`HANDOFF-CURRENT.md`](HANDOFF-CURRENT.md).
+
 > **Historical, 8634 lines, append-only.** This was the running handoff through 2026-09-12. It is kept
 > for provenance and superseded as the entry point by [`HANDOVER.md`](HANDOVER.md), which is current
 > and short. Where this file and `HANDOVER.md` disagree, `HANDOVER.md` and

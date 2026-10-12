@@ -1,5 +1,9 @@
 # HANDOVER
 
+> **Superseded as the entry point, 2026-10-12.** Read [`HANDOFF-CURRENT.md`](HANDOFF-CURRENT.md)
+> first. This file describes the `v0.30.0rc2` pin and the compilation-regime diagnosis of
+> 2026-09-13; the pin has since moved to `v0.31.1rc0`. Kept for provenance.
+
 Written 2026-09-13 at the end of a session that took the proto-v0.1.0 work from an untrustworthy
 ledger to a measured, closed diagnosis. Read this first; the long-form record is
 `docs/UPSTREAM.md` and the accumulated history is `HANDOFF.md`.
